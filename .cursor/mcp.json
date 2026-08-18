@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "exi-engine": {
+      "command": "node",
+      "args": ["tools/exi-mcp-server.mjs"],
+      "env": {
+        "EXI_MCP_ROOT": "."
+      }
+    }
+  }
+}

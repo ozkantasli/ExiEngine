@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'">
+    <title>ExiEngine · Renderer Core</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main class="shell">
+      <section class="intro">
+        <p class="eyebrow">EXIENGINE / CORE 0.2</p>
+        <h1>Kendi çekirdeğimiz.<br><span>İki GPU yolu.</span></h1>
+        <p class="lede">Bağımlılıksız 2D oyun motoru çekirdeği: sahne, graphics, particle, input, collision ve WebGPU/WebGL2.</p>
+        <div class="controls" aria-label="Renderer seçimi">
+          <button data-renderer="auto">Auto</button>
+          <button data-renderer="webgl2">WebGL2</button>
+          <button data-renderer="webgpu">WebGPU</button>
+        </div>
+      </section>
+
+      <section class="stage-card" aria-label="ExiEngine demo">
+        <div class="stage-topline">
+          <span id="status" data-tone="neutral">Başlatılıyor…</span>
+          <span><span id="fps">— FPS</span> · <span id="draws">— DRAW</span> · <span id="nodes">— NODE</span></span>
+        </div>
+        <canvas id="game-canvas" width="960" height="540" aria-label="ExiEngine renderer çıktısı"></canvas>
+        <output id="exi-runtime" aria-label="ExiEngine runtime" hidden></output>
+        <div class="stage-foot">
+          <span>BACKEND <strong id="backend">—</strong></span>
+          <span id="asset">ASSET LOAD…</span>
+          <span id="message">Ok tuşlarıyla hareket · Space ile zoom</span>
+        </div>
+      </section>
+
+      <section class="principles">
+        <article><span>01</span><h2>Kendi çekirdek</h2><p>Scene graph, sprite, graphics, particle, kamera ve texture batch tek API üzerinden çalışır.</p></article>
+        <article><span>02</span><h2>Güvenli varsayılan</h2><p>Aynı-origin asset sınırı, boyut limitleri, CSP ve dinamik shader çalıştırmama.</p></article>
+        <article><span>03</span><h2>Ölçülebilir</h2><p>Backend, FPS, draw call, node sayısı ve collision durumu görünür.</p></article>
+      </section>
+    </main>
+    <script type="module" src="/src/demo.js"></script>
+  </body>
+</html>

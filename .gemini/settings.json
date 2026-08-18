@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "exi-engine": {
+      "command": "node",
+      "args": ["tools/exi-mcp-server.mjs"],
+      "cwd": ".",
+      "env": {
+        "EXI_MCP_ROOT": "."
+      },
+      "timeout": 360000
+    }
+  }
+}

@@ -1,0 +1,102 @@
+{
+  "gpu-streaming": {
+    "elapsedMs": 12.15,
+    "simulatedFramesPerSecond": 4939.74
+  },
+  "cpu-instanced": {
+    "elapsedMs": 57.88,
+    "simulatedFramesPerSecond": 1036.65
+  },
+  "regular-streaming": {
+    "elapsedMs": 194.49,
+    "simulatedFramesPerSecond": 308.5
+  },
+  "spatial-culling": {
+    "elapsedMs": 27.27,
+    "simulatedFramesPerSecond": 2200.15
+  },
+  "sprite-culling": {
+    "elapsedMs": null,
+    "simulatedFramesPerSecond": null
+  },
+  "graphics-culling": {
+    "elapsedMs": null,
+    "simulatedFramesPerSecond": null
+  },
+  "graphics-streaming": {
+    "elapsedMs": 0.62,
+    "simulatedFramesPerSecond": null
+  },
+  "sprite-streaming": {
+    "elapsedMs": 1.53,
+    "simulatedFramesPerSecond": null
+  },
+  "subtree-culling": {
+    "elapsedMs": null,
+    "simulatedFramesPerSecond": null
+  },
+  "transform-streaming": {
+    "elapsedMs": null,
+    "simulatedFramesPerSecond": null
+  },
+  "text-streaming": {
+    "elapsedMs": null,
+    "simulatedFramesPerSecond": null
+  },
+  "glyph-atlas": {
+    "elapsedMs": null,
+    "simulatedFramesPerSecond": null
+  },
+  "particle-streaming": {
+    "elapsedMs": 79.52,
+    "simulatedFramesPerSecond": 754.57
+  },
+  "particle-cpu-streaming": {
+    "elapsedMs": 269.87,
+    "simulatedFramesPerSecond": 222.33
+  },
+  "particle-culling": {
+    "elapsedMs": null,
+    "simulatedFramesPerSecond": null
+  },
+  "particle-gpu-culling": {
+    "elapsedMs": null,
+    "simulatedFramesPerSecond": null
+  },
+  "input-streaming": {
+    "elapsedMs": 1.53,
+    "simulatedFramesPerSecond": 78395.51
+  },
+  "pointer-dispatch": {
+    "elapsedMs": 2.88,
+    "simulatedFramesPerSecond": null
+  },
+  "tilemap-streaming": {
+    "elapsedMs": 47.85,
+    "simulatedFramesPerSecond": 1253.84
+  },
+  "tilemap-regular-streaming": {
+    "elapsedMs": 0.6,
+    "simulatedFramesPerSecond": null
+  },
+  "queue-streaming": {
+    "elapsedMs": 3.89,
+    "simulatedFramesPerSecond": 15436.07
+  },
+  "frame-scratch": {
+    "elapsedMs": 2.43,
+    "simulatedFramesPerSecond": null
+  },
+  "animation-streaming": {
+    "elapsedMs": 22.09,
+    "simulatedFramesPerSecond": 5433.5
+  },
+  "collision-query": {
+    "elapsedMs": 25.29,
+    "simulatedFramesPerSecond": 2372.79
+  },
+  "physics-streaming": {
+    "elapsedMs": 170.94,
+    "simulatedFramesPerSecond": 350.99
+  }
+}

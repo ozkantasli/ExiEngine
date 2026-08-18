@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ExiEngine hardware soak</title>
+  </head>
+  <body>
+    <main>
+      <h1>ExiEngine hardware soak</h1>
+      <p>Gerçek tarayıcı/GPU üzerinde uzun süreli renderer ve kaynak yaşam döngüsü testi.</p>
+      <label>Backend <select id="renderer"><option value="auto">Auto</option><option value="webgl2">WebGL2</option><option value="webgpu">WebGPU</option></select></label>
+      <label>Sprite <input id="sprites" type="number" min="100" max="10000" step="100" value="2000"></label>
+      <label>Süre (sn) <input id="seconds" type="number" min="1" max="600" step="1" value="30"></label>
+      <button id="start">Başlat</button>
+      <button id="loss" disabled>Manuel loss</button>
+      <pre id="output">Hazır.</pre>
+      <canvas id="canvas" width="960" height="540"></canvas>
+    </main>
+    <script type="module" src="./hardware-soak.mjs"></script>
+  </body>
+</html>

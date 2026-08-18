@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "exi-engine": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["${CLAUDE_PROJECT_DIR:-.}/tools/exi-mcp-server.mjs"],
+      "env": {
+        "EXI_MCP_ROOT": "${CLAUDE_PROJECT_DIR:-.}"
+      },
+      "timeout": 360000
+    }
+  }
+}

@@ -1,0 +1,9 @@
+[mcp_servers.exi-engine]
+command = "node"
+args = ["tools/exi-mcp-server.mjs"]
+cwd = "."
+enabled = true
+required = false
+startup_timeout_sec = 20
+tool_timeout_sec = 360
+default_tools_approval_mode = "writes"

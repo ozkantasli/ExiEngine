@@ -1,0 +1,73 @@
+// ExiEngine test orchestration — her test dosyasını sıralı ama bağımsız çalıştırır.
+// Bir test başarısız olursa sonrakiler yine de koşar; tümü bitince özet raporlanır.
+// Henüz var olmayan aşamalar (unit, typecheck) SKIP olarak raporlanır; dosya oluşturulunca otomatik aktifleşir.
+// Bağımlılık yoktur: yalnızca Node built-in'leri.
+import { spawn } from "node:child_process";
+import { readdir, stat } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
+// Sıra önemli (engine-smoke en son; mcp-smoke child process bırakabilir).
+// Her dosya kendi içinde tamamlanır; birinin başarısızlığı diğerlerini durdurmaz.
+const stages = [
+  { name: "static", file: "test/static-smoke.mjs", command: ["node", "test/static-smoke.mjs"] },
+  { name: "server", file: "test/server-smoke.mjs", command: ["node", "test/server-smoke.mjs"] },
+  { name: "doctor", file: "test/doctor.mjs", command: ["node", "test/doctor.mjs"] },
+  { name: "clients", file: "test/client-config-smoke.mjs", command: ["node", "test/client-config-smoke.mjs"] },
+  { name: "mcp", file: "test/mcp-smoke.mjs", command: ["node", "test/mcp-smoke.mjs"] },
+  { name: "engine", file: "test/engine-smoke.mjs", command: ["node", "test/engine-smoke.mjs"] },
+  { name: "unit", file: "test/unit/", command: ["node", "--test", "test/unit/*.test.mjs"], minFiles: [".test.mjs"] },
+  { name: "typecheck", file: "test/typecheck-syntax.mjs", command: ["node", "--no-warnings", "--experimental-strip-types", "test/typecheck-syntax.mjs"] },
+];
+
+async function exists(relativePath, minFiles) {
+  try {
+    const info = await stat(path.join(root, relativePath));
+    if (!info.isDirectory()) return true;
+    if (!minFiles) return true;
+    const entries = await readdir(path.join(root, relativePath));
+    return entries.some((entry) => minFiles.some((suffix) => entry.endsWith(suffix)));
+  } catch {
+    return false;
+  }
+}
+
+function runStage(stage) {
+  return new Promise((resolve) => {
+    const child = spawn(process.execPath, stage.command.slice(1), { cwd: root, stdio: "inherit" });
+    child.once("error", (error) => resolve({ stage, code: 1, error }));
+    child.once("exit", (code, signal) => resolve({ stage, code: code ?? 1, signal }));
+  });
+}
+
+const results = [];
+for (const stage of stages) {
+  if (!(await exists(stage.file, stage.minFiles))) {
+    results.push({ stage, code: null, skipped: true });
+    continue;
+  }
+  results.push(await runStage(stage));
+}
+
+console.log("\n[run-all] Özet:");
+let failed = 0;
+for (const result of results) {
+  const { stage, code, signal, error, skipped } = result;
+  if (skipped) {
+    console.log(`  ${stage.name.padEnd(10)} SKIP (dosya yok: ${stage.file})`);
+    continue;
+  }
+  const ok = code === 0;
+  if (!ok) failed += 1;
+  const status = ok ? "GEÇTİ" : `BAŞARISIZ (${signal || `exit ${code}`}${error ? `: ${error.message}` : ""})`;
+  console.log(`  ${stage.name.padEnd(10)} ${status}`);
+}
+
+if (failed > 0) {
+  console.error(`\n[run-all] ${failed} aşama başarısız.`);
+  process.exitCode = 1;
+} else {
+  console.log("\n[run-all] Tüm aşamalar geçti.");
+}

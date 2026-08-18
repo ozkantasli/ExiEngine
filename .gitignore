@@ -1,0 +1,12 @@
+.wrongstack/
+!/.wrongstack/
+/.wrongstack/*
+!/.wrongstack/project.json
+
+# Test scratch artifacts (mcp-smoke.mjs ve runtime preview'ları sert kesintilerde bırakabilir)
+mcp-smoke-*/
+browser-callback-*/
+.temp_files/
+
+# Coverage raporları
+coverage/
