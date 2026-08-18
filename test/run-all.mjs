@@ -34,9 +34,21 @@ async function exists(relativePath, minFiles) {
   }
 }
 
-function runStage(stage) {
+async function listUnitFiles() {
+  const entries = await readdir(path.join(root, "test", "unit"));
+  return entries.filter((entry) => entry.endsWith(".test.mjs")).sort().map((entry) => `test/unit/${entry}`);
+}
+
+async function buildStageCommand(stage) {
+  if (stage.name !== "unit") return stage.command;
+  const files = await listUnitFiles();
+  if (files.length === 0) return null;
+  return ["node", "--test", ...files];
+}
+
+function runStage(stage, command) {
   return new Promise((resolve) => {
-    const child = spawn(process.execPath, stage.command.slice(1), { cwd: root, stdio: "inherit" });
+    const child = spawn(process.execPath, command.slice(1), { cwd: root, stdio: "inherit" });
     child.once("error", (error) => resolve({ stage, code: 1, error }));
     child.once("exit", (code, signal) => resolve({ stage, code: code ?? 1, signal }));
   });
@@ -48,7 +60,12 @@ for (const stage of stages) {
     results.push({ stage, code: null, skipped: true });
     continue;
   }
-  results.push(await runStage(stage));
+  const command = await buildStageCommand(stage);
+  if (command === null) {
+    results.push({ stage, code: null, skipped: true });
+    continue;
+  }
+  results.push(await runStage(stage, command));
 }
 
 console.log("\n[run-all] Özet:");
