@@ -30,7 +30,14 @@ function runTsFixture() {
     child.stdout.on("data", (chunk) => { output += chunk; });
     child.stderr.on("data", (chunk) => { output += chunk; });
     child.once("error", (error) => resolve({ supported: false, message: error.message }));
-    child.once("exit", (code) => resolve({ supported: true, ok: code === 0, message: output.trim() }));
+    child.once("exit", (code) => {
+      // Node 20 gibi sürümlerde bayrak bilinmiyorsa "bad option" çıkar — bu SKIP sayılır, hata değil.
+      if (output.includes("bad option") || output.includes("--experimental-strip-types")) {
+        resolve({ supported: false, message: output.trim() });
+        return;
+      }
+      resolve({ supported: true, ok: code === 0, message: output.trim() });
+    });
   });
 }
 
