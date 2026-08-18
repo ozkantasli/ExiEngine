@@ -13,7 +13,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: [20, 22]
+        # Node 20 deprecated (GitHub runner Node 24'e zorluyor); 22 + 24 aktif destek.
+        node: [22, 24]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -22,6 +23,7 @@ jobs:
       # Bağımlılık yok (runtime dependency-free); npm ci gerekmez.
       - run: npm test
       - run: npm run lint
+      # Node 22'de --experimental-strip-types SKIP raporlar (script içi tespit); 24'te tam çalışır.
       - run: npm run test:typecheck
 
   verify:
@@ -31,7 +33,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
       - run: npm run verify
       # Not: bench:regression (baseline drift) CI'da ÇALIŞTIRILMAZ — baseline yerel
       # donanımda üretildiği için GitHub runner'ında farklı CPU/timing flaky sonuç verir.
@@ -56,5 +58,5 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
       - run: node test/e2e/preview-e2e.mjs
