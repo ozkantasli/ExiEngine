@@ -33,7 +33,9 @@ jobs:
         with:
           node-version: 22
       - run: npm run verify
-      - run: npm run bench:regression
+      # Not: bench:regression (baseline drift) CI'da ÇALIŞTIRILMAZ — baseline yerel
+      # donanımda üretildiği için GitHub runner'ında farklı CPU/timing flaky sonuç verir.
+      # Drift kapısı yerel geliştirmede anlamlıdır; CI kapısı verify (25 benchmark)'dır.
 
   coverage:
     name: Coverage
