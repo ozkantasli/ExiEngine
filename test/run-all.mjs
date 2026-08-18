@@ -19,7 +19,7 @@ const stages = [
   { name: "mcp", file: "test/mcp-smoke.mjs", command: ["node", "test/mcp-smoke.mjs"] },
   { name: "engine", file: "test/engine-smoke.mjs", command: ["node", "test/engine-smoke.mjs"] },
   { name: "unit", file: "test/unit/", command: ["node", "--test", "test/unit/*.test.mjs"], minFiles: [".test.mjs"] },
-  { name: "typecheck", file: "test/typecheck-syntax.mjs", command: ["node", "--no-warnings", "--experimental-strip-types", "test/typecheck-syntax.mjs"] },
+  { name: "typecheck", file: "test/typecheck-syntax.mjs", command: ["node", "test/typecheck-syntax.mjs"] },
 ];
 
 async function exists(relativePath, minFiles) {
