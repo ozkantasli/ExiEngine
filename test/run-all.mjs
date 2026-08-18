@@ -48,9 +48,11 @@ async function buildStageCommand(stage) {
 
 function runStage(stage, command) {
   return new Promise((resolve) => {
-    const child = spawn(process.execPath, command.slice(1), { cwd: root, stdio: "inherit" });
-    child.once("error", (error) => resolve({ stage, code: 1, error }));
-    child.once("exit", (code, signal) => resolve({ stage, code: code ?? 1, signal }));
+    const child = spawn(process.execPath, command.slice(1), { cwd: root, stdio: ["inherit", "inherit", "pipe"] });
+    let stderr = "";
+    child.stderr.on("data", (chunk) => { stderr += chunk; });
+    child.once("error", (error) => resolve({ stage, code: 1, error, stderr }));
+    child.once("exit", (code, signal) => resolve({ stage, code: code ?? 1, signal, stderr }));
   });
 }
 
@@ -71,7 +73,7 @@ for (const stage of stages) {
 console.log("\n[run-all] Özet:");
 let failed = 0;
 for (const result of results) {
-  const { stage, code, signal, error, skipped } = result;
+  const { stage, code, signal, error, skipped, stderr } = result;
   if (skipped) {
     console.log(`  ${stage.name.padEnd(10)} SKIP (dosya yok: ${stage.file})`);
     continue;
@@ -80,6 +82,11 @@ for (const result of results) {
   if (!ok) failed += 1;
   const status = ok ? "GEÇTİ" : `BAŞARISIZ (${signal || `exit ${code}`}${error ? `: ${error.message}` : ""})`;
   console.log(`  ${stage.name.padEnd(10)} ${status}`);
+  if (!ok) {
+    // GitHub Actions annotation'larına düşer (oturumsuz API'den okunabilir)
+    const detail = (stderr || "").trim().split("\n").slice(-6).join(" | ");
+    console.error(`##[error][run-all] ${stage.name} başarısız: exit ${code}${signal ? ` (${signal})` : ""}${error ? ` — ${error.message}` : ""}${detail ? ` — stderr: ${detail.slice(0, 600)}` : ""}`);
+  }
 }
 
 if (failed > 0) {
