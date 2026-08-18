@@ -57,7 +57,8 @@ if (result.error) {
 }
 if (result.code !== 0) {
   console.error(result.stdout.slice(-4_000));
-  console.error(`[coverage] Unit suite başarısız (exit ${result.code}).`);
+  console.error(result.stderr.slice(-4_000));
+  console.error(`##[error][coverage] Unit suite başarısız (exit ${result.code}): ${result.stderr.trim().split("\n").slice(-4).join(" | ").slice(0, 600)}`);
   process.exitCode = 1;
   throw new Error("unit suite failed");
 }

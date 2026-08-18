@@ -44,7 +44,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          # Node 24: --experimental-test-coverage Node 22.13+ patch bağımlıdır; 24'te sabittir.
+          node-version: 24
       - run: npm run test:coverage
         continue-on-error: false
 
