@@ -8,5 +8,5 @@ mcp-smoke-*/
 browser-callback-*/
 .temp_files/
 
-# Coverage raporları
-coverage/
+# Coverage çıktıları (yalnızca kök seviye; test/coverage/ kaynak kodudur ve ignore edilmez)
+/coverage/
