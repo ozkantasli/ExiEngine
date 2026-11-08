@@ -182,8 +182,6 @@ export class WebGPURenderer {
     this.adapter = null;
     this.device = null;
     this.context = null;
-    this.pipeline = null;
-    this.instancedPipeline = null;
     this.pipelines = { normal: null, additive: null, multiply: null };
     this.instancedPipelines = { normal: null, additive: null, multiply: null };
     this.cullPipeline = null;
@@ -354,8 +352,7 @@ export class WebGPURenderer {
       this.pipelines[mode] = this.device.createRenderPipeline({ layout: pipelineLayout, vertex: regularVertex, fragment: { module, entryPoint: "fragmentMain", targets: [{ format: this.format, blend }] }, primitive: { topology: "triangle-list" } });
       this.instancedPipelines[mode] = this.device.createRenderPipeline({ layout: pipelineLayout, vertex: instancedVertex, fragment: { module, entryPoint: "fragmentMain", targets: [{ format: this.format, blend }] }, primitive: { topology: "triangle-list" } });
     }
-    this.pipeline = this.pipelines.normal;
-    this.instancedPipeline = this.instancedPipelines.normal;
+    // pipeline/instancedPipeline alias'ları kaldırıldı: getPipeline() ile tablodan türetiliyor (#62 denetimi).
     const cullModule = this.device.createShaderModule({ code: cullShaderSource });
     const indirectModule = this.device.createShaderModule({ code: indirectShaderSource });
     this.cullLayout = this.device.createBindGroupLayout({ entries: [
@@ -411,7 +408,9 @@ export class WebGPURenderer {
 
   getRenderPipeline(instanced, mode) {
     const pipelines = instanced ? this.instancedPipelines : this.pipelines;
-    return pipelines?.[mode] || pipelines?.normal || (instanced ? this.instancedPipeline : this.pipeline);
+    // Bilinmeyen moda sessizce normal'e düşülmemesi için tablo + "normal" geri dönüşü korunur,
+    // ancak son alias kaldırıldı (mode yoksa tablo zaten normal'e bakar).
+    return pipelines?.[mode] ?? pipelines?.normal ?? null;
   }
 
   pruneStaticBuffers() {
@@ -516,8 +515,6 @@ export class WebGPURenderer {
     this.filterLayout = null;
     this.cullLayout = null;
     this.indirectLayout = null;
-    this.pipeline = null;
-    this.instancedPipeline = null;
     this.pipelines = { normal: null, additive: null, multiply: null };
     this.instancedPipelines = { normal: null, additive: null, multiply: null };
     this.cullPipeline = null;
@@ -642,7 +639,7 @@ export class WebGPURenderer {
     const bytes = batch.data.byteLength;
     if (!Number.isSafeInteger(bytes) || bytes > this.maxVertexBufferBytes) throw new RangeError("WebGPU static batch buffer device limit exceeded.");
     let entry = this.staticBuffers.get(batch.staticOwner);
-    if (!entry) entry = { buffer: null, size: 0, key: null, vertexCount: 0 };
+    if (!entry) entry = { buffer: null, size: 0, key: null, vertexCount: 0, byteLength: 0 };
     if (!entry.buffer || bytes > entry.size) {
       const size = Math.min(this.maxVertexBufferBytes, Math.max(4096, 2 ** Math.ceil(Math.log2(bytes))));
       if (size > this.maxVertexBufferBytes) throw new RangeError("WebGPU static batch buffer device limit exceeded.");
@@ -660,12 +657,14 @@ export class WebGPURenderer {
       entry.size = size;
       entry.key = batch.staticKey;
       entry.vertexCount = batch.vertexCount;
+      entry.byteLength = bytes;
       this.staticBuffers.set(batch.staticOwner, entry);
       this.staticBufferResizes += 1;
-    } else if (entry.key !== batch.staticKey || entry.vertexCount !== batch.vertexCount) {
+    } else if (entry.key !== batch.staticKey || entry.vertexCount !== batch.vertexCount || entry.byteLength !== bytes) {
       this.device.queue.writeBuffer(entry.buffer, 0, batch.data);
       entry.key = batch.staticKey;
       entry.vertexCount = batch.vertexCount;
+      entry.byteLength = bytes;
     }
     return entry.buffer;
   }
@@ -878,7 +877,7 @@ export class WebGPURenderer {
       const encoder = this.device.createCommandEncoder();
       for (const batch of queue.batches) if (batch.gpuCulling) batch.gpuResource = this.encodeGpuCull(encoder, batch, camera, renderWidth, renderHeight);
       const pass = encoder.beginRenderPass({ colorAttachments: [{ view: targetEntry?.view || this.context.getCurrentTexture().createView(), clearValue: this.clearRGBA, loadOp: clear ? "clear" : "load", storeOp: "store" }] });
-      pass.setPipeline(this.pipeline);
+      pass.setPipeline(this.getRenderPipeline(false, "normal"));
       pass.setBindGroup(0, this.frameBindGroup);
       let byteOffset = 0;
       let instanceOffset = 0;
@@ -1034,6 +1033,7 @@ export class WebGPURenderer {
     this.instanceBufferResizes = 0;
     this.staticBufferResizes = 0;
     this.renderGroups.length = 0;
+    this._deviceLimitSnapshot = null;
     this.device = null; this.context = null; this.adapter = null;
   }
 }

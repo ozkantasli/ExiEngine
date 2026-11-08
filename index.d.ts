@@ -299,7 +299,7 @@ export class NineSliceSprite extends Sprite {
 }
 export interface TextCacheOptions { maxEntries?: number; maxPixels?: number; }
 export class TextCache {
-  maxEntries: number; maxPixels: number; readonly size: number;
+  maxEntries: number; maxPixels: number; readonly size: number; evictionFailures: number;
   constructor(options?: TextCacheOptions);
   clear(): number;
 }
@@ -307,9 +307,9 @@ export interface GlyphAtlasOptions {
   width?: number; height?: number; maxEntries?: number; maxPixels?: number; padding?: number;
 }
 export class GlyphAtlas {
-  width: number; height: number; maxEntries: number; maxPixels: number; padding: number; destroyed: boolean; readonly size: number;
+  width: number; height: number; maxEntries: number; maxPixels: number; padding: number; destroyed: boolean; readonly size: number; capacityRejections: number;
   constructor(options?: GlyphAtlasOptions);
-  getInfo(): { width: number; height: number; size: number; maxEntries: number; maxPixels: number; usedPixels: number; complexScriptFallbacks: number; destroyed: boolean };
+  getInfo(): { width: number; height: number; size: number; maxEntries: number; maxPixels: number; usedPixels: number; complexScriptFallbacks: number; capacityRejections: number; destroyed: boolean };
   clear(): this;
   destroy(): void;
 }
@@ -335,7 +335,7 @@ export interface AnimatedSpriteOptions extends SpriteOptions {
   onFrameChange?: ((sprite: AnimatedSprite, frame: number) => void) | null;
 }
 export class AnimatedSprite extends Sprite {
-  readonly frames: ReadonlyArray<Texture>; frameRate: number; loop: boolean; pingPong: boolean; playing: boolean; completed: boolean; direction: number;
+  readonly frames: ReadonlyArray<Texture>; frameRate: number; loop: boolean; pingPong: boolean; playing: boolean; readonly completed: boolean; readonly phase: "playing" | "stopped" | "completed"; direction: number;
   onComplete: ((sprite: AnimatedSprite) => void) | null; onLoop: ((sprite: AnimatedSprite) => void) | null; onFrameChange: ((sprite: AnimatedSprite, frame: number) => void) | null; currentFrame: number; elapsed: number;
   constructor(options: AnimatedSpriteOptions);
   setFrames(frames: readonly Texture[]): this;
@@ -514,7 +514,7 @@ export const easing: Record<string, EasingFunction>;
 export interface TweenOptions { from?: number; ease?: EasingFunction; loop?: number; yoyo?: boolean; onComplete?: (() => void) | null; }
 export class Tween {
   target: object; property: string; from: number; to: number; duration: number;
-  elapsed: number; finished: boolean;
+  elapsed: number; readonly finished: boolean;
   constructor(target: object, property: string, to: number, duration: number, options?: TweenOptions);
   update(delta: number): boolean;
 }
@@ -581,14 +581,14 @@ export function containsAABB(parent: AABB | ClipRect, child: AABB | ClipRect): b
 
 export interface AssetLoadOptions { signal?: AbortSignal; maxBytes?: number; maxJSONBytes?: number; maxJSONNodes?: number; maxJSONDepth?: number; mimeType?: string; integrity?: string; }
 export interface AssetEntry { key: string; type?: "texture" | "json" | "bytes" | "ktx2" | "atlas"; url: string; atlasUrl?: string; options?: AssetLoadOptions & { atlasIntegrity?: string }; decoder?: KTX2Decoder | null; }
-export interface AssetProgress { loaded: number; total: number; key: string; percent: number; }
+export interface AssetProgress { loaded: number; failed: number; total: number; key: string; percent: number; }
 export interface KTX2Level { byteOffset: number; byteLength: number; uncompressedByteLength: number; }
 export interface KTX2Info { width: number; height: number; pixelDepth: number; layerCount: number; faceCount: number; levelCount: number; vkFormat: number; typeSize: number; supercompressionScheme: number; rgba8: boolean; levels: KTX2Level[]; }
 export type KTX2Decoder = (bytes: Uint8Array, info: KTX2Info, options: { signal: AbortSignal | null }) => Promise<CanvasImageSource> | CanvasImageSource;
 export const VK_FORMAT_R8G8B8A8_UNORM: 37;
 export function inspectKTX2(bytes: Uint8Array, options?: { maxImageSize?: number; maxTexturePixels?: number }): KTX2Info;
 export class AssetLoader {
-  baseURL: string; maxBytes: number; maxJSONBytes: number; maxJSONNodes: number; maxJSONDepth: number; maxImageSize: number; maxTexturePixels: number; maxCacheTextures: number; maxCachePixels: number; cache: Map<string, Texture>; destroyed: boolean;
+  baseURL: string; maxBytes: number; maxJSONBytes: number; maxJSONNodes: number; maxJSONDepth: number; maxImageSize: number; maxTexturePixels: number; maxCacheTextures: number; maxCachePixels: number; cache: Map<string, Texture>; destroyed: boolean; failureCount: number; lastLoadError: { key: string; message: string } | null;
   constructor(options?: { baseURL?: string; allowedOrigins?: string[]; maxBytes?: number; maxJSONBytes?: number; maxJSONNodes?: number; maxJSONDepth?: number; maxImageSize?: number; maxTexturePixels?: number; maxCacheTextures?: number; maxCachePixels?: number });
   resolve(url: string): string;
   loadBytes(url: string, options?: AssetLoadOptions): Promise<Uint8Array>;
@@ -614,7 +614,7 @@ export class SaveStore {
 }
 
 export interface AudioBus { name: string; gain: GainNode; parent: string | null; }
-export interface AudioProgress { loaded: number; total: number; name: string; percent: number; }
+export interface AudioProgress { loaded: number; failed: number; total: number; name: string; percent: number; }
 export interface AudioLoadOptions { signal?: AbortSignal | null; integrity?: string | null; }
 export interface AudioEntry { name: string; url: string; integrity?: string | null; }
 export class AudioManager {
@@ -638,6 +638,8 @@ export class AudioManager {
   setVoiceVolume(source: AudioBufferSourceNode, volume: number): boolean;
   setVoicePan(source: AudioBufferSourceNode, pan: number): boolean;
   has(name: string): boolean;
+  hasPending(name: string): boolean;
+  readonly pendingCount: number;
   unload(name: string): boolean;
   load(name: string, url: string, options?: AudioLoadOptions): Promise<AudioBuffer>;
   loadMany(entries: ReadonlyArray<AudioEntry>, options?: { onProgress?: (event: AudioProgress) => void; signal?: AbortSignal | null; stopOnError?: boolean; maxConcurrent?: number }): Promise<{ results: Map<string, AudioBuffer>; errors: Map<string, Error> }>;
@@ -713,4 +715,36 @@ export function clamp(value: number, min: number, max: number): number;
 export function lerp(from: number, to: number, amount: number): number;
 export function degToRad(degrees: number): number;
 export function radToDeg(radians: number): number;
+
+export interface StateMachineTransition { from: string; event: string; to: string; }
+export interface StateMachineTransitionEvent { from: string; to: string; event: string; machine: string; }
+export type StateMachineListener = (transition: StateMachineTransitionEvent) => void;
+export interface StateMachineOptions { name?: string; initial: string; states: Record<string, { on?: Record<string, string> }>; }
+
+export class InvalidStateTransitionError extends Error {
+  readonly code: "EXI_INVALID_STATE_TRANSITION";
+  readonly machine: string;
+  readonly from: string;
+  readonly event: string;
+  constructor(name: string, from: string, event: string);
+}
+
+export class StateMachine {
+  readonly name: string;
+  readonly states: Readonly<Record<string, Readonly<{ on: Readonly<Record<string, string>> }>>>;
+  constructor(options: StateMachineOptions);
+  readonly state: string;
+  is(state: string): boolean;
+  can(event: string): boolean;
+  readonly events: readonly string[];
+  readonly transitions: readonly StateMachineTransition[];
+  onTransition(listener: StateMachineListener): () => void;
+  send(event: string): string;
+  clone(): StateMachine;
+}
+
+export const UNINITIALIZED: unique symbol;
+export const NONE: unique symbol;
+export const CONSUMED: unique symbol;
+export function isSentinel(value: unknown): boolean;
 

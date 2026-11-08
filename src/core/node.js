@@ -165,7 +165,7 @@ export class Node {
     this.position = new Vec2(x, y);
     this.scale = new Vec2(Number.isFinite(Number(scaleX)) ? Number(scaleX) : 1, Number.isFinite(Number(scaleY)) ? Number(scaleY) : 1);
     this.rotation = Number.isFinite(Number(rotation)) ? Number(rotation) : 0;
-    this.zIndex = Number.isFinite(Number(zIndex)) ? Number(zIndex) : 0;
+    this._zIndex = Number.isFinite(Number(zIndex)) ? Number(zIndex) : 0;
     this.visible = visible !== false;
     this.alpha = normalizeAlpha(alpha);
     this.worldAlpha = this.alpha;
@@ -228,6 +228,16 @@ export class Node {
     this._renderScaleY = this.scale.y;
     this._renderRotation = this.rotation;
     this._lastTraversalStamp = 0;
+  }
+
+  // zIndex writes invalidate the parent's lazy sort order — previously direct writes never
+  // set childrenDirty, so render-order/search colliders could run on stale order (#14 denetimi).
+  get zIndex() { return this._zIndex; }
+  set zIndex(value) {
+    const next = Number.isFinite(Number(value)) ? Number(value) : this._zIndex;
+    if (next === this._zIndex) return;
+    this._zIndex = next;
+    if (this.parent) this.parent.childrenDirty = true;
   }
 
   add(...nodes) {

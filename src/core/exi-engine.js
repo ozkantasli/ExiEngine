@@ -8,6 +8,14 @@ import { WebGL2Renderer } from "../render/webgl2-renderer.js";
 import { WebGPURenderer } from "../render/webgpu-renderer.js";
 import { RenderTexture } from "../assets/render-texture.js";
 import { DEFAULT_CLEAR_COLOR, normalizeClearAlpha, normalizeClearColor } from "../render/clear.js";
+import { StateMachine } from "./state-machine.js";
+
+// Yaşam döngüsü: tüm legal arc'lar açık tanım (created/ready/running/paused/visibility-paused/stopped);
+// "destroyed" alanı terminal (bu alan üzerinden gösterilir). Boole'lar makineden türetilir (#1/#12).
+const LIFECYCLE_STATE_NAMES = ["created", "ready", "running", "paused", "visibility-paused", "stopped"];
+const LIFECYCLE_STATES = Object.fromEntries(
+  LIFECYCLE_STATE_NAMES.map((name) => [name, { on: Object.fromEntries(LIFECYCLE_STATE_NAMES.map((target) => [target, target])) }]),
+);
 
 const allowedRendererKinds = new Set(["auto", "webgl2", "webgpu"]);
 const allowedResizeModes = new Set(["resize", "contain", "cover"]);
@@ -118,9 +126,8 @@ export class ExiEngine {
     this.assets = new AssetLoader();
     this.audio = new AudioManager({ loader: this.assets });
     this.profiler = new Profiler();
-    this.running = false;
-    this.paused = false;
-    this.visibilityPaused = false;
+    // Explicit lifecycle machine: boole'lar (running/paused/visibilityPaused) makineden türetilir.
+    this._lifecycleMachine = new StateMachine({ name: "engineLifecycle", initial: "created", states: LIFECYCLE_STATES });
     this.raf = 0;
     this.lastTime = 0;
     this.accumulator = 0;
@@ -142,7 +149,6 @@ export class ExiEngine {
     this.fallbackUsed = false;
     this.destroyed = false;
     this.initialized = false;
-    this._lifecycleState = "created";
     this._initPromise = null;
     this.info = {};
     this.infoRendererKeys = new Set();
@@ -300,6 +306,8 @@ export class ExiEngine {
         globalThis.document?.addEventListener?.("keydown", this.handleAudioUnlockGesture);
       }
       this.initialized = true;
+      // Yaşam döngüsü durumunu gerçekte yansıt ("created" → "ready"); makine tek doğruluk kaynağıdır.
+      if (this._lifecycleMachine.state === "created") this._setLifecycle("ready");
       this.emitStatus({ type: "engine-ready", info: this.getInfo() });
       return this;
     }).catch((error) => {
@@ -576,6 +584,8 @@ export class ExiEngine {
 
   _advance(delta, time) {
     this._assertConfiguration();
+    // Odağı yok edilmiş Node'da bırakma: bir sonraki key event'ini beklemeden blur() uygula (#10 denetimi).
+    if (this.focusedNode && this.focusedNode.destroyed) this.blur();
     const requestedDelta = Number(delta);
     const frameDelta = Number.isFinite(requestedDelta) ? Math.min(this.maxFrameDelta, Math.max(0, requestedDelta)) : 0;
     this.timeScale = normalizeTimeScale(this.timeScale);
@@ -598,7 +608,10 @@ export class ExiEngine {
         this.accumulator -= this.fixedStep;
         updateSteps += 1;
       }
-      if (updateSteps === MAX_UPDATE_STEPS && this.accumulator >= this.fixedStep) this.accumulator = 0;
+      if (updateSteps === MAX_UPDATE_STEPS && this.accumulator >= this.fixedStep) {
+        this.accumulator = 0;
+        this.emitStatus({ type: "frame-dropped-updates", maxUpdateSteps: MAX_UPDATE_STEPS });
+      }
       this.camera.update?.(simulationDelta);
       if (this.overlayCamera && this.overlayCamera !== this.camera) this.overlayCamera.update?.(simulationDelta);
       this.profiler.begin(globalThis.performance?.now?.() || frameTime);
@@ -639,19 +652,42 @@ export class ExiEngine {
     return this;
   }
 
+  // running/paused/visibilityPaused artık makineden türetilen erişimlerdir; doğrudan yazım makinaya senkronlanır (#12).
+  get running() { return this._lifecycleMachine.state === "running"; }
+  set running(value) {
+    if (value === true) { this._setLifecycle("running"); return; }
+    const state = this._lifecycleMachine.state;
+    if (state === "paused" || state === "visibility-paused") return; // pause baskın
+    this._setLifecycle(this.initialized ? "ready" : "created");
+  }
+  get paused() { const state = this._lifecycleMachine.state; return state === "paused" || state === "visibility-paused"; }
+  set paused(value) {
+    if (value === true) { this._setLifecycle(this.visibilityPaused ? "visibility-paused" : "paused"); return; }
+    const state = this._lifecycleMachine.state;
+    if (state === "paused" || (state === "visibility-paused" && !this.visibilityPaused)) this._setLifecycle(this.initialized ? "ready" : "created");
+  }
+  get visibilityPaused() { return this._lifecycleMachine.state === "visibility-paused"; }
+  set visibilityPaused(value) {
+    if (value === true) { this._setLifecycle("visibility-paused"); return; }
+    if (this._lifecycleMachine.state === "visibility-paused") this._setLifecycle("paused");
+  }
+  get _lifecycleState() { return this._lifecycleMachine.state; }
+
   get lifecycleState() {
     if (this.destroyed) return "destroyed";
-    if (this.running) return "running";
-    if (this.paused) return this.visibilityPaused ? "visibility-paused" : "paused";
-    if (this._lifecycleState === "stopped") return "stopped";
+    const state = this._lifecycleMachine.state;
+    if (state === "running") return "running";
+    if (state === "paused") return "paused";
+    if (state === "visibility-paused") return "visibility-paused";
+    if (state === "stopped") return "stopped";
     return this.initialized ? "ready" : "created";
   }
 
   _setLifecycle(state) {
-    this._lifecycleState = state;
-    this.running = state === "running";
-    this.paused = state === "paused" || state === "visibility-paused";
-    this.visibilityPaused = state === "visibility-paused";
+    const known = state === "created" || state === "ready" || state === "running" || state === "paused"
+      || state === "visibility-paused" || state === "stopped" || state === "destroyed";
+    if (!known) throw new RangeError(`ExiEngine bilinmeyen yaşam döngüsü durumu: ${String(state)}`);
+    this._lifecycleMachine.send(state === "destroyed" ? "stopped" : state);
     return this;
   }
 
@@ -710,6 +746,8 @@ export class ExiEngine {
   }
 
   stop() {
+    // destroy() sonrası stop()'un audio suspend / lifecycle yazmasını engelle (start/resume ile simetrik guard).
+    if (this.destroyed) return this;
     this._setLifecycle("stopped");
     this._stopLoop();
     this.suspendAudio();

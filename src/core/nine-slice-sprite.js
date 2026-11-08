@@ -1,5 +1,6 @@
 import { Sprite } from "./sprite.js";
 import { worldValue } from "./math.js";
+import { UNINITIALIZED } from "./sentinel.js";
 
 const finiteBorder = (value) => {
   const number = Number(value);
@@ -53,17 +54,17 @@ export class NineSliceSprite extends Sprite {
     this.right = finiteBorder(right);
     this.top = finiteBorder(top);
     this.bottom = finiteBorder(bottom);
-    this.renderGeometryTexture = null;
-    this.renderGeometryLeft = NaN;
-    this.renderGeometryRight = NaN;
-    this.renderGeometryTop = NaN;
-    this.renderGeometryBottom = NaN;
-    this.renderGeometryWidth = NaN;
-    this.renderGeometryHeight = NaN;
-    this.renderGeometryAnchorX = NaN;
-    this.renderGeometryAnchorY = NaN;
-    this.renderGeometryFlipX = null;
-    this.renderGeometryFlipY = null;
+    this.renderGeometryTexture = UNINITIALIZED;
+    this.renderGeometryLeft = UNINITIALIZED;
+    this.renderGeometryRight = UNINITIALIZED;
+    this.renderGeometryTop = UNINITIALIZED;
+    this.renderGeometryBottom = UNINITIALIZED;
+    this.renderGeometryWidth = UNINITIALIZED;
+    this.renderGeometryHeight = UNINITIALIZED;
+    this.renderGeometryAnchorX = UNINITIALIZED;
+    this.renderGeometryAnchorY = UNINITIALIZED;
+    this.renderGeometryFlipX = UNINITIALIZED;
+    this.renderGeometryFlipY = UNINITIALIZED;
     this.sliceX = new Float64Array(4);
     this.sliceY = new Float64Array(4);
     this.sliceU = new Float64Array(4);

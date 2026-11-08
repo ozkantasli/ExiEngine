@@ -101,4 +101,12 @@ test("updateStaticRenderKey: texture version değişimi yeni statik key üretir"
   assert.equal(fourth, third);
   const withoutTexture = updateStaticRenderKey(...args);
   assert.notEqual(withoutTexture, fourth);
+  // dataByteLength ekseni: aynı içerik byte'ı ile yeni key, farklı byte'ı ile yeni key
+  const argsBytes = [state, 1, camera, 320, 180, matrix, null, 1, "none", 1, null, null];
+  const keyA = updateStaticRenderKey(...argsBytes, 0, 512);
+  const keyA2 = updateStaticRenderKey(...argsBytes, 0, 512);
+  assert.equal(keyA2, keyA);
+  const keyB = updateStaticRenderKey(...argsBytes, 0, 1024);
+  assert.notEqual(keyB, keyA);
+  assert.notEqual(withoutTexture, fourth);
 });

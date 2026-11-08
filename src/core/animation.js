@@ -1,4 +1,5 @@
 import { clamp, lerp } from "./math.js";
+import { StateMachine } from "./state-machine.js";
 
 const MAX_TWEEN_DURATION = 3_600;
 const MAX_TWEEN_DELTA = 5;
@@ -72,9 +73,12 @@ export class Tween {
     this.yoyo = yoyo;
     this.onComplete = onComplete;
     this.elapsed = 0;
-    this.finished = false;
+    // Explicit playhead: "active" → "finished" is the only legal transition (loop re-arms stay in "active").
+    this._stateMachine = new StateMachine({ name: "tween", initial: "active", states: { active: { on: { finish: "finished" } }, finished: { on: {} } } });
     target[property] = this.from;
   }
+
+  get finished() { return this._stateMachine.is("finished"); }
 
   update(delta) {
     if (this.finished) return false;
@@ -91,7 +95,7 @@ export class Tween {
       if (this.yoyo) { const from = this.from; this.from = this.to; this.to = from; }
       return true;
     }
-    this.finished = true;
+    this._stateMachine.send("finish");
     this.target[this.property] = this.to;
     this.onComplete?.();
     return false;

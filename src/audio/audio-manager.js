@@ -64,12 +64,9 @@ export class AudioManager {
     this.pendingLoadIntegrities = new Map();
     this.loadControllers = new Map();
     this.keyGenerations = new Map();
-    this.activeVoices = new Set();
-    this.voiceBuffers = new Map();
-    this.voiceGains = new Map();
-    this.voicePanners = new Map();
-    this.voiceOutputs = new Map();
-    this.voiceCleanups = new Map();
+    // Tek ses kayıt tablosu: source → { buffer, gain, panner, output, cleanup, phase }.
+    // Semantics: voices üyeliği "alive" demektir; cleanup() idempotent olup kaydı siler (#40).
+    this.voices = new Map();
     this.buses = new Map();
     this.destroyed = false;
     this.generation = 0;
@@ -176,22 +173,43 @@ export class AudioManager {
   }
   async unlock() { this.ensureContext(); await this.resume(); }
 
-  get voiceCount() { return this.activeVoices.size; }
+  get voiceCount() { return this.voices.size; }
+
+  // Compat views for existing consumers (tests/tools read voiceGains/activeVoices by name).
+  get activeVoices() { return new Set(this.voices.keys()); }
+  get voiceGains() {
+    // Minimal compatibility view: existing consumers only call .get(source)?.gain / .has(source).
+    return {
+      get: (source) => this.voices.get(source)?.gain ?? undefined,
+      has: (source) => this.voices.has(source),
+    };
+  }
 
   stopVoice(source) {
-    if (!this.activeVoices.has(source)) return false;
+    const record = this.voices.get(source);
+    if (!record) return false;
     try { source.stop?.(); } catch {}
-    this.voiceCleanups.get(source)?.();
+    record.cleanup();
     return true;
   }
 
   stopAll() {
-    for (const source of this.activeVoices) this.stopVoice(source);
+    for (const source of [...this.voices.keys()]) this.stopVoice(source);
     return this;
   }
 
   has(name) {
     return this.buffers.has(String(name));
+  }
+
+  // "Loading" used to be invisible to has() — callers could not distinguish
+  // "absent" from "decode in flight". hasPending reports the pendingLoads generation.
+  hasPending(name) {
+    return this.pendingLoads.has(normalizeAudioKey(name));
+  }
+
+  get pendingCount() {
+    return this.pendingLoads.size;
   }
 
   getBusNames() {
@@ -202,8 +220,8 @@ export class AudioManager {
     const bus = this.getBus(name);
     if (!bus) return 0;
     let count = 0;
-    for (const [source, output] of this.voiceOutputs) {
-      if (output === bus.gain) {
+    for (const [source, record] of [...this.voices]) {
+      if (record.output === bus.gain) {
         this.stopVoice(source);
         count += 1;
       }
@@ -213,31 +231,30 @@ export class AudioManager {
 
   stopVoicesForBuffer(buffer) {
     if (!buffer) return this;
-    for (const [source, sourceBuffer] of this.voiceBuffers) if (sourceBuffer === buffer) this.stopVoice(source);
+    for (const [source, record] of [...this.voices]) if (record.buffer === buffer) this.stopVoice(source);
     return this;
   }
 
   setVoiceVolume(source, volume) {
-    if (!this.activeVoices.has(source)) return false;
-    const gain = this.voiceGains.get(source);
-    if (!gain) return false;
-    gain.gain.value = safeVolume(volume);
+    const record = this.voices.get(source);
+    if (!record) return false;
+    record.gain.gain.value = safeVolume(volume);
     return true;
   }
 
   setVoicePan(source, pan) {
-    if (!this.activeVoices.has(source)) return false;
-    const gain = this.voiceGains.get(source);
-    const output = this.voiceOutputs.get(source);
+    const record = this.voices.get(source);
+    if (!record) return false;
+    const { gain, output } = record;
     if (!gain || !output) return false;
     const requestedPan = safePan(pan);
-    let panner = this.voicePanners.get(source);
+    let panner = record.panner;
     if (requestedPan === 0) {
       if (panner) {
         try { gain.disconnect?.(); } catch {}
         try { panner.disconnect?.(); } catch {}
         gain.connect(output);
-        this.voicePanners.delete(source);
+        record.panner = null;
       }
       return true;
     }
@@ -255,7 +272,7 @@ export class AudioManager {
         gain.connect(output);
         throw error;
       }
-      this.voicePanners.set(source, panner);
+      record.panner = panner;
     } else panner.pan.value = requestedPan;
     return true;
   }
@@ -359,7 +376,7 @@ export class AudioManager {
           if (stopOnError) throw error;
         } finally {
           loaded += 1;
-          onProgress({ loaded, total, name: entry?.name || `#${index}`, percent: total ? loaded / total : 1 });
+          onProgress({ loaded, failed: errors.size, total, name: entry?.name || `#${index}`, percent: total ? loaded / total : 1 });
         }
       }
     };
@@ -374,7 +391,7 @@ export class AudioManager {
     this.ensureActive();
     const buffer = typeof nameOrBuffer === "string" ? this.buffers.get(normalizeAudioKey(nameOrBuffer)) : nameOrBuffer;
     if (!buffer) throw new Error("Audio buffer bulunamadı.");
-    if (this.activeVoices.size >= this.maxVoices) throw new RangeError(`Audio voice limiti ${this.maxVoices}.`);
+    if (this.voices.size >= this.maxVoices) throw new RangeError(`Audio voice limiti ${this.maxVoices}.`);
     const context = this.ensureContext();
     const output = this.getBus(bus) || this.getBus("master");
     const source = context.createBufferSource();
@@ -391,28 +408,20 @@ export class AudioManager {
       gain.connect(panner);
       panner.connect(output.gain);
     } else gain.connect(output.gain);
-    let cleaned = false;
+    // Ses canlılığı yalnızca voices tablosundaki kayıt üyeliğidir; cleanup idempotenttir (#40).
+    const record = { buffer, gain, panner, output: output.gain, phase: "alive", cleanup: null };
     const cleanup = () => {
-      if (cleaned) return;
-      cleaned = true;
+      if (!this.voices.has(source)) return;
+      record.phase = "cleaned";
       source.removeEventListener?.("ended", cleanup);
       source.onended = null;
       try { source.disconnect?.(); } catch {}
       try { gain.disconnect?.(); } catch {}
       try { panner?.disconnect?.(); } catch {}
-      this.activeVoices.delete(source);
-      this.voiceBuffers.delete(source);
-      this.voiceGains.delete(source);
-      this.voicePanners.delete(source);
-      this.voiceOutputs.delete(source);
-      this.voiceCleanups.delete(source);
+      this.voices.delete(source);
     };
-    this.activeVoices.add(source);
-    this.voiceBuffers.set(source, buffer);
-    this.voiceGains.set(source, gain);
-    this.voiceOutputs.set(source, output.gain);
-    this.voiceCleanups.set(source, cleanup);
-    if (panner) this.voicePanners.set(source, panner);
+    record.cleanup = cleanup;
+    this.voices.set(source, record);
     source.addEventListener?.("ended", cleanup, { once: true });
     source.onended = cleanup;
     try { source.start(); } catch (error) { cleanup(); throw error; }
@@ -436,12 +445,7 @@ export class AudioManager {
     this.pendingLoadURLs.clear();
     this.pendingLoadIntegrities.clear();
     this.keyGenerations.clear();
-    this.activeVoices.clear();
-    this.voiceBuffers.clear();
-    this.voiceGains.clear();
-    this.voicePanners.clear();
-    this.voiceOutputs.clear();
-    this.voiceCleanups.clear();
+    this.voices.clear();
     this.buses.clear();
   }
 }

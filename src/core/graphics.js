@@ -99,13 +99,16 @@ export class Graphics extends Node {
     this.boundsCache = null;
   }
 
-  clear() { this.commands.length = 0; this.itemsDirty = true; this.boundsCache = null; this.contentVersion += 1; return this; }
+  clear() { this.commands.length = 0; this._invalidate(); return this; }
+
+  // Tek invalidasyon noktası: itemsDirty + boundsCache + contentVersion her zaman birlikte ilerler (#30 denetimi).
+  _invalidate() { this.itemsDirty = true; this.boundsCache = null; this.contentVersion += 1; return this; }
 
   rect(x, y, width, height, { fill = 0xffffff, alpha = 1 } = {}) {
     const left = finite(x); const top = finite(y); const rectWidth = finite(width); const rectHeight = finite(height);
     if (rectWidth <= 0 || rectHeight <= 0 || this.commands.length >= MAX_GRAPHICS_COMMANDS) { if (this.commands.length >= MAX_GRAPHICS_COMMANDS) throw new RangeError(`Graphics komut limiti ${MAX_GRAPHICS_COMMANDS}.`); return this; }
     this.commands.push({ type: "rect", x: left, y: top, width: rectWidth, height: rectHeight, tint: fill, alpha: alphaValue(alpha) });
-    this.itemsDirty = true; this.boundsCache = null; this.contentVersion += 1;
+    this._invalidate();
     return this;
   }
 
@@ -113,7 +116,7 @@ export class Graphics extends Node {
     const centerX = finite(x); const centerY = finite(y); const circleRadius = finite(radius);
     if (circleRadius <= 0 || this.commands.length >= MAX_GRAPHICS_COMMANDS) { if (this.commands.length >= MAX_GRAPHICS_COMMANDS) throw new RangeError(`Graphics komut limiti ${MAX_GRAPHICS_COMMANDS}.`); return this; }
     this.commands.push({ type: "circle", x: centerX, y: centerY, radius: circleRadius, tint: fill, alpha: alphaValue(alpha), segments: clampSegments(segments) });
-    this.itemsDirty = true; this.boundsCache = null; this.contentVersion += 1;
+    this._invalidate();
     return this;
   }
 
@@ -121,7 +124,7 @@ export class Graphics extends Node {
     const startX = finite(x1); const startY = finite(y1); const endX = finite(x2); const endY = finite(y2); const lineWidth = finite(width);
     if (lineWidth <= 0 || this.commands.length >= MAX_GRAPHICS_COMMANDS) { if (this.commands.length >= MAX_GRAPHICS_COMMANDS) throw new RangeError(`Graphics komut limiti ${MAX_GRAPHICS_COMMANDS}.`); return this; }
     this.commands.push({ type: "line", x1: startX, y1: startY, x2: endX, y2: endY, width: lineWidth, tint: fill, alpha: alphaValue(alpha) });
-    this.itemsDirty = true; this.boundsCache = null; this.contentVersion += 1;
+    this._invalidate();
     return this;
   }
 
@@ -131,7 +134,7 @@ export class Graphics extends Node {
     const p3x = finite(x3); const p3y = finite(y3);
     if (this.commands.length >= MAX_GRAPHICS_COMMANDS) throw new RangeError(`Graphics komut limiti ${MAX_GRAPHICS_COMMANDS}.`);
     this.commands.push({ type: "triangle", x1: p1x, y1: p1y, x2: p2x, y2: p2y, x3: p3x, y3: p3y, tint: fill, alpha: alphaValue(alpha) });
-    this.itemsDirty = true; this.boundsCache = null; this.contentVersion += 1;
+    this._invalidate();
     return this;
   }
 
@@ -143,7 +146,7 @@ export class Graphics extends Node {
       return this;
     }
     this.commands.push({ type: "ellipse", x: centerX, y: centerY, radiusX: rx, radiusY: ry, tint: fill, alpha: alphaValue(alpha), segments: clampSegments(segments) });
-    this.itemsDirty = true; this.boundsCache = null; this.contentVersion += 1;
+    this._invalidate();
     return this;
   }
 
@@ -204,7 +207,7 @@ export class Graphics extends Node {
     const normalized = new Array(length);
     for (let index = 0; index < length; index += 1) normalized[index] = finite(points[index]);
     this.commands.push({ type: "polygon", positions: triangulatePolygon(normalized), bounds: polygonBounds(normalized), tint: fill, alpha: alphaValue(alpha) });
-    this.itemsDirty = true; this.boundsCache = null; this.contentVersion += 1;
+    this._invalidate();
     return this;
   }
 
@@ -296,6 +299,9 @@ export class Graphics extends Node {
     this.renderItemPool.length = 0;
     this.boundsCache = null;
     this.staticRenderCache = null;
+    // Yok edilmiş grafik yasadışı kullanımda ne tam ne eksik cache sunmasın: dirty + version bump.
+    this.itemsDirty = true;
+    this.contentVersion += 1;
     super.destroy();
   }
 }

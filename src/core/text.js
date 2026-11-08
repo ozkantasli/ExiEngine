@@ -163,6 +163,8 @@ export class TextCache {
     this.entries = new Map();
     this.totalPixels = 0;
     this.clock = 0;
+    // Kurban-bulunamayan tahliye redleri gözlemlenebilir — #49 ("no victim" durumu gizli kalmaz).
+    this.evictionFailures = 0;
   }
 
   get size() { return this.entries.size; }
@@ -186,10 +188,10 @@ export class TextCache {
     if (existing) this.remove(existing);
     const value = create();
     const pixels = value.sourceWidth * value.sourceHeight;
-    if (!Number.isSafeInteger(pixels) || pixels <= 0 || pixels > this.maxPixels) return null;
+    if (!Number.isSafeInteger(pixels) || pixels <= 0 || pixels > this.maxPixels) { this.evictionFailures += 1; return null; }
     while (this.entries.size >= this.maxEntries || this.totalPixels + pixels > this.maxPixels) {
       const idle = [...this.entries.values()].filter((entry) => entry.references === 0).sort((left, right) => left.lastUsed - right.lastUsed)[0];
-      if (!idle) return null;
+      if (!idle) { this.evictionFailures += 1; return null; }
       this.remove(idle);
     }
     const entry = {
@@ -253,13 +255,15 @@ export class GlyphAtlas {
     this.rowHeight = 0;
     this.usedPixels = 0;
     this.complexScriptFallbacks = 0;
+    // Kapasite/boyut redleri artık gözlemlenebilir ("full-but-alive" sınıfı sessizce kaybolmaz) — #50.
+    this.capacityRejections = 0;
     this.destroyed = false;
   }
 
   get size() { return this.entries.size; }
 
   getInfo() {
-    return { width: this.width, height: this.height, size: this.size, maxEntries: this.maxEntries, maxPixels: this.maxPixels, usedPixels: this.usedPixels, complexScriptFallbacks: this.complexScriptFallbacks, destroyed: this.destroyed };
+    return { width: this.width, height: this.height, size: this.size, maxEntries: this.maxEntries, maxPixels: this.maxPixels, usedPixels: this.usedPixels, complexScriptFallbacks: this.complexScriptFallbacks, capacityRejections: this.capacityRejections, destroyed: this.destroyed };
   }
 
   assertBudget() {
@@ -277,7 +281,7 @@ export class GlyphAtlas {
     const key = JSON.stringify([cluster, ...styleKey]);
     const existing = this.entries.get(key);
     if (existing) return existing;
-    if (this.entries.size >= this.maxEntries) return null;
+    if (this.entries.size >= this.maxEntries) { this.capacityRejections += 1; return null; }
     measureContext.font = style.font;
     const metrics = measureContext.measureText(cluster);
     const advance = Number(metrics?.width);
@@ -287,13 +291,13 @@ export class GlyphAtlas {
     const logicalHeight = Math.max(1, lineHeightFor(style.font) + inset * 2);
     const sourceWidth = Math.max(1, Math.ceil(logicalWidth * style.resolution));
     const sourceHeight = Math.max(1, Math.ceil(logicalHeight * style.resolution));
-    if (sourceWidth > this.width || sourceHeight > this.height) return null;
+    if (sourceWidth > this.width || sourceHeight > this.height) { this.capacityRejections += 1; return null; }
     if (this.cursorX + sourceWidth > this.width) {
       this.cursorX = 0;
       this.cursorY += this.rowHeight;
       this.rowHeight = 0;
     }
-    if (this.cursorY + sourceHeight > this.height) return null;
+    if (this.cursorY + sourceHeight > this.height) { this.capacityRejections += 1; return null; }
     const x = this.cursorX;
     const y = this.cursorY;
     this.cursorX += sourceWidth;

@@ -3,8 +3,20 @@ import { Texture } from "../assets/texture.js";
 import { GPU_SOURCE_FLOATS, INSTANCE_FLOATS } from "../render/instanced.js";
 import { updateStaticRenderKey } from "../render/batch.js";
 import { PhysicsBody } from "./collision.js";
+import { NONE } from "./sentinel.js";
 
 const MAX_TILE_COUNT = 500_000;
+
+// TileMap frameCache, subTexture'ları tileIndex başına saklar; ancak texture
+// yeniden atanırsa veya atlas UV leri değişirse eski kareleri sunardı. Texture
+// kimliğini WeakMap ile ve baseTexture sürümünü anahtara katarak ayıklar.
+const textureUidRegistry = new WeakMap();
+let nextTextureUid = 1;
+function textureUid(texture) {
+  let uid = textureUidRegistry.get(texture);
+  if (uid === undefined) { uid = nextTextureUid; nextTextureUid += 1; textureUidRegistry.set(texture, uid); }
+  return uid;
+}
 const TILE_FLIP_X = 1;
 const TILE_FLIP_Y = 2;
 
@@ -213,9 +225,9 @@ export class TileMap extends Node {
     let active = new Map();
     for (let row = 0; row < this.rows; row += 1) {
       const current = new Map();
-      let runStart = -1;
+      let runStart = NONE;
       const flushRun = (end) => {
-        if (runStart < 0) return;
+        if (runStart === NONE) return;
         const runWidth = end - runStart;
         let widths = current.get(runStart);
         if (!widths) { widths = new Map(); current.set(runStart, widths); }
@@ -226,12 +238,12 @@ export class TileMap extends Node {
           : { x: runStart * this.tileWidth, y, width: runWidth * this.tileWidth, height: this.tileHeight };
         if (previous) rect.height += this.tileHeight;
         widths.set(runWidth, rect);
-        runStart = -1;
+        runStart = NONE;
       };
       for (let column = 0; column <= this.columns; column += 1) {
         const tileIndex = column < this.columns ? this.tiles[row * this.columns + column] : -1;
         if (column < this.columns && isSolidTile(tileIndex, column, row, predicate)) {
-          if (runStart < 0) runStart = column;
+          if (runStart === NONE) runStart = column;
         } else flushRun(column);
       }
       for (const [x, widths] of active) for (const [width, rect] of widths) if (!current.get(x)?.has(width)) out.push(rect);
@@ -430,7 +442,8 @@ export class TileMap extends Node {
     if (gridColumns <= 0) throw new RangeError("TileMap texture tile grid geçersiz.");
     const frameX = (tileIndex % gridColumns) * this.tileWidth;
     const frameY = Math.floor(tileIndex / gridColumns) * this.tileHeight;
-    const frameKey = tileIndex;
+    const textureVersion = this.texture?.baseTexture?.version ?? this.texture?.version ?? 0;
+    const frameKey = `${textureUid(this.texture)}:${textureVersion}:${gridColumns}:${this.tileWidth}:${this.tileHeight}:${tileIndex}`;
     let frame = this.frameCache.get(frameKey);
     if (!frame) {
       frame = this.texture.subTexture({ x: frameX, y: frameY, width: this.tileWidth, height: this.tileHeight, id: `${this.texture.id}:${frameX}:${frameY}:${this.tileWidth}:${this.tileHeight}` });

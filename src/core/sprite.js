@@ -1,6 +1,7 @@
 import { Node } from "./node.js";
 import { Texture } from "../assets/texture.js";
 import { worldValue } from "./math.js";
+import { UNINITIALIZED } from "./sentinel.js";
 
 export class Sprite extends Node {
   constructor({ texture = Texture.white, width = 64, height = 64, anchorX = 0.5, anchorY = 0.5, tint = 0xffffff, alpha = 1, flipX = false, flipY = false, ...options } = {}) {
@@ -20,22 +21,22 @@ export class Sprite extends Node {
     const requestedAlpha = Number(alpha);
     this.alpha = Number.isFinite(requestedAlpha) ? Math.max(0, Math.min(1, requestedAlpha)) : 1;
     this.renderItems = [];
-    this.renderGeometryTexture = null;
-    this.renderGeometryU0 = NaN;
-    this.renderGeometryV0 = NaN;
-    this.renderGeometryU1 = NaN;
-    this.renderGeometryV1 = NaN;
-    this.renderGeometryWidth = NaN;
-    this.renderGeometryHeight = NaN;
-    this.renderGeometryAnchorX = NaN;
-    this.renderGeometryAnchorY = NaN;
-    this.renderGeometryFlipX = null;
-    this.renderGeometryFlipY = null;
+    this.renderGeometryTexture = UNINITIALIZED;
+    this.renderGeometryU0 = UNINITIALIZED;
+    this.renderGeometryV0 = UNINITIALIZED;
+    this.renderGeometryU1 = UNINITIALIZED;
+    this.renderGeometryV1 = UNINITIALIZED;
+    this.renderGeometryWidth = UNINITIALIZED;
+    this.renderGeometryHeight = UNINITIALIZED;
+    this.renderGeometryAnchorX = UNINITIALIZED;
+    this.renderGeometryAnchorY = UNINITIALIZED;
+    this.renderGeometryFlipX = UNINITIALIZED;
+    this.renderGeometryFlipY = UNINITIALIZED;
     this.localBounds = { x: 0, y: 0, width: 0, height: 0 };
-    this.localBoundsWidth = NaN;
-    this.localBoundsHeight = NaN;
-    this.localBoundsAnchorX = NaN;
-    this.localBoundsAnchorY = NaN;
+    this.localBoundsWidth = UNINITIALIZED;
+    this.localBoundsHeight = UNINITIALIZED;
+    this.localBoundsAnchorX = UNINITIALIZED;
+    this.localBoundsAnchorY = UNINITIALIZED;
   }
 
   setTexture(texture, { width = this.width, height = this.height } = {}) {

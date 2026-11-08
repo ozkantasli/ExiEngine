@@ -1,4 +1,5 @@
 import { Vec2, MAX_WORLD_COORDINATE, worldValue } from "./math.js";
+import { UNINITIALIZED } from "./sentinel.js";
 
 function transformedBounds(node, output = null, localBounds = null) {
   const bounds = localBounds || node.getLocalBounds?.();
@@ -201,21 +202,21 @@ export class Collider {
     this._mask = normalizeCollisionBits(mask, "mask");
     this._enabled = true;
     this._worlds = new Set();
-    this._bounds = null;
-    this._boundsWorldVersion = -1;
-    this._boundsX = NaN;
-    this._boundsY = NaN;
-    this._boundsWidth = NaN;
-    this._boundsHeight = NaN;
+    this._bounds = UNINITIALIZED;
+    this._boundsWorldVersion = UNINITIALIZED;
+    this._boundsX = UNINITIALIZED;
+    this._boundsY = UNINITIALIZED;
+    this._boundsWidth = UNINITIALIZED;
+    this._boundsHeight = UNINITIALIZED;
   }
 
   setBounds(bounds = null) {
     this._localBounds = normalizeColliderBounds(bounds);
-    this._boundsWorldVersion = -1;
-    this._boundsX = NaN;
-    this._boundsY = NaN;
-    this._boundsWidth = NaN;
-    this._boundsHeight = NaN;
+    this._boundsWorldVersion = UNINITIALIZED;
+    this._boundsX = UNINITIALIZED;
+    this._boundsY = UNINITIALIZED;
+    this._boundsWidth = UNINITIALIZED;
+    this._boundsHeight = UNINITIALIZED;
     for (const world of this._worlds) world.spatialDirty = true;
     return this;
   }
@@ -239,8 +240,8 @@ export class Collider {
     const localWidth = Number.isFinite(Number(localBounds?.width)) ? Number(localBounds.width) : (Number.isFinite(Number(this.node.width)) ? Number(this.node.width) : 0);
     const localHeight = Number.isFinite(Number(localBounds?.height)) ? Number(localBounds.height) : (Number.isFinite(Number(this.node.height)) ? Number(this.node.height) : 0);
     const worldVersion = Number.isSafeInteger(this.node._worldVersion) ? this.node._worldVersion : 0;
-    if (!this._bounds || this._boundsWorldVersion !== worldVersion || this._boundsX !== localX || this._boundsY !== localY || this._boundsWidth !== localWidth || this._boundsHeight !== localHeight) {
-      this._bounds = transformedBounds(this.node, this._bounds, localBounds);
+    if (this._bounds === UNINITIALIZED || this._boundsWorldVersion !== worldVersion || this._boundsX !== localX || this._boundsY !== localY || this._boundsWidth !== localWidth || this._boundsHeight !== localHeight) {
+      this._bounds = transformedBounds(this.node, this._bounds === UNINITIALIZED ? null : this._bounds, localBounds);
       this._boundsWorldVersion = worldVersion;
       this._boundsX = localX;
       this._boundsY = localY;
@@ -551,9 +552,9 @@ export class PhysicsBody {
   constructor(node, { static: isStatic = false, kinematic = false, isTrigger = false, oneWay = null, tag = "physics", layer = 1, mask = MAX_COLLISION_BITS, bounds = null, velocityX = 0, velocityY = 0, gravityScale = 1, maxSpeed = MAX_PHYSICS_SPEED } = {}) {
     if (!node || node.destroyed === true || !node.position || typeof node.updateWorldMatrix !== "function") throw new TypeError("PhysicsBody canlı ve geçerli bir Node ister.");
     this.node = node;
-    this.isStatic = Boolean(isStatic);
-    this.isKinematic = Boolean(kinematic);
-    if (this.isStatic && this.isKinematic) throw new TypeError("PhysicsBody static ve kinematic aynı anda olamaz.");
+    this._isStatic = Boolean(isStatic);
+    this._isKinematic = Boolean(kinematic);
+    if (this._isStatic && this._isKinematic) throw new TypeError("PhysicsBody static ve kinematic aynı anda olamaz.");
     this.gravityScale = boundedPhysics(gravityScale, 1, -MAX_PHYSICS_GRAVITY_SCALE, MAX_PHYSICS_GRAVITY_SCALE);
     this.maxSpeed = boundedPhysics(maxSpeed, MAX_PHYSICS_SPEED, 1, MAX_PHYSICS_SPEED);
     this.velocity = new Vec2(
@@ -568,6 +569,13 @@ export class PhysicsBody {
     this.collider.body = this;
     this._worlds = new Set();
   }
+
+  // Direct field writes would otherwise silently produce the invalid static+kinematic combo;
+  // the accessors enforce the exclusivity invariant for every write path.
+  get isStatic() { return this._isStatic; }
+  set isStatic(value) { const next = Boolean(value); if (next && this._isKinematic) throw new TypeError("PhysicsBody static ve kinematic aynı anda olamaz."); this._isStatic = next; }
+  get isKinematic() { return this._isKinematic; }
+  set isKinematic(value) { const next = Boolean(value); if (next && this._isStatic) throw new TypeError("PhysicsBody static ve kinematic aynı anda olamaz."); this._isKinematic = next; }
 
   setVelocity(x, y = 0) {
     this.velocity.x = boundedPhysics(x, 0, -this.maxSpeed, this.maxSpeed);

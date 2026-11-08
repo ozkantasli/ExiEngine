@@ -1,4 +1,13 @@
 import { isPublicMethod } from "./public-methods.js";
+import { StateMachine } from "../core/state-machine.js";
+
+// Poll phase machine: idle (not running) → armed (running, timer set) → polling (poll in flight).
+// `pollEpoch` remains the abort-identity guard; the machine makes the phase explicit and throws on nonsense.
+const POLL_STATES = {
+  idle: { on: { start: "armed", fire: "polling", stop: "idle" } },
+  armed: { on: { start: "armed", fire: "polling", stop: "idle" } },
+  polling: { on: { settle: "armed", stop: "idle" } },
+};
 
 const MAX_DEPTH = 32;
 const MAX_KEYS = 128;
@@ -463,7 +472,8 @@ export class RuntimeAgent {
     this.nextHandleId = 1;
     this.timer = null;
     this.running = false;
-    this.polling = false;
+    // Explicit poll phase machine (idle → armed → polling); pollEpoch remains the abort-identity guard.
+    this.pollMachine = new StateMachine({ name: "runtimeAgentPoll", initial: "idle", states: POLL_STATES });
     this.pollEpoch = 0;
     this.controller = null;
     for (const [name, callback] of Object.entries(callbacks)) this.registerCallback(name, callback);
@@ -489,9 +499,12 @@ export class RuntimeAgent {
     return `${this.baseUrl}${path}`;
   }
 
+  get polling() { return this.pollMachine.state === "polling"; }
+
   start() {
     if (this.running || !this.token) return this;
     this.running = true;
+    if (this.pollMachine.state !== "polling") this.pollMachine.send("start");
     this.schedule();
     return this;
   }
@@ -499,7 +512,7 @@ export class RuntimeAgent {
   stop() {
     this.running = false;
     this.pollEpoch += 1;
-    this.polling = false;
+    if (this.pollMachine.state !== "idle") this.pollMachine.send("stop");
     if (this.timer !== null) clearTimeout(this.timer);
     this.timer = null;
     this.controller?.abort?.();
@@ -518,8 +531,8 @@ export class RuntimeAgent {
 
   async poll() {
     if (!this.running || this.polling || this.controller) return;
-    this.polling = true;
     const epoch = ++this.pollEpoch;
+    this.pollMachine.send("fire");
     const controller = typeof AbortController === "function" ? new AbortController() : null;
     this.controller = controller;
     const signal = controller?.signal;
@@ -546,7 +559,7 @@ export class RuntimeAgent {
       }
     } finally {
       if (this.controller === controller) this.controller = null;
-      if (this.pollEpoch === epoch) this.polling = false;
+      if (this.pollEpoch === epoch && this.pollMachine.state === "polling") this.pollMachine.send("settle");
     }
   }
 
@@ -698,6 +711,8 @@ export class RuntimeAgent {
     const sceneHandle = this.objectHandles.get(scene) || this.registerHandle(scene);
     const frames = [];
     let resumed = false;
+    let scenarioError = null;
+    let resumeError = null;
     try {
       stop.call(engine);
       for (let index = 0; index < options.frames.length; index += 1) {
@@ -713,12 +728,22 @@ export class RuntimeAgent {
         if (frame.snapshot !== null) result.snapshot = sceneSnapshot(this, scene, sceneHandle, frame.snapshot);
         frames.push(result);
       }
+    } catch (error) {
+      // Scenario hatasını sakla; resume hatası onun maskelemesin (#101).
+      scenarioError = error;
     } finally {
       if (wasRunning && options.resume) {
-        start.call(engine);
-        resumed = true;
+        try {
+          start.call(engine);
+          resumed = true;
+        } catch (error) {
+          resumed = false;
+          resumeError = error;
+        }
       }
     }
+    if (scenarioError) throw scenarioError;
+    if (resumeError) throw resumeError;
     return { type: "runtime-scenario", handle: engineHandle, frames, frameCount: frames.length, wasRunning, resumed };
   }
 

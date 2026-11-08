@@ -11,6 +11,8 @@ export { SpriteBatch } from "./core/sprite-batch.js";
 export { Graphics } from "./core/graphics.js";
 export { ParticleEmitter } from "./core/particle-emitter.js";
 export { Vec2, Mat3, clamp, lerp, degToRad, radToDeg, MAX_WORLD_COORDINATE } from "./core/math.js";
+export { StateMachine, InvalidStateTransitionError } from "./core/state-machine.js";
+export { UNINITIALIZED, NONE, CONSUMED, isSentinel } from "./core/sentinel.js";
 export { findGridPath, MAX_GRID_PATH_CELLS } from "./core/pathfinding.js";
 export { Input } from "./core/input.js";
 export { Animator, Tween, easing } from "./core/animation.js";

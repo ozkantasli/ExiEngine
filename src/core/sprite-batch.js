@@ -11,6 +11,39 @@ const MAX_ANIMATION_RATE = 240;
 const MAX_ANIMATION_DELTA = 5;
 const MAX_ANIMATION_STEPS = 4_096;
 
+// AnimatedSprite ile aynı "oynatıcı" sözlüğü: phase ∈ { playing, stopped, completed }.
+// playing alanı phase'den türeyen erişimdir (eski tüketiciler için); tek doğruluk kaynağı phase'dir.
+function transitionAnimation(animation, event) {
+  if (event === "play") {
+    const replay = animation.phase === "completed";
+    animation.phase = "playing";
+    return { changed: true, replay };
+  }
+  if (event === "stop") {
+    if (animation.phase !== "playing") return { changed: false, replay: false };
+    animation.phase = "stopped";
+    return { changed: true, replay: false };
+  }
+  if (event === "complete") {
+    animation.phase = "completed";
+    return { changed: true, replay: false };
+  }
+  if (event === "reopen") {
+    if (animation.phase !== "completed") return { changed: false, replay: false };
+    animation.phase = "stopped";
+    return { changed: true, replay: false };
+  }
+  return { changed: false, replay: false };
+}
+function syncSpriteAnimationTexture(sprite) {
+  const animation = sprite?.animation;
+  if (!animation) return false;
+  const frame = animation.frames[Math.max(0, Math.min(animation.frames.length - 1, animation.currentFrame | 0))];
+  if (sprite.texture === frame) return false;
+  sprite.texture = frame;
+  return true;
+}
+
 function normalizeAnimation(options) {
   if (options === null || options === undefined) return null;
   if (!options || typeof options !== "object" || !Array.isArray(options.frames) || options.frames.length === 0 || options.frames.length > MAX_ANIMATION_FRAMES || options.frames.some((frame) => !(frame instanceof Texture))) {
@@ -18,12 +51,13 @@ function normalizeAnimation(options) {
   }
   const requestedRate = Number(options.frameRate ?? 12);
   const requestedFrame = Number(options.currentFrame ?? 0);
-  return {
+  const playing = options.playing !== false;
+  const animation = {
     frames: options.frames.slice(),
     frameRate: Number.isFinite(requestedRate) ? Math.min(MAX_ANIMATION_RATE, Math.max(0, requestedRate)) : 0,
     loop: options.loop !== false,
     pingPong: Boolean(options.pingPong),
-    playing: options.playing !== false,
+    phase: playing ? "playing" : "stopped",
     onComplete: options.onComplete == null ? null : options.onComplete,
     onLoop: options.onLoop == null ? null : options.onLoop,
     onFrameChange: options.onFrameChange == null ? null : options.onFrameChange,
@@ -31,6 +65,12 @@ function normalizeAnimation(options) {
     direction: 1,
     elapsed: 0,
   };
+  Object.defineProperty(animation, "playing", {
+    enumerable: true,
+    get() { return this.phase === "playing"; },
+    set(value) { transitionAnimation(this, value === false ? "stop" : "play"); },
+  });
+  return animation;
 }
 
 function normalizeSprite(options = {}, fallbackTexture = null) {
@@ -48,7 +88,7 @@ function normalizeSprite(options = {}, fallbackTexture = null) {
     flipY: Boolean(options.flipY),
     tint: options.tint ?? 0xffffff,
     alpha: Math.max(0, Math.min(1, number(options.alpha, 1))),
-    texture: options.texture || animation?.frames[0] || fallbackTexture,
+    texture: options.texture || (animation ? animation.frames[animation.currentFrame] : null) || fallbackTexture,
     animation,
   };
 }
@@ -163,7 +203,7 @@ export class SpriteBatch extends Node {
 
   get count() { return this.sprites.length; }
 
-  invalidate({ preserveInstanceBuffer = false } = {}) { this.itemsDirty = true; this.contentVersion += 1; if (!preserveInstanceBuffer) this.instanceChunkItems.length = 0; this.spatialIndex.clear(); this.spatialLargeIndices.length = 0; this.spatialSpriteBounds.length = 0; this.visibleChunkBounds.length = 0; this.spatialIndexVersion = -1; this.visibleIndices.length = 0; this.renderItemsKey = null; this.instanceItemsKey = null; }
+  invalidate({ preserveInstanceBuffer = false } = {}) { this.itemsDirty = true; this.contentVersion += 1; if (!preserveInstanceBuffer) this.instanceChunkItems.length = 0; this.chunkBounds.length = 0; this.spatialIndex.clear(); this.spatialLargeIndices.length = 0; this.spatialSpriteBounds.length = 0; this.visibleChunkBounds.length = 0; this.spatialIndexVersion = -1; this.visibleIndices.length = 0; this.renderItemsKey = null; this.instanceItemsKey = null; }
 
   markDirty() { this.invalidate({ preserveInstanceBuffer: true }); return this; }
 
@@ -242,21 +282,35 @@ export class SpriteBatch extends Node {
   }
 
   playSprite(index) {
-    const animation = this.sprites[index]?.animation;
+    const sprite = this.sprites[index];
+    const animation = sprite?.animation;
     if (!animation) return false;
-    animation.playing = true;
+    if (animation.phase === "completed") {
+      // AnimatedSprite.play() ile aynı replay semantiği: başa sar, texture'ı senkronla, onFrameChange yayınla.
+      animation.currentFrame = 0;
+      animation.direction = 1;
+      animation.elapsed = 0;
+      transitionAnimation(animation, "play");
+      syncSpriteAnimationTexture(sprite);
+      animation.onFrameChange?.(this, index, 0);
+      this.markDirty();
+      return true;
+    }
+    // stopped → playing görsel değişiklik değildir; dirty işaretleme gerekmez.
+    transitionAnimation(animation, "play");
     return true;
   }
 
   stopSprite(index) {
     const animation = this.sprites[index]?.animation;
     if (!animation) return false;
-    animation.playing = false;
+    transitionAnimation(animation, "stop");
     return true;
   }
 
   gotoSpriteFrame(index, frame) {
-    const animation = this.sprites[index]?.animation;
+    const sprite = this.sprites[index];
+    const animation = sprite?.animation;
     if (!animation) return false;
     const requestedFrame = Number(frame);
     const nextFrame = Number.isSafeInteger(requestedFrame) ? Math.max(0, Math.min(animation.frames.length - 1, requestedFrame)) : 0;
@@ -264,7 +318,9 @@ export class SpriteBatch extends Node {
     animation.currentFrame = nextFrame;
     animation.direction = 1;
     animation.elapsed = 0;
-    this.sprites[index].texture = animation.frames[animation.currentFrame];
+    // AnimatedSprite.gotoFrame ile aynı: completed'ten stopped'a dön; playing'e dokunma.
+    transitionAnimation(animation, "reopen");
+    syncSpriteAnimationTexture(sprite);
     if (changed) animation.onFrameChange?.(this, index, animation.currentFrame);
     this.markDirty();
     return true;
@@ -278,11 +334,11 @@ export class SpriteBatch extends Node {
     for (let index = 0; index < this.sprites.length; index += 1) {
       const sprite = this.sprites[index];
       const animation = sprite.animation;
-      if (!animation || !animation.playing || animation.frames.length < 2 || animation.frameRate <= 0) continue;
+      if (!animation || animation.phase !== "playing" || animation.frames.length < 2 || animation.frameRate <= 0) continue;
       animation.elapsed += frameDelta;
       const frameDuration = 1 / animation.frameRate;
       let steps = 0;
-      while (animation.elapsed >= frameDuration && animation.playing && steps < MAX_ANIMATION_STEPS) {
+      while (animation.elapsed >= frameDuration && animation.phase === "playing" && steps < MAX_ANIMATION_STEPS) {
         animation.elapsed -= frameDuration;
         steps += 1;
         if (animation.pingPong && animation.loop) {
@@ -294,11 +350,11 @@ export class SpriteBatch extends Node {
         } else if (animation.currentFrame < animation.frames.length - 1) animation.currentFrame += 1;
         else if (animation.loop) { animation.currentFrame = 0; animation.onLoop?.(this, index); }
         else {
-          animation.playing = false;
+          transitionAnimation(animation, "complete");
           animation.onComplete?.(this, index);
           break;
         }
-        sprite.texture = animation.frames[animation.currentFrame];
+        syncSpriteAnimationTexture(sprite);
         animation.onFrameChange?.(this, index, animation.currentFrame);
         changed = true;
       }
@@ -461,15 +517,12 @@ export class SpriteBatch extends Node {
     const useGpuCulling = this.gpuCulling && gpuCulling;
     const canCull = Boolean(camera && this.cullable !== false);
     const needsCamera = Boolean(camera && !useGpuCulling);
-    if (!this.itemsDirty && this.hasInstanceCache(camera, width, height, useGpuCulling, needsCamera)) { this.lastCulledCount = 0; return this.instanceItems; }
+    // İnstance yolu contentVersion'ı tek doğruluk kaynağı olarak kullanır; itemsDirty'yi tüketmez.
+    // itemsDirty yalnızca renderItems tüketicisinin bayrağı olarak kalır (instance rebuild onu temizlemez).
+    if (this.hasInstanceCache(camera, width, height, useGpuCulling, needsCamera)) { this.lastCulledCount = 0; return this.instanceItems; }
     this.lastCulledCount = 0;
     const previousInstanceItem = this.instanceItems[0] || this.instanceChunkItems[0] || null;
     this.instanceItems.length = 0;
-    if (this.itemsDirty) {
-      this.chunkItems.length = 0;
-      this.chunkBounds.length = 0;
-      this.itemsDirty = false;
-    }
     if (useGpuCulling && this.sprites.length > 0) {
       const item = this.buildInstanceChunk(0, this.sprites.length, this.getLocalBounds(), camera, null, true, previousInstanceItem, renderAlpha);
       this.instanceChunkItems[0] = item;
@@ -695,9 +748,9 @@ export class SpriteBatch extends Node {
     const canCull = camera && this.cullable !== false;
     const renderItemsKey = canCull ? this.getStaticRenderKey(camera, width, height) : "all";
     if (!this.itemsDirty && this.renderItemsKey === renderItemsKey) { this.lastCulledCount = 0; return this.renderItems; }
+    // chunkBounds her invalidate()'te boşaltılır; bayrak okumaya gerek yok.
+    this.itemsDirty = false;
     this.lastCulledCount = 0;
-    const wasDirty = this.itemsDirty;
-    if (wasDirty) this.itemsDirty = false;
     this.renderItems.length = 0;
     if (this.spatialCulling && canCull) {
       const indices = this.getVisibleSpriteIndices(camera, width, height);
@@ -715,7 +768,7 @@ export class SpriteBatch extends Node {
     for (let start = 0, chunkIndex = 0; start < this.sprites.length; start += this.chunkSize, chunkIndex += 1) {
       const end = Math.min(this.sprites.length, start + this.chunkSize);
       const bounds = this.chunkBounds[chunkIndex] || { x: 0, y: 0, width: 0, height: 0 };
-      if (wasDirty || !this.chunkBounds[chunkIndex]) this.getChunkBounds(start, end, bounds);
+      if (!this.chunkBounds[chunkIndex]) this.getChunkBounds(start, end, bounds);
       this.chunkBounds[chunkIndex] = bounds;
       if (canCull && !this.isChunkVisible(bounds, camera, width, height)) { this.lastCulledCount += 1; continue; }
       const item = this.buildChunk(start, end, bounds, null, this.chunkItems[chunkIndex]);
@@ -733,12 +786,11 @@ export class SpriteBatch extends Node {
       this.boundsCache = { version: this.contentVersion, value: { x: 0, y: 0, width: 0, height: 0 } };
       return this.boundsCache.value;
     }
-    const wasDirty = this.itemsDirty;
     let left = Infinity; let top = Infinity; let right = -Infinity; let bottom = -Infinity;
     for (let start = 0; start < this.sprites.length; start += this.chunkSize) {
       const chunkIndex = Math.floor(start / this.chunkSize);
       const bounds = this.chunkBounds[chunkIndex] || { x: 0, y: 0, width: 0, height: 0 };
-      if (wasDirty || !this.chunkBounds[chunkIndex]) this.getChunkBounds(start, Math.min(this.sprites.length, start + this.chunkSize), bounds);
+      if (!this.chunkBounds[chunkIndex]) this.getChunkBounds(start, Math.min(this.sprites.length, start + this.chunkSize), bounds);
       this.chunkBounds[chunkIndex] = bounds;
       left = Math.min(left, bounds.x); top = Math.min(top, bounds.y); right = Math.max(right, bounds.x + bounds.width); bottom = Math.max(bottom, bounds.y + bounds.height);
     }

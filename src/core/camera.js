@@ -189,6 +189,8 @@ export class Camera {
     this.position.x = worldValue(this.position.x - this.shakeOffset.x);
     this.position.y = worldValue(this.position.y - this.shakeOffset.y);
     this.shakeOffset.set(0, 0);
+    // Yok edilmiş follow hedefini takip etmeye devam etme: hedef yok edildiğinde follow'u bırak (#20 denetimi).
+    if (this.followTarget?.destroyed === true) this.followTarget = null;
     const point = this.followTarget?.position || this.followTarget;
     if (point) {
       const x = Number(point.x); const y = Number(point.y);

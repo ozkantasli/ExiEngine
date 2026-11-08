@@ -613,20 +613,22 @@ export class WebGL2Renderer {
         if (entry?.buffer) this.gl.bindBuffer?.(this.gl.ARRAY_BUFFER, entry.buffer);
         throw error;
       }
-      entry = entry || { buffer: null, size: 0, key: null, vertexCount: 0 };
+      entry = entry || { buffer: null, size: 0, key: null, vertexCount: 0, byteLength: 0 };
       if (entry.buffer) this.gl.deleteBuffer?.(entry.buffer);
       entry.buffer = nextBuffer;
       entry.size = size;
       entry.key = batch.staticKey;
       entry.vertexCount = batch.vertexCount;
+      entry.byteLength = batch.data.byteLength;
       this.staticBuffers.set(batch.staticOwner, entry);
       this.staticBufferResizes += 1;
     } else {
       this.gl.bindBuffer(this.gl.ARRAY_BUFFER, entry.buffer);
-      if (entry.key !== batch.staticKey || entry.vertexCount !== batch.vertexCount) {
+      if (entry.key !== batch.staticKey || entry.vertexCount !== batch.vertexCount || entry.byteLength !== batch.data.byteLength) {
         this.gl.bufferSubData(this.gl.ARRAY_BUFFER, 0, batch.data);
         entry.key = batch.staticKey;
         entry.vertexCount = batch.vertexCount;
+        entry.byteLength = batch.data.byteLength;
       }
     }
     return entry.buffer;
@@ -662,6 +664,16 @@ export class WebGL2Renderer {
     gl.vertexAttribDivisor(this.instanceAxisYLocation, 1);
     gl.vertexAttribDivisor(this.instanceUvRectLocation, 1);
     gl.vertexAttribDivisor(this.instanceColorLocation, 1);
+  }
+
+  unbindInstanceBuffer() {
+    const gl = this.gl;
+    // Instance attrib'leri regular draw'da da enabled kalırdı; isim alanı çakışmasını önlemek için kapat.
+    for (const location of [this.instanceOriginLocation, this.instanceAxisXLocation, this.instanceAxisYLocation, this.instanceUvRectLocation, this.instanceColorLocation]) {
+      if (location === null || location === undefined) continue;
+      gl.disableVertexAttribArray?.(location);
+      gl.vertexAttribDivisor?.(location, 0);
+    }
   }
 
   render(time, scene, camera, target = null, processGroups = true, offscreenRoot = false, clear = this.clearBeforeRender, accumulateMetrics = false) {
@@ -748,6 +760,7 @@ export class WebGL2Renderer {
           gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, batch.instanceCount);
           instanceOffset += batch.instanceData.byteLength;
         } else {
+          this.unbindInstanceBuffer();
           gl.useProgram(this.program);
           gl.uniform2f(this.resolutionLocation, renderWidth, renderHeight);
           gl.uniform1i(this.textureLocation, 0);
@@ -771,6 +784,7 @@ export class WebGL2Renderer {
         }
       }
     } finally {
+      this.unbindInstanceBuffer();
       this.setBlendMode("normal");
       gl.disable(gl.SCISSOR_TEST);
       gl.activeTexture?.(gl.TEXTURE0);
@@ -828,6 +842,7 @@ export class WebGL2Renderer {
       if (this.instancedProgram) this.gl.deleteProgram(this.instancedProgram);
     }
     this.renderGroups.length = 0;
+    this._maxTextureSizeSnapshot = null;
     this.textures.clear(); this.renderTargets.clear(); this.textureVersions.clear(); this.textureFilters.clear(); this.textureByteSizes.clear(); this.textureBytes = 0; this.staticBuffers.clear(); this.buffer = null; this.bufferSize = 0; this.instanceBuffer = null; this.instanceBufferSize = 0; this.program = null; this.instancedProgram = null; this.filterLocation = null; this.instanceFilterLocation = null; this.maskLocation = null; this.instanceMaskLocation = null; this.maskRectLocation = null; this.instanceMaskRectLocation = null; this.maxTextureSize = 0; this.gl = null;
   }
 }

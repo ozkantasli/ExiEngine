@@ -2,6 +2,7 @@ import { Camera } from "./camera.js";
 import { Node, Scene, normalizeFilterAmount, normalizeFilterType } from "./node.js";
 import { Sprite } from "./sprite.js";
 import { RenderTexture } from "../assets/render-texture.js";
+import { NONE } from "./sentinel.js";
 
 const MAX_POST_PROCESS_EFFECTS = 4;
 const MAX_POST_PROCESS_PIXELS = 16 * 1024 * 1024;
@@ -43,7 +44,7 @@ export class RenderGroup extends Node {
     this.renderItems = [];
     this.effects = normalizeEffects(effects, this.width, this.height);
     this.effectTargets = [];
-    this.effectTargetCount = -1;
+    this.effectTargetCount = NONE;
     this.effectTargetWidth = 0;
     this.effectTargetHeight = 0;
     this.effectTargetFilter = "";

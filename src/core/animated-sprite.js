@@ -1,5 +1,6 @@
 import { Sprite } from "./sprite.js";
 import { Texture } from "../assets/texture.js";
+import { StateMachine } from "./state-machine.js";
 
 const MAX_ANIMATION_FRAMES = 4_096;
 const MAX_ANIMATION_RATE = 240;
@@ -23,8 +24,17 @@ export class AnimatedSprite extends Sprite {
     this.frameRate = Number.isFinite(requestedRate) ? Math.min(MAX_ANIMATION_RATE, Math.max(0, requestedRate)) : 0;
     this.loop = loop !== false;
     this.pingPong = Boolean(pingPong);
-    this.playing = playing !== false;
-    this.completed = false;
+    // Explicit playhead machine: playing → stopped | completed. "stop" from completed is a no-op so a
+    // finished sprite never loses its completed marker; gotoFrame/setFrames send "reopen" (completed → stopped).
+    this._phaseMachine = new StateMachine({
+      name: "animatedSprite",
+      initial: playing === false ? "stopped" : "playing",
+      states: {
+        playing: { on: { play: "playing", stop: "stopped", complete: "completed" } },
+        stopped: { on: { play: "playing", stop: "stopped", complete: "completed" } },
+        completed: { on: { play: "playing", stop: "completed", reopen: "stopped" } },
+      },
+    });
     this.onComplete = onComplete;
     this.onLoop = onLoop;
     this.onFrameChange = onFrameChange;
@@ -32,6 +42,14 @@ export class AnimatedSprite extends Sprite {
     this.direction = 1;
     this.elapsed = 0;
   }
+
+  get playing() { return this._phaseMachine.state === "playing"; }
+  set playing(value) {
+    if (value === false) { if (this._phaseMachine.state === "playing") this._phaseMachine.send("stop"); return; }
+    if (this._phaseMachine.state !== "playing") this._phaseMachine.send("play");
+  }
+  get completed() { return this._phaseMachine.state === "completed"; }
+  get phase() { return this._phaseMachine.state; }
 
   setFrames(frames) {
     const normalizedFrames = validateFrames(frames);
@@ -41,7 +59,7 @@ export class AnimatedSprite extends Sprite {
     this.currentFrame = Math.min(this.currentFrame, normalizedFrames.length - 1);
     this.direction = 1;
     this.elapsed = 0;
-    this.completed = false;
+    if (this._phaseMachine.state === "completed") this._phaseMachine.send("reopen");
     this.setTexture(normalizedFrames[this.currentFrame]);
     if (previousFrame !== this.currentFrame || previousTexture !== this.texture) this.onFrameChange?.(this, this.currentFrame);
     return this;
@@ -58,15 +76,14 @@ export class AnimatedSprite extends Sprite {
     this.currentFrame = nextFrame;
     this.direction = 1;
     this.elapsed = 0;
-    this.completed = false;
+    if (this._phaseMachine.state === "completed") this._phaseMachine.send("reopen");
     this.setTexture(this.frames[this.currentFrame]);
     if (changed) this.onFrameChange?.(this, this.currentFrame);
     return this;
   }
 
   play() {
-    if (this.completed) {
-      this.completed = false;
+    if (this._phaseMachine.state === "completed") {
       this.currentFrame = 0;
       this.direction = 1;
       this.elapsed = 0;
@@ -97,7 +114,7 @@ export class AnimatedSprite extends Sprite {
         else { this.direction = 1; this.currentFrame += 1; this.onLoop?.(this); }
       } else if (this.currentFrame < this.frames.length - 1) this.currentFrame += 1;
       else if (this.loop) { this.currentFrame = 0; this.onLoop?.(this); }
-      else { this.playing = false; this.completed = true; this.onComplete?.(this); break; }
+      else { this._phaseMachine.send("stop"); this._phaseMachine.send("complete"); this.onComplete?.(this); break; }
       this.setTexture(this.frames[this.currentFrame]);
       this.onFrameChange?.(this, this.currentFrame);
     }

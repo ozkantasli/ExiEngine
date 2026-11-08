@@ -1,6 +1,7 @@
 import { Texture } from "./texture.js";
 import { TextureAtlas } from "./texture-atlas.js";
 import { inspectKTX2 as inspectKTX2Bytes } from "./ktx2.js";
+import { UNINITIALIZED, CONSUMED } from "../core/sentinel.js";
 
 const MAX_CACHE_TEXTURES = 4_096;
 const MAX_CACHE_PIXELS = 512 * 1024 * 1024;
@@ -243,11 +244,13 @@ function waitForAbort(promise, signal) {
   const abortReason = () => signal.reason || Object.assign(new Error("Asset yükleme iptal edildi."), { name: "AbortError" });
   if (signal.aborted) return Promise.reject(abortReason());
   return new Promise((resolve, reject) => {
-    let settled = false;
+    // First-settle-wins latch via shared sentinels: UNINITIALIZED (pending) → CONSUMED (fired).
+    let settled = UNINITIALIZED;
+    const claim = () => { if (settled === CONSUMED) return false; settled = CONSUMED; return true; };
     const cleanup = () => signal.removeEventListener?.("abort", onAbort);
-    const onAbort = () => { if (settled) return; settled = true; cleanup(); reject(abortReason()); };
+    const onAbort = () => { if (!claim()) return; cleanup(); reject(abortReason()); };
     signal.addEventListener("abort", onAbort, { once: true });
-    promise.then((value) => { if (settled) return; settled = true; cleanup(); resolve(value); }, (error) => { if (settled) return; settled = true; cleanup(); reject(error); });
+    promise.then((value) => { if (!claim()) return; cleanup(); resolve(value); }, (error) => { if (!claim()) return; cleanup(); reject(error); });
   });
 }
 
@@ -284,6 +287,9 @@ export class AssetLoader {
     this.decoderIds = new WeakMap();
     this.nextDecoderId = 1;
     this.pendingControllers = new Set();
+    // Tally failed loads so silent refetch-after-failure stays observable (audit #75).
+    this.failureCount = 0;
+    this.lastLoadError = null;
     this.destroyed = false;
   }
 
@@ -321,7 +327,14 @@ export class AssetLoader {
     if (map.has(key)) return map.get(key);
     const promise = Promise.resolve().then(factory);
     map.set(key, promise);
-    promise.then(() => { if (map.get(key) === promise) map.delete(key); }, () => { if (map.get(key) === promise) map.delete(key); });
+    const settle = (error) => {
+      if (error !== null && error !== undefined) {
+        this.failureCount += 1;
+        this.lastLoadError = { key: String(key).slice(0, 256), message: String(error?.message ?? error).slice(0, 512) };
+      }
+      if (map.get(key) === promise) map.delete(key);
+    };
+    promise.then(() => settle(null), (error) => settle(error));
     return promise;
   }
 
@@ -576,7 +589,8 @@ export class AssetLoader {
           if (stopOnError) throw error;
         } finally {
           loaded += 1;
-          onProgress({ loaded, total, key: entry?.key || `#${index}`, percent: total ? loaded / total : 1 });
+          // loaded, tamamlanan attempt sayısını korur (geri uyum); failed başarısızlığı açıkça verir.
+          onProgress({ loaded, failed: errors.size, total, key: entry?.key || `#${index}`, percent: total ? loaded / total : 1 });
         }
       }
     };

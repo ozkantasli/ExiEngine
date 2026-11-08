@@ -4,7 +4,7 @@ import { normalizeBlendMode, normalizeFilterAmount, normalizeFilterType } from "
 const FLOATS_PER_VERTEX = 8;
 const BATCH_POOL_RETENTION = 16;
 
-export function updateStaticRenderKey(state, contentVersion, camera, width, height, matrix, clip, alpha = 1, filter = "none", filterAmount = 1, maskTexture = null, maskRect = null, textureVersion = -1) {
+export function updateStaticRenderKey(state, contentVersion, camera, width, height, matrix, clip, alpha = 1, filter = "none", filterAmount = 1, maskTexture = null, maskRect = null, textureVersion = -1, dataByteLength = 0) {
   const hasClip = Boolean(clip);
   const clipX = hasClip ? clip.x : 0;
   const clipY = hasClip ? clip.y : 0;
@@ -14,7 +14,7 @@ export function updateStaticRenderKey(state, contentVersion, camera, width, heig
   const maskY = maskRect?.y || 0;
   const maskWidth = maskRect?.width || 0;
   const maskHeight = maskRect?.height || 0;
-  if (state.contentVersion === contentVersion && state.textureVersion === textureVersion && state.width === width && state.height === height
+  if (state.contentVersion === contentVersion && state.textureVersion === textureVersion && state.dataByteLength === dataByteLength && state.width === width && state.height === height
     && state.cameraX === camera.position.x && state.cameraY === camera.position.y
     && state.zoom === camera.zoom && state.pixelRatio === (camera.pixelRatio || 1) && state.rotation === camera.rotation
     && state.cameraWidth === camera.width && state.cameraHeight === camera.height
@@ -27,6 +27,7 @@ export function updateStaticRenderKey(state, contentVersion, camera, width, heig
     && state.maskX === maskX && state.maskY === maskY && state.maskWidth === maskWidth && state.maskHeight === maskHeight) return state.version;
   state.contentVersion = contentVersion;
   state.textureVersion = textureVersion;
+  state.dataByteLength = dataByteLength;
   state.width = width; state.height = height;
   state.cameraX = camera.position.x; state.cameraY = camera.position.y;
   state.zoom = camera.zoom; state.pixelRatio = camera.pixelRatio || 1; state.rotation = camera.rotation;
@@ -324,9 +325,9 @@ export function buildRenderBatches(scene, camera, width, height, { gpuCulling = 
         staticBatch.values = null;
         staticBatch.staticOwner = renderable;
         staticBatch.staticKey = staticKey;
-        renderable.staticRenderCache = { key: staticKey, texture: staticBatch.texture, data: staticBatch.data, vertexCount: staticBatch.vertexCount };
+        renderable.staticRenderCache = { key: staticKey, texture: staticBatch.texture, data: staticBatch.data, vertexCount: staticBatch.vertexCount, byteLength: staticBatch.data?.byteLength ?? 0 };
       } else {
-        renderable.staticRenderCache = { key: staticKey, texture: null, data: null, vertexCount: 0 };
+        renderable.staticRenderCache = { key: staticKey, texture: null, data: null, vertexCount: 0, byteLength: 0 };
       }
     }
   }

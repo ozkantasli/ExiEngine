@@ -6,7 +6,7 @@
 [![Node](https://img.shields.io/badge/node-22%20%7C%2024-22d3ee.svg)](.github/workflows/ci.yml)
 [![Renderer](https://img.shields.io/badge/renderer-WebGPU%20%2B%20WebGL2-22d3ee.svg)](ADR-001-language-graphics-api.md)
 [![Dependencies](https://img.shields.io/badge/runtime%20deps-0-brightgreen.svg)](package.json)
-[![Unit tests](https://img.shields.io/badge/unit%20tests-201-blue.svg)](test/unit)
+[![Unit tests](https://img.shields.io/badge/unit%20tests-225-blue.svg)](test/unit)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-blue.svg)](CONTRIBUTING.md)
 
 **A dependency-free 2D game engine with its own core.**
@@ -41,7 +41,7 @@ browser.
 🎨 Pixel-art friendly: nearest sampling, `roundPixels`, flipX/flipY, atlas animations</br>
 🛡️ Safe defaults: same-origin assets, byte/pixel budgets, fixed shaders, CSP</br>
 🤖 MCP bridge: agents discover the engine, build games and verify them in the browser</br>
-📐 TypeScript definitions (`index.d.ts`), 201 unit tests and 25 allocation benchmarks</br>
+📐 TypeScript definitions (`index.d.ts`), 225 unit tests and 25 allocation benchmarks</br>
 
 Full list and behavior details: [FEATURES.md](FEATURES.md)
 

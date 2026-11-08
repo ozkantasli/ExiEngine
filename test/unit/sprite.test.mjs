@@ -1,7 +1,7 @@
 // ExiEngine unit test — Sprite family (Sprite, NineSliceSprite, AnimatedSprite)
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { Sprite, NineSliceSprite, AnimatedSprite, Texture, MAX_WORLD_COORDINATE } from "../../src/index.js";
+import { Sprite, NineSliceSprite, AnimatedSprite, Texture, MAX_WORLD_COORDINATE, UNINITIALIZED } from "../../src/index.js";
 
 test("sprite: güvenli boyutlar ve anchor", () => {
   const safe = new Sprite({ width: Infinity, height: NaN, anchorX: Infinity, alpha: NaN });
@@ -74,7 +74,8 @@ test("nineSlice: kurucu tüm geometri aynalarını tanımlı değerle damglamal�
     assert.ok(Object.hasOwn(nine, key), `kurucu ${key} alanını damglamalı`);
     assert.notEqual(nine[key], undefined, `${key} undefined olamaz`);
   }
-  assert.equal(nine.renderGeometryTexture, null);
+  assert.equal(nine.renderGeometryTexture, UNINITIALIZED);
+  for (const key of mirrorKeys) assert.equal(nine[key], UNINITIALIZED, `${key} UNINITIALIZED olmalı`);
 });
 
 test("animatedSprite: frame ilerleme, pingPong, callback'ler", () => {
