@@ -1,6 +1,7 @@
 ![ExiEngine](assets/banner.png)
 
 [![CI](https://github.com/ozkantasli/ExiEngine/actions/workflows/ci.yml/badge.svg)](https://github.com/ozkantasli/ExiEngine/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-0.2.0-ff6f9f.svg)](package.json)
 [![Node](https://img.shields.io/badge/node-22%20%7C%2024-6fffc0.svg)](.github/workflows/ci.yml)
 [![Renderer](https://img.shields.io/badge/renderer-WebGPU%20%2B%20WebGL2-ffd36f.svg)](ADR-001-language-graphics-api.md)
@@ -8,54 +9,54 @@
 [![Unit tests](https://img.shields.io/badge/unit%20tests-201-blue.svg)](test/unit)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-blue.svg)](CONTRIBUTING.md)
 
-**Kendi çekirdeğiyle çalışan, sıfır bağımlılıklı 2D oyun motoru.**
-ExiEngine; sahne grafiği, sprite batching, tilemap, particle, fizik, input, ses ve
-asset yükleme katmanlarını tek bir JavaScript API'sinde toplar ve WebGPU'yu
-öncelikli, WebGL2'yi yedek backend olarak kullanır. Çalışma zamanında başka bir
-oyun motoruna ya da npm paketine bağlı değildir; Node.js yalnızca demo sunucusu,
-testler ve MCP köprüsü için gerekir.
+**A dependency-free 2D game engine with its own core.**
+ExiEngine brings the scene graph, sprite batching, tilemaps, particles, physics,
+input, audio and asset loading together in a single JavaScript API. It renders
+with WebGPU first and falls back to WebGL2. At runtime it depends on no other game
+engine and no npm package; Node.js is only needed for the demo server, the tests
+and the MCP bridge.
 
-Onu diğer 2D motorlardan ayıran şey **AI-native** olmasıdır: yerleşik MCP köprüsü
-sayesinde Claude Code, Codex, Gemini CLI, Cursor gibi coding agent'lar motoru
-keşfedebilir, oyun iskeleti kurabilir, sahne üretebilir ve sonucu gerçek tarayıcıda
-doğrulayabilir.
+What sets it apart from other 2D engines is that it is **AI-native**: a built-in
+MCP bridge lets coding agents such as Claude Code, Codex, Gemini CLI and Cursor
+discover the engine, scaffold a game, build scenes and verify the result in a real
+browser.
 
-> **Önizleme (v0.2):** API, yapılandırma ve davranış sürümler arasında değişebilir.
-> Node testleri gerçek GPU kanıtının yerine geçmez; fiziksel mobil cihaz matrisi
-> henüz tamamlanmadı. Bkz. [Bilinçli sınırlar](#bilinçli-sınırlar).
+> **Preview (v0.2):** APIs, configuration and behavior can change between releases.
+> Node tests are not a substitute for real GPU evidence, and the physical mobile
+> device matrix is not complete yet. See [Limitations](#limitations).
 
-[Başlarken](#başlarken) · [Dokümantasyon](#dokümantasyon) · [API](API.md) ·
-[AI ajanlarıyla kullanım](#ai-ajanlarıyla-kullanım) · [Katkı](CONTRIBUTING.md)
+[Get started](#getting-started) · [Documentation](#documentation) · [API](API.md) ·
+[Using with AI agents](#using-with-ai-agents) · [Contribute](CONTRIBUTING.md)
 
-## Özellikler
+## Features
 
-⚡ WebGPU-first, otomatik WebGL2 fallback ve device-loss kurtarma</br>
-📦 Sıfır runtime bağımlılığı, tek `import`</br>
+⚡ WebGPU-first with automatic WebGL2 fallback and device-loss recovery</br>
+📦 Zero runtime dependencies, one `import`</br>
 🧩 Scene graph: Sprite, Text, Graphics, TileMap, ParticleEmitter, NineSlice, RenderGroup</br>
-🚀 Instanced `SpriteBatch` ve WebGPU compute culling ile 100.000 sprite'a kadar tek batch</br>
-🗺️ Instanced TileMap, çarpışma kutusu üretimi ve A* yol bulma</br>
-🧱 Hafif fizik: gravity, one-way platform, kinematic platform, layer/mask, temas olayları</br>
-🎮 Klavye, pointer, dokunmatik ve gamepad için tek action/axis input katmanı</br>
-🔊 Web Audio `AudioManager`: bus, fade, pan, voice bütçesi</br>
-🎨 Pixel-art dostu: nearest sampling, `roundPixels`, flipX/flipY, atlas animasyonları</br>
-🛡️ Güvenli varsayılanlar: aynı-origin asset, byte/pixel bütçeleri, sabit shader'lar, CSP</br>
-🤖 MCP köprüsü: ajanlar motoru keşfeder, oyun kurar, tarayıcıda doğrular</br>
-📐 TypeScript tanımları (`index.d.ts`), 201 unit test ve 25 allocation benchmark'ı</br>
+🚀 Instanced `SpriteBatch` with WebGPU compute culling, up to 100,000 sprites per batch</br>
+🗺️ Instanced TileMap, collision-rect generation and A* pathfinding</br>
+🧱 Lightweight physics: gravity, one-way and moving platforms, layers/masks, contact events</br>
+🎮 One action/axis input layer for keyboard, pointer, touch and gamepad</br>
+🔊 Web Audio `AudioManager`: buses, fades, panning, voice budget</br>
+🎨 Pixel-art friendly: nearest sampling, `roundPixels`, flipX/flipY, atlas animations</br>
+🛡️ Safe defaults: same-origin assets, byte/pixel budgets, fixed shaders, CSP</br>
+🤖 MCP bridge: agents discover the engine, build games and verify them in the browser</br>
+📐 TypeScript definitions (`index.d.ts`), 201 unit tests and 25 allocation benchmarks</br>
 
-Tam liste ve davranış ayrıntıları: [FEATURES.md](FEATURES.md)
+Full list and behavior details: [FEATURES.md](FEATURES.md)
 
-## Başlarken
+## Getting started
 
-| Hedefiniz | Buradan başlayın | Elde ettiğiniz |
+| Your goal | Start here | What you get |
 |---|---|---|
-| **Motoru denemek** | [Demoyu çalıştırın](#demoyu-çalıştırın) | Auto / WebGL2 / WebGPU arasında geçiş yapılabilen canlı sahne ve FPS/draw/node ölçümleri |
-| **Oyun yazmak** | [Hızlı başlangıç](#hızlı-başlangıç) ve [API.md](API.md) | Sahne, kamera, input ve fizikle çalışan ilk oyun döngünüz |
-| **AI ajanıyla oyun kurmak** | [AI ajanlarıyla kullanım](#ai-ajanlarıyla-kullanım) | MCP üzerinden iskelet, sahne üretimi ve tarayıcı önizlemesi |
-| **Katkı vermek** | [Geliştirme](#geliştirme) | Test, lint, coverage ve release kapısı |
+| **Try the engine** | [Run the demo](#run-the-demo) | A live scene you can switch between Auto / WebGL2 / WebGPU, with FPS/draw/node stats |
+| **Write a game** | [Quick start](#quick-start) and [API.md](API.md) | Your first game loop with scene, camera, input and physics |
+| **Build a game with an AI agent** | [Using with AI agents](#using-with-ai-agents) | Scaffolding, scene generation and browser preview over MCP |
+| **Contribute** | [Development](#development) | Tests, lint, coverage and the release gate |
 
-### Demoyu çalıştırın
+### Run the demo
 
-**Node.js 22 veya 24** yeterlidir; `npm install` gerekmez.
+**Node.js 22 or 24** is all you need; there is no `npm install` step.
 
 ```bash
 git clone https://github.com/ozkantasli/ExiEngine.git
@@ -63,13 +64,13 @@ cd ExiEngine
 npm run dev
 ```
 
-Ardından tarayıcıda `http://127.0.0.1:4173/` adresini açın. Sunucu yalnızca loopback
-adresinde dinler ve CSP/`nosniff` başlıklarıyla çalışır.
+Then open `http://127.0.0.1:4173/` in your browser. The server listens on loopback
+only and sends CSP/`nosniff` headers.
 
-### Hızlı başlangıç
+### Quick start
 
-Paket henüz npm'de yayımlanmadı; repo içindeki `src/index.js` dosyasını doğrudan
-import edin.
+The package is not published to npm yet; import `src/index.js` from the repository
+directly.
 
 ```js
 import { ExiEngine, Scene, Sprite, Camera } from "./ExiEngine/src/index.js";
@@ -92,16 +93,16 @@ const engine = await ExiEngine.create({
 engine.start();
 ```
 
-Kamera takibi, overlay HUD, RenderTexture, fizik ve pointer olayları için örnekler
-[API.md](API.md) içindedir.
+Examples for camera follow, overlay HUDs, RenderTexture, physics and pointer events
+are in [API.md](API.md).
 
-## Genel bakış
+## Overview
 
 ```mermaid
 flowchart LR
-  Game[Oyun kodu] --> Engine[ExiEngine<br/>fixed-step döngü]
+  Game[Game code] --> Engine[ExiEngine<br/>fixed-step loop]
   Agent[AI coding agent] -- MCP stdio --> Bridge[exi-mcp-server]
-  Bridge -- scaffold / preview / handle çağrıları --> Engine
+  Bridge -- scaffold / preview / handle calls --> Engine
   Engine --> Scene[Scene graph<br/>Sprite · Text · Graphics · TileMap · Particles]
   Engine --> Systems[Input · Animator · PhysicsWorld · AudioManager]
   Engine --> Assets[AssetLoader · TextureAtlas · KTX2 · SaveStore]
@@ -111,24 +112,24 @@ flowchart LR
   GPU --> WebGL2[WebGL2<br/>fallback]
 ```
 
-| Klasör | İçerik |
+| Folder | Contents |
 |---|---|
-| [`src/core`](src/core) | Engine, scene graph, renderable'lar, kamera, input, animasyon, çarpışma/fizik, pathfinding, profiler |
-| [`src/render`](src/render) | WebGPU ve WebGL2 renderer'ları, batching, instancing, scissor, post-process |
+| [`src/core`](src/core) | Engine, scene graph, renderables, camera, input, animation, collision/physics, pathfinding, profiler |
+| [`src/render`](src/render) | WebGPU and WebGL2 renderers, batching, instancing, scissor, post-process |
 | [`src/assets`](src/assets) | AssetLoader, Texture, RenderTexture, TextureAtlas, KTX2, SaveStore |
-| [`src/audio`](src/audio) | Web Audio tabanlı AudioManager |
-| [`src/ai`](src/ai) | Tarayıcı içi RuntimeAgent (MCP preview çağrılarının hedefi) |
-| [`tools`](tools) | Sıfır bağımlılıklı MCP köprüsü ve lint aracı |
-| [`test`](test) | Smoke, unit, typecheck, coverage, e2e ve benchmark'lar |
+| [`src/audio`](src/audio) | Web Audio based AudioManager |
+| [`src/ai`](src/ai) | In-browser RuntimeAgent (the target of MCP preview calls) |
+| [`tools`](tools) | Zero-dependency MCP bridge and lint tool |
+| [`test`](test) | Smoke, unit, typecheck, coverage, e2e and benchmarks |
 
-Grafik API ve dil seçiminin gerekçesi [ADR-001](ADR-001-language-graphics-api.md) içindedir.
+The rationale for the language and graphics API choice is in [ADR-001](ADR-001-language-graphics-api.md).
 
-## AI ajanlarıyla kullanım
+## Using with AI agents
 
-Repo, yaygın AI CLI'ları için hazır MCP yapılandırmasıyla gelir. Ajan klasörü
-açtığında `exi-engine` sunucusunu otomatik bulur.
+The repository ships ready-made MCP configuration for common AI CLIs. When an agent
+opens the folder, it finds the `exi-engine` server automatically.
 
-| İstemci | Yapılandırma |
+| Client | Configuration |
 |---|---|
 | Claude Code | [`.mcp.json`](.mcp.json), [`CLAUDE.md`](CLAUDE.md) |
 | Codex | [`.codex/config.toml`](.codex/config.toml), [`AGENTS.md`](AGENTS.md) |
@@ -136,124 +137,127 @@ açtığında `exi-engine` sunucusunu otomatik bulur.
 | Gemini CLI | [`.gemini/settings.json`](.gemini/settings.json), [`GEMINI.md`](GEMINI.md) |
 | Cursor CLI | [`.cursor/mcp.json`](.cursor/mcp.json) |
 | Cline CLI | [`.cline/mcp.json`](.cline/mcp.json) |
-| Windsurf / diğerleri | [MCP.md](MCP.md) içindeki doğrudan Node komutu |
+| Windsurf / others | The direct Node command in [MCP.md](MCP.md) |
 
-Köprüyü elle başlatmak için:
+To start the bridge manually:
 
 ```bash
 node tools/exi-mcp-server.mjs
 ```
 
-> MCP stdio komutu olarak `npm run mcp` kullanmayın; npm başlığı stdout'a karışır.
+> Do not use `npm run mcp` as the MCP stdio command; npm's banner gets mixed into stdout.
 
-Tipik ajan akışı: `exi_api` ile motoru keşfet → `exi_scaffold` (yeni oyun) veya
-`exi_project_open` (mevcut oyun) → `exi_project_apply` ile dosyaları yaz →
-`exi_project_preview` ile kontrol edip tarayıcıda aç → `exi_preview_call` ile
-canlı motor state'ini doğrula. Tüm araçlar ve güvenlik limitleri:
+A typical agent flow: discover the engine with `exi_api` → `exi_scaffold` (new game)
+or `exi_project_open` (existing game) → write files with `exi_project_apply` →
+check and open in the browser with `exi_project_preview` → verify live engine state
+with `exi_preview_call`. All tools and their safety limits:
 [AI_ENGINE_GUIDE.md](AI_ENGINE_GUIDE.md), [MCP.md](MCP.md).
 
-## Geliştirme
+## Development
 
-| Komut | Ne yapar |
+| Command | What it does |
 |---|---|
-| `npm run doctor` | Ortam, export ve agent-contract hızlı kontrolü |
-| `npm test` | Statik, server, engine smoke, unit ve typecheck aşamaları |
-| `npm run test:unit` | Yalnızca unit testler |
-| `npm run lint` | Sıfır bağımlılıklı sözdizimi ve anti-pattern taraması |
-| `npm run test:coverage` | Unit suite coverage eşikleri |
-| `npm run test:mcp` | Modern ve legacy MCP uçtan uca smoke testi |
-| `npm run test:clients` | Repo'daki her istemci config'inin gerçek handshake testi |
-| `npm run verify` | Release kapısı: `npm test` + tüm benchmark'lar |
-| `npm run bench:regression` | Yerel baseline'a göre benchmark sapma kontrolü |
-| `npm run bench:<ad>` | Tekil benchmark (`streaming`, `sprite`, `tilemap`, `physics` …) |
+| `npm run doctor` | Fast environment, export and agent-contract check |
+| `npm test` | Static, server, engine smoke, unit and typecheck stages |
+| `npm run test:unit` | Unit tests only |
+| `npm run lint` | Zero-dependency syntax and anti-pattern scan |
+| `npm run test:coverage` | Unit suite coverage thresholds |
+| `npm run test:mcp` | Modern and legacy MCP end-to-end smoke test |
+| `npm run test:clients` | Real handshake test for every client config in the repo |
+| `npm run verify` | Release gate: `npm test` plus all benchmarks |
+| `npm run bench:regression` | Benchmark drift check against the local baseline |
+| `npm run bench:<name>` | A single benchmark (`streaming`, `sprite`, `tilemap`, `physics` …) |
 
-CI ([`ci.yml`](.github/workflows/ci.yml)) her push ve PR'da Node 22 ve 24 üzerinde
-test, lint, typecheck, verify, coverage ve preview-e2e job'larını çalıştırır.
+CI ([`ci.yml`](.github/workflows/ci.yml)) runs test, lint, typecheck, verify,
+coverage and preview-e2e jobs on Node 22 and 24 for every push and pull request.
 
-Gerçek GPU/ses/input soak testi için demo sunucusu açıkken
-`http://127.0.0.1:4173/test/hardware-soak.html` sayfasını kullanın. Fiziksel cihaz
-sonuçları [test/HARDWARE_MATRIX.md](test/HARDWARE_MATRIX.md) üzerinden toplanır.
+For real GPU/audio/input soak testing, open
+`http://127.0.0.1:4173/test/hardware-soak.html` while the demo server is running.
+Physical device results are collected in [test/HARDWARE_MATRIX.md](test/HARDWARE_MATRIX.md).
 
-## Dokümantasyon
+## Documentation
 
-| Konu | Belge |
+> Most project documents are currently written in Turkish.
+
+| Topic | Document |
 |---|---|
-| Örnekli runtime ve MCP API referansı | [API.md](API.md) |
-| Ajan ve katkı sözleşmesi (canonical) | [AI_ENGINE_GUIDE.md](AI_ENGINE_GUIDE.md) |
-| MCP istemci kurulumları | [MCP.md](MCP.md) |
-| Tüm özellikler ve davranış ayrıntıları | [FEATURES.md](FEATURES.md) |
-| Tehdit modeli ve güvenlik sözleşmesi | [SECURITY.md](SECURITY.md) |
-| Ürün gereksinimleri | [PRD.md](PRD.md) |
-| Yol haritası | [ROADMAP.md](ROADMAP.md) |
-| Diğer motorlarla karşılaştırma | [ENGINE_FEATURE_MATRIX.md](ENGINE_FEATURE_MATRIX.md), [ENGINE_GAP_ANALYSIS.md](ENGINE_GAP_ANALYSIS.md) |
-| Araştırma boşlukları | [RESEARCH_GAPS.md](RESEARCH_GAPS.md) |
+| Runtime and MCP API reference with examples | [API.md](API.md) |
+| Agent and contributor contract (canonical) | [AI_ENGINE_GUIDE.md](AI_ENGINE_GUIDE.md) |
+| MCP client setup | [MCP.md](MCP.md) |
+| All features and behavior details | [FEATURES.md](FEATURES.md) |
+| Threat model and security contract | [SECURITY.md](SECURITY.md) |
+| Product requirements | [PRD.md](PRD.md) |
+| Roadmap | [ROADMAP.md](ROADMAP.md) |
+| Comparison with other engines | [ENGINE_FEATURE_MATRIX.md](ENGINE_FEATURE_MATRIX.md), [ENGINE_GAP_ANALYSIS.md](ENGINE_GAP_ANALYSIS.md) |
+| Research gaps | [RESEARCH_GAPS.md](RESEARCH_GAPS.md) |
 
-## SSS
+## FAQ
 
-> 3D destekliyor mu?
+> Does it support 3D?
 
-Hayır. ExiEngine bilinçli olarak 2D-öncelikli bir çekirdektir; 3D uzun vadeli bir
-hedef olarak yol haritasının dışında tutulur.
+No. ExiEngine is deliberately a 2D-first core; 3D is a long-term goal outside the
+current roadmap.
 
-> Tarayıcı WebGPU desteklemiyorsa ne olur?
+> What happens if the browser doesn't support WebGPU?
 
-`renderer: "auto"` önce WebGPU'yu dener, olmazsa WebGL2 ile başlar. Çalışırken WebGPU
-cihazı kaybolursa motor WebGL2'ye geçer; WebGL2 context kaybında kaynaklar yeniden
-kurulur.
+`renderer: "auto"` tries WebGPU first and starts with WebGL2 if it isn't available.
+If the WebGPU device is lost at runtime, the engine switches to WebGL2; on a WebGL2
+context loss, resources are rebuilt.
 
-> Oyunu yayınlarken Node.js gerekir mi?
+> Do I need Node.js to ship my game?
 
-Hayır. Node yalnızca geliştirme sunucusu, testler ve MCP köprüsü içindir. Oyununuz
-statik dosyalar olarak herhangi bir HTTPS sunucusundan yayınlanabilir.
+No. Node is only for the dev server, the tests and the MCP bridge. Your game can be
+served as static files from any HTTPS server.
 
-> npm'den kurabilir miyim?
+> Can I install it from npm?
 
-Henüz değil. Paket `private` olarak işaretli; şimdilik repo'yu klonlayıp
-`src/index.js` dosyasını import edin.
+Not yet. The package is marked `private`; for now, clone the repository and import
+`src/index.js`.
 
-> Tam bir rigid-body fizik motoru var mı?
+> Is there a full rigid-body physics engine?
 
-Hayır. `PhysicsWorld` platformer ve top-down oyunlar için hafif, eksen-ayrık AABB
-çözümleyicisidir. Rotasyon ve impulse çözümü bilinçli olarak çekirdeğe eklenmedi.
+No. `PhysicsWorld` is a lightweight, axis-separated AABB solver for platformers and
+top-down games. Rotation and impulse solving are intentionally left out of the core.
 
-> Mobilde çalışıyor mu?
+> Does it run on mobile?
 
-Mobil tarayıcılarda çalışacak şekilde tasarlandı (`maxPixelRatio`, dokunmatik input,
-görünürlükte duraklama), ancak fiziksel iOS/Android cihaz matrisi henüz tamamlanmadı.
+It is designed for mobile browsers (`maxPixelRatio`, touch input, pausing when
+hidden), but the physical iOS/Android device matrix is not complete yet.
 
-## Bilinçli sınırlar
+## Limitations
 
-ExiEngine bir **çekirdek**tir; görsel editör, sahne serileştirme ve hot-reload v1.0
-yol haritasındadır. Device-loss ve fallback akışları simüle smoke testlerle
-doğrulanır; gerçek GPU bellek soak'ı, driver reset ve fiziksel cihaz testleri ayrıca
-yapılmalıdır. Ses, tarayıcının kullanıcı etkileşimi politikasına tabidir. Production
-dağıtımında HTTPS ve sunucu tarafı güvenlik başlıkları ayrıca korunmalıdır.
+ExiEngine is a **core**: a visual editor, scene serialization and hot reload are on
+the v1.0 roadmap. Device-loss and fallback flows are verified with simulated smoke
+tests; real GPU memory soak, driver resets and physical device testing must be done
+separately. Audio is subject to the browser's user-gesture policy. In production,
+HTTPS and server-side security headers still need to be configured.
 
-**Kısacası:** Editör ve hazır içerik hattı istiyorsanız Godot gibi tam bir motor
-seçin; kodla kontrol edilen, bağımlılıksız ve AI ajanlarının doğrudan sürebileceği
-bir web 2D çekirdeği istiyorsanız ExiEngine'i deneyin.
+**tl;dr:** If you want an editor and a ready-made content pipeline, pick a full engine
+like Godot. If you want a code-driven, dependency-free 2D web core that AI agents can
+drive directly, try ExiEngine.
 
-## Yol haritası
+## Roadmap
 
-| Milestone | Durum | Kapsam |
+| Milestone | Status | Scope |
 |---|---|---|
-| MVP | ✅ | Bağımlılıksız 2D çekirdek, sahne grafiği, kamera, input, MCP köprüsü |
-| v0.2 | ✅ | Fizik/çarpışma, deterministik fixed-step, A*, asset pipeline, güvenlik sınırları, benchmark kapısı |
-| v1.0 | 🛠️ | Görsel editör, sahne serileştirme, hot-reload, GPU profiling, mobil cihaz matrisi |
+| MVP | ✅ | Dependency-free 2D core, scene graph, camera, input, MCP bridge |
+| v0.2 | ✅ | Physics/collision, deterministic fixed step, A*, asset pipeline, safety limits, benchmark gate |
+| v1.0 | 🛠️ | Visual editor, scene serialization, hot reload, GPU profiling, mobile device matrix |
 
-Ayrıntılar: [ROADMAP.md](ROADMAP.md)
+Details: [ROADMAP.md](ROADMAP.md)
 
-## Katkı ve destek
+## Contributing and support
 
-Katkılar, hata bildirimleri ve doküman iyileştirmeleri memnuniyetle karşılanır.
-Önce [CONTRIBUTING.md](CONTRIBUTING.md) ve [AI_ENGINE_GUIDE.md](AI_ENGINE_GUIDE.md)
-dosyalarını okuyun. Public API değişiklikleri `src/index.js`, `index.d.ts`, ilgili
-test ve dokümanla birlikte gönderilmelidir.
+Contributions, bug reports and documentation improvements are welcome. Start with
+[CONTRIBUTING.md](CONTRIBUTING.md) and [AI_ENGINE_GUIDE.md](AI_ENGINE_GUIDE.md).
+Public API changes must ship together with `src/index.js`, `index.d.ts`, a matching
+test and documentation.
 
-- **Hata ve öneriler:** [GitHub Issues](https://github.com/ozkantasli/ExiEngine/issues)
-- **Güvenlik açıkları:** Herkese açık issue açmak yerine [GitHub üzerinden özel olarak bildirin](https://github.com/ozkantasli/ExiEngine/security/advisories/new). Tehdit modeli: [SECURITY.md](SECURITY.md)
+- **Bugs and feature requests:** [GitHub Issues](https://github.com/ozkantasli/ExiEngine/issues)
+- **Security vulnerabilities:** report them [privately on GitHub](https://github.com/ozkantasli/ExiEngine/security/advisories/new) instead of opening a public issue. Threat model: [SECURITY.md](SECURITY.md)
 
-## Lisans
+## License
 
-<!-- TODO: LICENSE dosyası ekleyip burayı güncelleyin (örn. MIT / Apache-2.0). -->
-Henüz bir lisans seçilmedi. Lisans dosyası eklenene kadar tüm hakları saklıdır.
+ExiEngine is released under the [MIT License](LICENSE).
+
+Copyright (c) 2026 Özkan Taşlı
