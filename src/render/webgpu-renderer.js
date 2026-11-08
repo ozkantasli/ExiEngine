@@ -642,7 +642,7 @@ export class WebGPURenderer {
     const bytes = batch.data.byteLength;
     if (!Number.isSafeInteger(bytes) || bytes > this.maxVertexBufferBytes) throw new RangeError("WebGPU static batch buffer device limit exceeded.");
     let entry = this.staticBuffers.get(batch.staticOwner);
-    if (!entry) entry = { buffer: null, size: 0, key: null };
+    if (!entry) entry = { buffer: null, size: 0, key: null, vertexCount: 0 };
     if (!entry.buffer || bytes > entry.size) {
       const size = Math.min(this.maxVertexBufferBytes, Math.max(4096, 2 ** Math.ceil(Math.log2(bytes))));
       if (size > this.maxVertexBufferBytes) throw new RangeError("WebGPU static batch buffer device limit exceeded.");
@@ -659,11 +659,13 @@ export class WebGPURenderer {
       entry.buffer = nextBuffer;
       entry.size = size;
       entry.key = batch.staticKey;
+      entry.vertexCount = batch.vertexCount;
       this.staticBuffers.set(batch.staticOwner, entry);
       this.staticBufferResizes += 1;
-    } else if (entry.key !== batch.staticKey) {
+    } else if (entry.key !== batch.staticKey || entry.vertexCount !== batch.vertexCount) {
       this.device.queue.writeBuffer(entry.buffer, 0, batch.data);
       entry.key = batch.staticKey;
+      entry.vertexCount = batch.vertexCount;
     }
     return entry.buffer;
   }

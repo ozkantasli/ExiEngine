@@ -33,6 +33,21 @@ test.after(() => {
   else delete globalThis.navigator;
 });
 
+test("input: invalid constructor bindings leave existing listeners untouched", (t) => {
+  const canvas = makeCanvas();
+  const active = new Input(canvas);
+  t.after(() => active.destroy());
+  const before = [new Map(windowListeners), new Map(documentListeners), new Map(canvasListeners)];
+  for (const options of [
+    { actions: { jump: [] } },
+    { axes: { move: { type: "unknown" } } },
+    { actions: { move: "KeyA" }, axes: { move: { type: "key-axis", positive: "KeyD", negative: "KeyA" } } },
+  ]) {
+    assert.throws(() => new Input(canvas, options));
+    assert.deepEqual([windowListeners, documentListeners, canvasListeners], before);
+  }
+});
+
 test("input: temel binding ve axis davranışı", () => {
   const input = new Input(makeCanvas(), { axes: { keyboardAxis: { type: "key-axis", positive: "ArrowRight", negative: "ArrowLeft" } } });
   input.bindAction("keyboardAction", "KeyB");

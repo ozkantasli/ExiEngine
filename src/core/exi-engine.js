@@ -95,6 +95,20 @@ export class ExiEngine {
     this.pauseAudio = pauseAudio !== false;
     this.onStatus = onStatus;
     this.emitStatus = (status) => { try { this.onStatus(status); } catch {} };
+    this._rendererLost = false;
+    this._rendererLostPaused = false;
+    this._fallbackPromise = null;
+    this.handleRendererStatus = (status) => {
+      if (status?.type === "context-lost") {
+        this._rendererLost = true;
+      } else if (status?.type === "context-restored") {
+        this._rendererLost = false;
+        const shouldResume = this._rendererLostPaused;
+        this._rendererLostPaused = false;
+        if (shouldResume && !this.destroyed && this.paused && !this.visibilityPaused) this.resume();
+      }
+      this.emitStatus(status);
+    };
     this.onUpdate = onUpdate;
     this.onRender = onRender;
     this.renderer = null;
@@ -112,9 +126,24 @@ export class ExiEngine {
     this.accumulator = 0;
     this.audioSuspendedByEngine = false;
     this.audioLifecycleGeneration = 0;
+    this.handleAudioUnlockGesture = () => {
+      globalThis.document?.removeEventListener?.("pointerdown", this.handleAudioUnlockGesture);
+      globalThis.document?.removeEventListener?.("keydown", this.handleAudioUnlockGesture);
+      if (this.destroyed) return;
+      try {
+        Promise.resolve(this.audio?.unlock?.()).catch((error) => {
+          if (this.destroyed) return;
+          this.emitStatus({ type: "audio-error", message: error?.message || String(error) });
+        });
+      } catch (error) {
+        this.emitStatus({ type: "audio-error", message: error?.message || String(error) });
+      }
+    };
     this.fallbackUsed = false;
     this.destroyed = false;
     this.initialized = false;
+    this._lifecycleState = "created";
+    this._initPromise = null;
     this.info = {};
     this.infoRendererKeys = new Set();
     this.interpolationRoots = [];
@@ -165,10 +194,10 @@ export class ExiEngine {
       if (hidden) {
         if (this.running) {
           this.pause();
-          this.visibilityPaused = true;
+          this._setLifecycle("visibility-paused");
         }
       } else if (this.visibilityPaused) {
-        this.visibilityPaused = false;
+        this._setLifecycle("paused");
         this.start();
       }
     };
@@ -176,11 +205,11 @@ export class ExiEngine {
       this.input?.clearTransientState?.();
       if (!this.pauseOnHidden || !this.running) return;
       this.pause();
-      this.visibilityPaused = true;
+      this._setLifecycle("visibility-paused");
     };
     this.handlePageShow = () => {
       if (!this.pauseOnHidden || !this.visibilityPaused || globalThis.document?.visibilityState === "hidden") return;
-      this.visibilityPaused = false;
+      this._setLifecycle("paused");
       this.start();
     };
     this.resizeObserver = null;
@@ -189,13 +218,25 @@ export class ExiEngine {
     this.usesIntrinsicCanvasSize = false;
     this.handleRendererLost = (error) => {
       if (this.destroyed) return;
-      if (error?.recoverable) return;
+      if (error?.recoverable) {
+        this._rendererLost = true;
+        if (this.running) {
+          this._rendererLostPaused = true;
+          this.pause();
+        }
+        return;
+      }
+      this._rendererLost = false;
+      this._rendererLostPaused = false;
       if (this.preference === "webgpu" || this.fallbackUsed || this.renderer instanceof WebGL2Renderer) {
         this.stop();
         this.emitStatus({ type: "renderer-error", message: error?.message || String(error) });
         return;
       }
-      this.fallbackToWebGL(error).catch((fallbackError) => this.emitStatus({ type: "renderer-error", message: fallbackError?.message || String(fallbackError) }));
+      if (this._fallbackPromise) return;
+      this._fallbackPromise = this.fallbackToWebGL(error)
+        .catch((fallbackError) => this.emitStatus({ type: "renderer-error", message: fallbackError?.message || String(fallbackError) }))
+        .finally(() => { this._fallbackPromise = null; });
     };
   }
 
@@ -222,44 +263,59 @@ export class ExiEngine {
   async init() {
     if (this.destroyed) throw new Error("ExiEngine yok edilmiş.");
     if (this.initialized) return this;
-    this._assertConfiguration();
-    this.detectCanvasSizing();
-    this.resize();
-    if (this.preference === "webgl2") await this.selectBackend("webgl2");
-    else if (this.preference === "webgpu") await this.selectBackend("webgpu");
-    else {
-      try { await this.selectBackend("webgpu"); }
-      catch (webgpuError) {
-        if (this.destroyed) throw new Error("ExiEngine yok edilmiş.");
-        this.emitStatus({ type: "fallback", from: "webgpu", to: "webgl2", message: webgpuError.message });
-        await this.selectBackend("webgl2");
+    if (this._initPromise) return this._initPromise;
+    this._initPromise = Promise.resolve().then(async () => {
+      if (this.destroyed) throw new Error("ExiEngine yok edilmiş.");
+      this._assertConfiguration();
+      this.detectCanvasSizing();
+      this.resize();
+      if (this.preference === "webgl2") await this.selectBackend("webgl2");
+      else if (this.preference === "webgpu") await this.selectBackend("webgpu");
+      else {
+        try { await this.selectBackend("webgpu"); }
+        catch (webgpuError) {
+          if (this.destroyed) throw new Error("ExiEngine yok edilmiş.");
+          this.fallbackUsed = true;
+          this.emitStatus({ type: "fallback", from: "webgpu", to: "webgl2", message: webgpuError.message });
+          await this.selectBackend("webgl2");
+        }
       }
-    }
-    if (this.destroyed) throw new Error("ExiEngine yok edilmiş.");
-    this.input = new Input(this.canvas, { actions: this.inputActions, axes: this.inputAxes, onKeyDown: this.handleKeyDown, onGamepadConnected: this.onGamepadConnected, onGamepadDisconnected: this.onGamepadDisconnected });
-    this.resize();
-    this.eventTarget.addEventListener?.("resize", this.handleResize, { passive: true });
-    const ResizeObserverClass = globalThis.ResizeObserver;
-    this.resizeObserverTarget = this.canvas.parentElement || null;
-    if (typeof ResizeObserverClass === "function" && this.resizeObserverTarget && !this.usesIntrinsicCanvasSize) {
-      this.resizeObserver = new ResizeObserverClass(this.handleResize);
-      this.resizeObserver.observe(this.resizeObserverTarget);
-    }
-    this.visualViewport = globalThis.visualViewport || null;
-    this.visualViewport?.addEventListener?.("resize", this.handleResize, { passive: true });
-    globalThis.document?.addEventListener?.("visibilitychange", this.handleVisibilityChange, { passive: true });
-    this.eventTarget.addEventListener?.("pagehide", this.handlePageHide, { passive: true });
-    this.eventTarget.addEventListener?.("pageshow", this.handlePageShow, { passive: true });
-    this.initialized = true;
-    this.emitStatus({ type: "engine-ready", info: this.getInfo() });
-    return this;
+      if (this.destroyed) throw new Error("ExiEngine yok edilmiş.");
+      this.input = new Input(this.canvas, { actions: this.inputActions, axes: this.inputAxes, onKeyDown: this.handleKeyDown, onGamepadConnected: this.onGamepadConnected, onGamepadDisconnected: this.onGamepadDisconnected });
+      this.resize();
+      this.eventTarget.addEventListener?.("resize", this.handleResize, { passive: true });
+      const ResizeObserverClass = globalThis.ResizeObserver;
+      this.resizeObserverTarget = this.canvas.parentElement || null;
+      if (typeof ResizeObserverClass === "function" && this.resizeObserverTarget && !this.usesIntrinsicCanvasSize) {
+        this.resizeObserver = new ResizeObserverClass(this.handleResize);
+        this.resizeObserver.observe(this.resizeObserverTarget);
+      }
+      this.visualViewport = globalThis.visualViewport || null;
+      this.visualViewport?.addEventListener?.("resize", this.handleResize, { passive: true });
+      globalThis.document?.addEventListener?.("visibilitychange", this.handleVisibilityChange, { passive: true });
+      this.eventTarget.addEventListener?.("pagehide", this.handlePageHide, { passive: true });
+      this.eventTarget.addEventListener?.("pageshow", this.handlePageShow, { passive: true });
+      if (this.pauseAudio) {
+        globalThis.document?.addEventListener?.("pointerdown", this.handleAudioUnlockGesture, { passive: true });
+        globalThis.document?.addEventListener?.("keydown", this.handleAudioUnlockGesture);
+      }
+      this.initialized = true;
+      this.emitStatus({ type: "engine-ready", info: this.getInfo() });
+      return this;
+    }).catch((error) => {
+      if (!this.destroyed) this.destroy();
+      throw error;
+    });
+    return this._initPromise;
   }
 
   async selectBackend(kind) {
     this._assertConfiguration();
+    this._rendererLost = false;
+    this._rendererLostPaused = false;
     const next = kind === "webgpu"
-      ? new WebGPURenderer({ canvas: this.canvas, onLost: this.handleRendererLost, onStatus: this.emitStatus, clearColor: this.backgroundColor, clearAlpha: this.backgroundAlpha, clearBeforeRender: this.clearBeforeRender, maxTextureBytes: this.maxTextureBytes, maxTextureCount: this.maxTextureCount })
-      : new WebGL2Renderer({ canvas: this.canvas, onLost: this.handleRendererLost, onStatus: this.emitStatus, clearColor: this.backgroundColor, clearAlpha: this.backgroundAlpha, clearBeforeRender: this.clearBeforeRender, maxTextureBytes: this.maxTextureBytes, maxTextureCount: this.maxTextureCount });
+      ? new WebGPURenderer({ canvas: this.canvas, onLost: this.handleRendererLost, onStatus: this.handleRendererStatus, clearColor: this.backgroundColor, clearAlpha: this.backgroundAlpha, clearBeforeRender: this.clearBeforeRender, maxTextureBytes: this.maxTextureBytes, maxTextureCount: this.maxTextureCount })
+      : new WebGL2Renderer({ canvas: this.canvas, onLost: this.handleRendererLost, onStatus: this.handleRendererStatus, clearColor: this.backgroundColor, clearAlpha: this.backgroundAlpha, clearBeforeRender: this.clearBeforeRender, maxTextureBytes: this.maxTextureBytes, maxTextureCount: this.maxTextureCount });
     try { await next.init(); }
     catch (error) { next.destroy(); if (kind === "webgpu" && !this.destroyed) this.replaceCanvas(); throw error; }
     if (this.destroyed) { next.destroy(); throw new Error("ExiEngine yok edilmiş."); }
@@ -583,6 +639,29 @@ export class ExiEngine {
     return this;
   }
 
+  get lifecycleState() {
+    if (this.destroyed) return "destroyed";
+    if (this.running) return "running";
+    if (this.paused) return this.visibilityPaused ? "visibility-paused" : "paused";
+    if (this._lifecycleState === "stopped") return "stopped";
+    return this.initialized ? "ready" : "created";
+  }
+
+  _setLifecycle(state) {
+    this._lifecycleState = state;
+    this.running = state === "running";
+    this.paused = state === "paused" || state === "visibility-paused";
+    this.visibilityPaused = state === "visibility-paused";
+    return this;
+  }
+
+  _stopLoop() {
+    if (this.raf) globalThis.cancelAnimationFrame?.(this.raf);
+    this.raf = 0;
+    this.lastTime = 0;
+    this.accumulator = 0;
+  }
+
   start() {
     if (this.running) return this;
     if (this.destroyed) throw new Error("ExiEngine yok edilmiş.");
@@ -590,17 +669,13 @@ export class ExiEngine {
     if (!this.renderer) throw new Error("ExiEngine başlatılmadan önce init() gerekli.");
     if (typeof globalThis.requestAnimationFrame !== "function") throw new Error("ExiEngine start() için requestAnimationFrame gerekli; SSR/Worker ortamında step() kullanın.");
     this.prepare();
-    this.running = true;
-    this.paused = false;
-    this.visibilityPaused = false;
     this.lastTime = 0;
     this.accumulator = 0;
     if (this.pauseOnHidden && globalThis.document?.visibilityState === "hidden") {
-      this.running = false;
-      this.paused = true;
-      this.visibilityPaused = true;
+      this._setLifecycle("visibility-paused");
       return this;
     }
+    this._setLifecycle("running");
     this.resumeAudio();
     const frame = (time) => {
       if (!this.running) return;
@@ -617,13 +692,8 @@ export class ExiEngine {
 
   pause() {
     if (!this.running) return this;
-    this.running = false;
-    this.paused = true;
-    this.visibilityPaused = false;
-    if (this.raf) globalThis.cancelAnimationFrame?.(this.raf);
-    this.raf = 0;
-    this.lastTime = 0;
-    this.accumulator = 0;
+    this._setLifecycle("paused");
+    this._stopLoop();
     this.suspendAudio();
     return this;
   }
@@ -632,7 +702,7 @@ export class ExiEngine {
     if (!this.paused) return this;
     if (this.destroyed) throw new Error("ExiEngine yok edilmiş.");
     if (this.pauseOnHidden && globalThis.document?.visibilityState === "hidden") {
-      this.visibilityPaused = true;
+      this._setLifecycle("visibility-paused");
       return this;
     }
     this.visibilityPaused = false;
@@ -640,13 +710,9 @@ export class ExiEngine {
   }
 
   stop() {
-    this.running = false;
-    this.paused = false;
-    this.visibilityPaused = false;
-    if (this.raf) globalThis.cancelAnimationFrame?.(this.raf);
-    this.raf = 0;
-    this.lastTime = 0;
-    this.accumulator = 0;
+    this._setLifecycle("stopped");
+    this._stopLoop();
+    this.suspendAudio();
     return this;
   }
 
@@ -927,6 +993,7 @@ export class ExiEngine {
     }
     info.running = this.running;
     info.paused = this.paused;
+    info.lifecycleState = this.lifecycleState;
     info.timeScale = this.timeScale;
     info.interpolate = this.interpolate;
     info.pauseOnHidden = this.pauseOnHidden;
@@ -948,6 +1015,7 @@ export class ExiEngine {
 
   destroy() {
     this.destroyed = true;
+    this.initialized = false;
     try { this.blur(); } catch {}
     this.audioLifecycleGeneration += 1;
     this.audioSuspendedByEngine = false;
@@ -957,7 +1025,8 @@ export class ExiEngine {
     this.pointerHitResult.target = null;
     this.pointerHoverHitResult.target = null;
     this.interpolationRoots.length = 0;
-    this.stop();
+    this._setLifecycle("stopped");
+    this._stopLoop();
     this.eventTarget.removeEventListener?.("resize", this.handleResize);
     this.resizeObserver?.disconnect?.();
     this.resizeObserver = null;
@@ -967,6 +1036,8 @@ export class ExiEngine {
     globalThis.document?.removeEventListener?.("visibilitychange", this.handleVisibilityChange);
     this.eventTarget.removeEventListener?.("pagehide", this.handlePageHide);
     this.eventTarget.removeEventListener?.("pageshow", this.handlePageShow);
+    globalThis.document?.removeEventListener?.("pointerdown", this.handleAudioUnlockGesture);
+    globalThis.document?.removeEventListener?.("keydown", this.handleAudioUnlockGesture);
     this.input?.destroy();
     this.pointerTargets.clear();
     this.pointerTargetScopes.clear();

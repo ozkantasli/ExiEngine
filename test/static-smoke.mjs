@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const sourceFiles = [
   "src/index.js",
+  "src/ai/public-methods.js",
   "src/audio/audio-manager.js",
   "src/assets/save-store.js",
   "src/core/exi-engine.js",

@@ -350,6 +350,10 @@ export class Input {
         }
       }
     };
+    if (actions !== null && (typeof actions !== "object" || Array.isArray(actions))) throw new TypeError("Input actions must be an object.");
+    if (axes !== null && (typeof axes !== "object" || Array.isArray(axes))) throw new TypeError("Input axes must be an object.");
+    if (actions) for (const name of Object.keys(actions)) this.bindAction(name, actions[name]);
+    if (axes) for (const name of Object.keys(axes)) this.bindAxis(name, axes[name]);
     this.eventTarget.addEventListener?.("keydown", this.handleKeyDown, { passive: true });
     this.eventTarget.addEventListener?.("keyup", this.handleKeyUp, { passive: true });
     this.eventTarget.addEventListener?.("blur", this.clearTransientState, { passive: true });
@@ -361,10 +365,6 @@ export class Input {
     canvas.addEventListener("wheel", this.handleWheel, { passive: true });
     this.eventTarget.addEventListener?.("pointerup", this.handlePointerUp, { passive: true });
     if (globalThis.document?.addEventListener) globalThis.document.addEventListener("visibilitychange", this.clearTransientState, { passive: true });
-    if (actions !== null && (typeof actions !== "object" || Array.isArray(actions))) throw new TypeError("Input actions must be an object.");
-    if (axes !== null && (typeof axes !== "object" || Array.isArray(axes))) throw new TypeError("Input axes must be an object.");
-    if (actions) for (const name of Object.keys(actions)) this.bindAction(name, actions[name]);
-    if (axes) for (const name of Object.keys(axes)) this.bindAxis(name, axes[name]);
   }
 
   injectKeyDown(code, options = {}) {

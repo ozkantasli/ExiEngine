@@ -344,7 +344,7 @@ export class SpriteBatch extends Node {
 
   getStaticRenderKey(camera, width, height) {
     if (this.instanced) return null;
-    return updateStaticRenderKey(this.staticKeyState, this.contentVersion, camera, width, height, this.worldMatrix, this.renderClip, this.worldAlpha, this.worldFilter, this.worldFilterAmount, this.worldMaskTexture, this.worldMaskRect);
+    return updateStaticRenderKey(this.staticKeyState, this.contentVersion, camera, width, height, this.worldMatrix, this.renderClip, this.worldAlpha, this.worldFilter, this.worldFilterAmount, this.worldMaskTexture, this.worldMaskRect, this.texture?.baseTexture?.version ?? -1);
   }
 
   buildGpuSourceChunk(start, end, bounds, indices = null, reuseItem = null, alpha = 1) {

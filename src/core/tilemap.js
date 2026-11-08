@@ -70,7 +70,8 @@ export class TileMap extends Node {
     this.frameCache = new Map();
     this.renderItems = [];
     this.renderItemPool = [];
-    this.itemsDirty = true;
+    this.renderItemsDirty = true;
+    this.instanceItemsDirty = true;
     this.staticCache = Boolean(staticCache);
     this.staticKeyState = { version: 0, contentVersion: -1 };
     this.instanced = Boolean(instanced);
@@ -140,7 +141,8 @@ export class TileMap extends Node {
       if (!this.tileFlags) this.tileFlags = new Uint8Array(this.tiles.length);
       this.tileFlags[index] = nextFlags;
     }
-    this.itemsDirty = true;
+    this.renderItemsDirty = true;
+    this.instanceItemsDirty = true;
     this.contentVersion += 1;
     return this;
   }
@@ -163,7 +165,7 @@ export class TileMap extends Node {
       for (let index = 0; index < normalized.length; index += 1) if (this.tiles[index] !== normalized[index]) { changed = true; break; }
       if (changed) this.tiles.set(normalized);
     }
-    if (changed) { this.itemsDirty = true; this.contentVersion += 1; }
+    if (changed) { this.renderItemsDirty = true; this.instanceItemsDirty = true; this.contentVersion += 1; }
     return this;
   }
 
@@ -191,13 +193,15 @@ export class TileMap extends Node {
       const targetOffset = (top + row) * this.columns + left;
       for (let column = 0; column < regionWidth; column += 1) this.tiles[targetOffset + column] = normalized ? normalized[sourceOffset + column] : values[sourceOffset + column];
     }
-    this.itemsDirty = true;
+    this.renderItemsDirty = true;
+    this.instanceItemsDirty = true;
     this.contentVersion += 1;
     return this;
   }
 
   rebuild() {
-    this.itemsDirty = true;
+    this.renderItemsDirty = true;
+    this.instanceItemsDirty = true;
     this.contentVersion += 1;
     return this;
   }
@@ -300,7 +304,7 @@ export class TileMap extends Node {
 
   getStaticRenderKey(camera, width, height) {
     if (!this.staticCache || this.instanced) return null;
-    return updateStaticRenderKey(this.staticKeyState, this.contentVersion, camera, width, height, this.worldMatrix, this.renderClip, this.worldAlpha, this.worldFilter, this.worldFilterAmount, this.worldMaskTexture, this.worldMaskRect);
+    return updateStaticRenderKey(this.staticKeyState, this.contentVersion, camera, width, height, this.worldMatrix, this.renderClip, this.worldAlpha, this.worldFilter, this.worldFilterAmount, this.worldMaskTexture, this.worldMaskRect, this.texture?.baseTexture?.version ?? -1);
   }
 
   hasInstanceCache(camera, width, height, useGpuCulling) {
@@ -365,13 +369,14 @@ export class TileMap extends Node {
   }
 
   getInstanceItems(camera, width, height, { gpuCulling = false, alpha = this.worldAlpha } = {}) {
+    if (this.destroyed) { this.instanceItems.length = 0; this.lastCulledCount = 0; return this.instanceItems; }
     const renderAlpha = Number.isFinite(Number(alpha)) ? Math.max(0, Math.min(1, Number(alpha))) : 1;
     const useGpuCulling = this.gpuCulling && gpuCulling;
-    if (!this.itemsDirty && this.hasInstanceCache(camera, width, height, useGpuCulling)) { this.lastCulledCount = 0; return this.instanceItems; }
-    if (this.itemsDirty) {
+    if (!this.instanceItemsDirty && this.hasInstanceCache(camera, width, height, useGpuCulling)) { this.lastCulledCount = 0; return this.instanceItems; }
+    if (this.instanceItemsDirty) {
       this.activeTileIndices.length = 0;
       for (let index = 0; index < this.tiles.length; index += 1) if (this.tiles[index] >= 0) this.activeTileIndices.push(index);
-      this.itemsDirty = false;
+      this.instanceItemsDirty = false;
     }
     const indices = useGpuCulling ? this.activeTileIndices : this.getVisibleTileIndices(camera, width, height);
     this.lastCulledCount = this.activeTileIndices.length - indices.length;
@@ -435,7 +440,8 @@ export class TileMap extends Node {
   }
 
   getRenderItems() {
-    if (!this.itemsDirty) return this.renderItems;
+    if (this.destroyed) { this.renderItems.length = 0; return this.renderItems; }
+    if (!this.renderItemsDirty) return this.renderItems;
     const renderItems = this.renderItems;
     let itemIndex = 0;
     for (let y = 0; y < this.rows; y += 1) {
@@ -460,7 +466,7 @@ export class TileMap extends Node {
       }
     }
     renderItems.length = itemIndex;
-    this.itemsDirty = false;
+    this.renderItemsDirty = false;
     return renderItems;
   }
 

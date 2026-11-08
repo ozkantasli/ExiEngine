@@ -6,7 +6,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const requiredFiles = [
   "AI_ENGINE_GUIDE.md", "AGENTS.md", "CLAUDE.md", "GEMINI.md", "CONTRIBUTING.md",
-  "README.md", "API.md", "MCP.md", "SECURITY.md", "RESEARCH_GAPS.md", "index.d.ts", "src/index.js", "src/ai/runtime-agent.js", "tools/exi-mcp-server.mjs", "test/engine-smoke.mjs", "test/mcp-smoke.mjs",
+  "README.md", "API.md", "MCP.md", "SECURITY.md", "RESEARCH_GAPS.md", "index.d.ts", "src/index.js", "src/ai/public-methods.js", "src/ai/runtime-agent.js", "tools/exi-mcp-server.mjs", "test/engine-smoke.mjs", "test/mcp-smoke.mjs",
 ];
 const requiredExports = [
   "ExiEngine", "Scene", "Sprite", "SpriteBatch", "Texture", "TextureAtlas", "RenderTexture", "RenderGroup",

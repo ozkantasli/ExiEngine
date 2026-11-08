@@ -1,5 +1,6 @@
 export type RendererKind = "auto" | "webgpu" | "webgl2";
 export type ResizeMode = "resize" | "contain" | "cover";
+export type EngineLifecycleState = "created" | "ready" | "running" | "paused" | "visibility-paused" | "stopped" | "destroyed";
 export type BlendMode = "normal" | "additive" | "multiply";
 export type FilterKind = "none" | "grayscale" | "invert" | "brightness" | "sepia" | "contrast" | "saturate";
 export type PostProcessEffectKind = Exclude<FilterKind, "none">;
@@ -334,7 +335,7 @@ export interface AnimatedSpriteOptions extends SpriteOptions {
   onFrameChange?: ((sprite: AnimatedSprite, frame: number) => void) | null;
 }
 export class AnimatedSprite extends Sprite {
-  readonly frames: ReadonlyArray<Texture>; frameRate: number; loop: boolean; pingPong: boolean; playing: boolean; direction: number;
+  readonly frames: ReadonlyArray<Texture>; frameRate: number; loop: boolean; pingPong: boolean; playing: boolean; completed: boolean; direction: number;
   onComplete: ((sprite: AnimatedSprite) => void) | null; onLoop: ((sprite: AnimatedSprite) => void) | null; onFrameChange: ((sprite: AnimatedSprite, frame: number) => void) | null; currentFrame: number; elapsed: number;
   constructor(options: AnimatedSpriteOptions);
   setFrames(frames: readonly Texture[]): this;
@@ -679,8 +680,9 @@ export class ExiEngine {
   backgroundColor: number; backgroundAlpha: number; clearBeforeRender: boolean;
   preference: RendererKind; resizeMode: ResizeMode; scene: Scene; overlayScene: Scene | null; overlayCamera: Camera | null; animator: Animator | null; physics: PhysicsWorld | null; input: Input | null;
   assets: AssetLoader; audio: AudioManager; profiler: Profiler;
-  running: boolean; paused: boolean; timeScale: number; interpolate: boolean; pauseOnHidden: boolean; pauseAudio: boolean; audioSuspendedByEngine: boolean; focusedNode: Node | null; fallbackUsed: boolean;
+  running: boolean; paused: boolean; visibilityPaused: boolean; initialized: boolean; destroyed: boolean; lifecycleState: EngineLifecycleState; timeScale: number; interpolate: boolean; pauseOnHidden: boolean; pauseAudio: boolean; audioSuspendedByEngine: boolean; focusedNode: Node | null; fallbackUsed: boolean;
   constructor(options: EngineOptions);
+  /** Concurrent calls share initialization. Failure destroys owned resources; retry with a new engine. */
   init(): Promise<this>;
   start(): this;
   pause(): this;

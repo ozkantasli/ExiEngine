@@ -163,6 +163,30 @@ test("audio: destroy sırasında pending decode reddedilir", async () => {
   globalThis.AudioContext = FakeAudioContext;
 });
 
+test("audio: unload pending load request'ini abort eder", async () => {
+  let requestSignal = null;
+  const blockingLoader = {
+    loadBytes: (_url, options = {}) => new Promise((_resolve, reject) => {
+      requestSignal = options.requestSignal;
+      requestSignal?.addEventListener("abort", () => {
+        const error = new Error("aborted");
+        error.name = "AbortError";
+        reject(error);
+      }, { once: true });
+    }),
+  };
+  const audio = new AudioManager({ loader: blockingLoader });
+  const pending = audio.load("abort-me", "/abort.ogg");
+  for (let index = 0; index < 4 && !requestSignal; index += 1) await Promise.resolve();
+  assert.ok(requestSignal);
+  assert.equal(requestSignal.aborted, false);
+  assert.equal(audio.unload("abort-me"), false);
+  assert.equal(requestSignal.aborted, true);
+  await assert.rejects(pending, /aborted|AbortError/);
+  assert.equal(audio.pendingLoads.size, 0);
+  audio.destroy();
+});
+
 test("audio: shared load dedupe ve abort", async () => {
   let resolveBytes;
   let loadCalls = 0;

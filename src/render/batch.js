@@ -4,7 +4,7 @@ import { normalizeBlendMode, normalizeFilterAmount, normalizeFilterType } from "
 const FLOATS_PER_VERTEX = 8;
 const BATCH_POOL_RETENTION = 16;
 
-export function updateStaticRenderKey(state, contentVersion, camera, width, height, matrix, clip, alpha = 1, filter = "none", filterAmount = 1, maskTexture = null, maskRect = null) {
+export function updateStaticRenderKey(state, contentVersion, camera, width, height, matrix, clip, alpha = 1, filter = "none", filterAmount = 1, maskTexture = null, maskRect = null, textureVersion = -1) {
   const hasClip = Boolean(clip);
   const clipX = hasClip ? clip.x : 0;
   const clipY = hasClip ? clip.y : 0;
@@ -14,7 +14,7 @@ export function updateStaticRenderKey(state, contentVersion, camera, width, heig
   const maskY = maskRect?.y || 0;
   const maskWidth = maskRect?.width || 0;
   const maskHeight = maskRect?.height || 0;
-  if (state.contentVersion === contentVersion && state.width === width && state.height === height
+  if (state.contentVersion === contentVersion && state.textureVersion === textureVersion && state.width === width && state.height === height
     && state.cameraX === camera.position.x && state.cameraY === camera.position.y
     && state.zoom === camera.zoom && state.pixelRatio === (camera.pixelRatio || 1) && state.rotation === camera.rotation
     && state.cameraWidth === camera.width && state.cameraHeight === camera.height
@@ -26,6 +26,7 @@ export function updateStaticRenderKey(state, contentVersion, camera, width, heig
     && state.filter === filter && state.filterAmount === filterAmount && state.maskTexture === maskTexture
     && state.maskX === maskX && state.maskY === maskY && state.maskWidth === maskWidth && state.maskHeight === maskHeight) return state.version;
   state.contentVersion = contentVersion;
+  state.textureVersion = textureVersion;
   state.width = width; state.height = height;
   state.cameraX = camera.position.x; state.cameraY = camera.position.y;
   state.zoom = camera.zoom; state.pixelRatio = camera.pixelRatio || 1; state.rotation = camera.rotation;

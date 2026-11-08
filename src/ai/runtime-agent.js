@@ -1,3 +1,5 @@
+import { isPublicMethod } from "./public-methods.js";
+
 const MAX_DEPTH = 32;
 const MAX_KEYS = 128;
 const MAX_ITEMS = 4096;
@@ -298,7 +300,14 @@ export function createCanvasObserver(canvas, defaults = {}) {
   if (!canvas || typeof canvas !== "object" || !Number.isSafeInteger(canvas.width) || !Number.isSafeInteger(canvas.height) || canvas.width < 1 || canvas.height < 1) fail("Canvas gözlemcisi geçerli canvas ister.");
   const { columns: defaultColumns, rows: defaultRows } = observeDefaults(defaults);
   let previousHash = null;
-  return async (options = {}) => {
+  let observeQueue = Promise.resolve();
+  return (options = {}) => {
+    const run = observeQueue.then(() => observeCanvas(options));
+    observeQueue = run.then(() => {}, () => {});
+    return run;
+  };
+
+  async function observeCanvas(options = {}) {
     if (!options || typeof options !== "object" || Array.isArray(options)) fail("Canvas gözlem options object olmalı.");
     const columns = observeGridSize(options.columns, defaultColumns, "columns");
     const rows = observeGridSize(options.rows, defaultRows, "rows");
@@ -325,7 +334,7 @@ export function createCanvasObserver(canvas, defaults = {}) {
     const observation = createGridObservation({ width: canvas.width, height: canvas.height, columns, rows, pixels: context.getImageData(0, 0, columns, rows).data, previousHash });
     previousHash = observation.hash;
     return observation;
-  };
+  }
 }
 
 /**
@@ -336,7 +345,14 @@ export function createEngineObserver(engine, defaults = {}) {
   if (!engine || typeof engine.captureFrame !== "function") fail("Engine gözlemcisi captureFrame destekleyen ExiEngine ister.", "EXI_RUNTIME_OBSERVE_UNAVAILABLE");
   const { columns: defaultColumns, rows: defaultRows } = observeDefaults(defaults);
   let previousHash = null;
-  return async (options = {}) => {
+  let observeQueue = Promise.resolve();
+  return (options = {}) => {
+    const run = observeQueue.then(() => observeEngine(options));
+    observeQueue = run.then(() => {}, () => {});
+    return run;
+  };
+
+  async function observeEngine(options = {}) {
     if (!options || typeof options !== "object" || Array.isArray(options)) fail("Engine gözlem options object olmalı.");
     const columns = observeGridSize(options.columns, defaultColumns, "columns");
     const rows = observeGridSize(options.rows, defaultRows, "rows");
@@ -354,7 +370,7 @@ export function createEngineObserver(engine, defaults = {}) {
     });
     previousHash = observation.hash;
     return observation;
-  };
+  }
 }
 
 function serializeTypedArray(value) {
@@ -415,8 +431,19 @@ function resolveBatchReferences(value, results, depth = 0, key = "") {
   return resolved;
 }
 
+function raceWithTimeout(promise, timeoutMs) {
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) return Promise.resolve(promise);
+  let timer = null;
+  const timeout = new Promise((_resolve, reject) => {
+    timer = setTimeout(() => {
+      try { fail(`Runtime komut zaman aşımı: ${timeoutMs} ms.`, "EXI_RUNTIME_COMMAND_TIMEOUT"); } catch (error) { reject(error); }
+    }, timeoutMs);
+  });
+  return Promise.race([Promise.resolve(promise), timeout]).finally(() => { clearTimeout(timer); });
+}
+
 export class RuntimeAgent {
-  constructor({ api, roots = {}, callbacks = {}, observe = null, token = "", baseUrl = "", pollMs = 100, fetchImpl = globalThis.fetch?.bind(globalThis) } = {}) {
+  constructor({ api, roots = {}, callbacks = {}, observe = null, token = "", baseUrl = "", pollMs = 100, executeTimeoutMs = 10_000, fetchImpl = globalThis.fetch?.bind(globalThis) } = {}) {
     if (!api || typeof api !== "object") throw new TypeError("RuntimeAgent api nesnesi gerekli.");
     if (typeof fetchImpl !== "function") throw new TypeError("RuntimeAgent fetch gerekli.");
     if (!callbacks || typeof callbacks !== "object" || Array.isArray(callbacks)) throw new TypeError("RuntimeAgent callbacks nesnesi gerekli.");
@@ -425,6 +452,7 @@ export class RuntimeAgent {
     this.token = typeof token === "string" ? token : "";
     this.baseUrl = String(baseUrl).replace(/\/+$/, "");
     this.pollMs = Number.isFinite(Number(pollMs)) ? Math.min(2_000, Math.max(25, Number(pollMs))) : 100;
+    this.executeTimeoutMs = Number.isSafeInteger(Number(executeTimeoutMs)) ? Math.min(60_000, Math.max(250, Number(executeTimeoutMs))) : 10_000;
     this.fetch = fetchImpl;
     this.handles = new Map();
     this.objectHandles = new WeakMap();
@@ -435,6 +463,9 @@ export class RuntimeAgent {
     this.nextHandleId = 1;
     this.timer = null;
     this.running = false;
+    this.polling = false;
+    this.pollEpoch = 0;
+    this.controller = null;
     for (const [name, callback] of Object.entries(callbacks)) this.registerCallback(name, callback);
     for (const [handle, value] of Object.entries(roots)) this.registerHandle(value, handle, true);
   }
@@ -467,8 +498,13 @@ export class RuntimeAgent {
 
   stop() {
     this.running = false;
+    this.pollEpoch += 1;
+    this.polling = false;
     if (this.timer !== null) clearTimeout(this.timer);
     this.timer = null;
+    this.controller?.abort?.();
+    this.controller = null;
+    this.snapshotHashes.clear();
     return this;
   }
 
@@ -481,25 +517,36 @@ export class RuntimeAgent {
   }
 
   async poll() {
-    let response;
+    if (!this.running || this.polling || this.controller) return;
+    this.polling = true;
+    const epoch = ++this.pollEpoch;
+    const controller = typeof AbortController === "function" ? new AbortController() : null;
+    this.controller = controller;
+    const signal = controller?.signal;
     try {
-      response = await this.fetch(this.endpoint("/__exi/runtime-command"), { headers: { "x-exi-runtime-token": this.token, accept: "application/json" }, cache: "no-store" });
-    } catch {
-      return;
-    }
-    if (!response.ok) return;
-    let payload;
-    try { payload = await response.json(); } catch { return; }
-    if (!Array.isArray(payload?.commands)) return;
-    for (const command of payload.commands) {
-      if (!this.running) return;
-      let result;
-      try { result = { id: command.id, ok: true, value: await this.execute(command) }; }
-      catch (error) { result = { id: command?.id, ok: false, error: { message: error instanceof Error ? error.message : String(error), code: error?.code || "EXI_RUNTIME_ERROR" } }; }
-      if (new TextEncoder().encode(JSON.stringify(result)).byteLength > MAX_RESULT_BYTES) result = { id: command?.id, ok: false, error: { message: "Runtime result boyutu limiti aşıldı.", code: "EXI_RUNTIME_OUTPUT_LIMIT" } };
+      let response;
       try {
-        await this.fetch(this.endpoint("/__exi/runtime-result"), { method: "POST", headers: { "content-type": "application/json", "x-exi-runtime-token": this.token }, body: JSON.stringify(result), keepalive: true });
-      } catch { /* the MCP caller will time out if the preview has gone away */ }
+        response = await this.fetch(this.endpoint("/__exi/runtime-command"), { headers: { "x-exi-runtime-token": this.token, accept: "application/json" }, cache: "no-store", signal });
+      } catch {
+        return;
+      }
+      if (!response.ok) return;
+      let payload;
+      try { payload = await response.json(); } catch { return; }
+      if (!Array.isArray(payload?.commands)) return;
+      for (const command of payload.commands) {
+        if (!this.running) return;
+        let result;
+        try { result = { id: command.id, ok: true, value: await raceWithTimeout(this.execute(command), this.executeTimeoutMs) }; }
+        catch (error) { result = { id: command?.id, ok: false, error: { message: error instanceof Error ? error.message : String(error), code: error?.code || "EXI_RUNTIME_ERROR" } }; }
+        if (new TextEncoder().encode(JSON.stringify(result)).byteLength > MAX_RESULT_BYTES) result = { id: command?.id, ok: false, error: { message: "Runtime result boyutu limiti aşıldı.", code: "EXI_RUNTIME_OUTPUT_LIMIT" } };
+        try {
+          await this.fetch(this.endpoint("/__exi/runtime-result"), { method: "POST", headers: { "content-type": "application/json", "x-exi-runtime-token": this.token }, body: JSON.stringify(result), keepalive: true, signal });
+        } catch { /* the MCP caller will time out if the preview has gone away */ }
+      }
+    } finally {
+      if (this.controller === controller) this.controller = null;
+      if (this.pollEpoch === epoch) this.polling = false;
     }
   }
 
@@ -564,8 +611,10 @@ export class RuntimeAgent {
     // Callback-valued instance fields are application code, not engine methods.
     let prototype = Object.getPrototypeOf(object);
     while (prototype && prototype !== Object.prototype) {
+      const ownerName = prototype.constructor?.name;
       const descriptor = Object.getOwnPropertyDescriptor(prototype, method);
       if (descriptor) {
+        if (!isPublicMethod(ownerName, method)) fail(`Public method değil: ${method}`);
         if (typeof descriptor.value !== "function") fail(`Public method değil: ${method}`);
         return descriptor.value;
       }
@@ -596,8 +645,9 @@ export class RuntimeAgent {
     const properties = new Map();
     let target = object;
     while (target && target !== Object.prototype) {
+      const ownerName = target.constructor?.name;
       for (const name of Object.getOwnPropertyNames(target)) {
-        if (name === "constructor" || name.startsWith("_") || forbiddenKeys.has(name) || methods.has(name) || properties.has(name)) continue;
+        if (name === "constructor" || !isPublicMethod(ownerName, name) || forbiddenKeys.has(name) || methods.has(name) || properties.has(name)) continue;
         const descriptor = Object.getOwnPropertyDescriptor(target, name);
         if (!descriptor) continue;
         if (typeof descriptor.value === "function") {
@@ -774,6 +824,9 @@ export class RuntimeAgent {
       if (typeof object.destroy === "function") object.destroy();
       this.handles.delete(command.handle);
       this.objectHandles.delete(object);
+      for (const key of [...this.snapshotHashes.keys()]) {
+        if (key.startsWith(`${command.handle}:`)) this.snapshotHashes.delete(key);
+      }
       return { released: command.handle };
     }
     fail(`Bilinmeyen runtime operation: ${command.operation}`);

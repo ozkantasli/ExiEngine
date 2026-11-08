@@ -75,7 +75,7 @@ function normalizeContactHandler(value, label) {
   return value;
 }
 
-function writePhysicsContact(contact, body, other, phase) {
+function writePhysicsContact(body, other, phase) {
   const first = body.collider.bounds;
   const second = other.collider.bounds;
   const overlapX = Math.min(first.right, second.right) - Math.max(first.left, second.left);
@@ -84,10 +84,8 @@ function writePhysicsContact(contact, body, other, phase) {
   const firstCenterY = (first.top + first.bottom) * 0.5;
   const secondCenterX = (second.left + second.right) * 0.5;
   const secondCenterY = (second.top + second.bottom) * 0.5;
-  const normal = contact.normal;
-  contact.body = body;
-  contact.other = other;
-  contact.phase = phase;
+  const normal = { x: 0, y: 0 };
+  const contact = { body, other, phase, normal, penetration: 0 };
   if (overlapX >= 0 && overlapY >= 0 && overlapX <= overlapY) {
     normal.x = secondCenterX >= firstCenterX ? 1 : -1;
     normal.y = 0;
@@ -629,7 +627,6 @@ export class PhysicsWorld {
     this.contactPairs = new Map();
     this.nextContactPairs = new Map();
     this.contactOrder = new Map();
-    this.contactInfo = { body: null, other: null, phase: "begin", normal: { x: 0, y: 0 }, penetration: 0 };
     this.activeBody = null;
     this.activeOverlapFilter = acceptPhysicsBody;
     this.filterSolid = (collider) => {
@@ -685,11 +682,11 @@ export class PhysicsWorld {
   _removeContactBody(body) {
     const onEndContact = typeof this.onEndContact === "function" ? this.onEndContact : null;
     const current = this.contactPairs.get(body);
-    if (onEndContact && current) for (const other of current) onEndContact.call(this, body, other, writePhysicsContact(this.contactInfo, body, other, "end"));
+    if (onEndContact && current) for (const other of current) onEndContact.call(this, body, other, writePhysicsContact(body, other, "end"));
     this.contactPairs.delete(body);
     this.nextContactPairs.delete(body);
     for (const [owner, pairs] of this.contactPairs) {
-      if (owner !== body && pairs.delete(body) && onEndContact) onEndContact.call(this, owner, body, writePhysicsContact(this.contactInfo, owner, body, "end"));
+      if (owner !== body && pairs.delete(body) && onEndContact) onEndContact.call(this, owner, body, writePhysicsContact(owner, body, "end"));
     }
     for (const pairs of this.nextContactPairs.values()) pairs.delete(body);
     this.contactOrder.delete(body);
@@ -868,9 +865,9 @@ export class PhysicsWorld {
     }
     for (const [body, next] of nextPairs) {
       const previous = previousPairs.get(body) || null;
-      if (onBeginContact) for (const other of next) if (!previous?.has(other)) onBeginContact.call(this, body, other, writePhysicsContact(this.contactInfo, body, other, "begin"));
-      if (onStayContact) for (const other of next) onStayContact.call(this, body, other, writePhysicsContact(this.contactInfo, body, other, "stay"));
-      if (onEndContact && previous) for (const other of previous) if (!next.has(other)) onEndContact.call(this, body, other, writePhysicsContact(this.contactInfo, body, other, "end"));
+      if (onBeginContact) for (const other of next) if (!previous?.has(other)) onBeginContact.call(this, body, other, writePhysicsContact(body, other, "begin"));
+      if (onStayContact) for (const other of next) onStayContact.call(this, body, other, writePhysicsContact(body, other, "stay"));
+      if (onEndContact && previous) for (const other of previous) if (!next.has(other)) onEndContact.call(this, body, other, writePhysicsContact(body, other, "end"));
     }
     this.contactPairs = nextPairs;
     this.nextContactPairs = previousPairs;
@@ -1023,16 +1020,10 @@ export class PhysicsWorld {
     this.nextContactPairs = new Map();
     this.contactOrder.clear();
     for (const body of bodies) body._worlds.delete(this);
-    if (onEndContact) for (const [body, pairs] of activePairs) for (const other of pairs) onEndContact.call(this, body, other, writePhysicsContact(this.contactInfo, body, other, "end"));
+    if (onEndContact) for (const [body, pairs] of activePairs) for (const other of pairs) onEndContact.call(this, body, other, writePhysicsContact(body, other, "end"));
     this.collisionWorld.clear();
     this.overlapCandidates.length = 0;
     this.overlapColliderCandidates.length = 0;
-    this.contactInfo.body = null;
-    this.contactInfo.other = null;
-    this.contactInfo.phase = "end";
-    this.contactInfo.normal.x = 0;
-    this.contactInfo.normal.y = 0;
-    this.contactInfo.penetration = 0;
     this.activeBody = null;
   }
 }

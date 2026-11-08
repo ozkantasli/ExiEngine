@@ -62,6 +62,7 @@ export class AudioManager {
     this.pendingLoads = new Map();
     this.pendingLoadURLs = new Map();
     this.pendingLoadIntegrities = new Map();
+    this.loadControllers = new Map();
     this.keyGenerations = new Map();
     this.activeVoices = new Set();
     this.voiceBuffers = new Map();
@@ -262,6 +263,8 @@ export class AudioManager {
   unload(name) {
     const key = normalizeAudioKey(name);
     this.keyGenerations.set(key, (this.keyGenerations.get(key) || 0) + 1);
+    this.loadControllers.get(key)?.abort?.();
+    this.loadControllers.delete(key);
     this.pendingLoads.delete(key);
     this.pendingLoadURLs.delete(key);
     this.pendingLoadIntegrities.delete(key);
@@ -287,8 +290,9 @@ export class AudioManager {
     }
     const generation = this.generation;
     const keyGeneration = this.keyGenerations.get(key) || 0;
+    const controller = typeof AbortController === "function" ? new AbortController() : null;
     const promise = (async () => {
-      const bytes = await this.loader.loadBytes(requestURL, { maxBytes: this.maxBytes, signal: null, integrity });
+      const bytes = await this.loader.loadBytes(requestURL, { maxBytes: this.maxBytes, signal: null, requestSignal: controller?.signal, integrity });
       if (this.destroyed || generation !== this.generation) throw new Error("AudioManager yok edilmiş.");
       if (keyGeneration !== (this.keyGenerations.get(key) || 0)) throw new Error("Audio load geçersiz kılındı.");
       const exactBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
@@ -310,7 +314,15 @@ export class AudioManager {
     this.pendingLoads.set(key, promise);
     this.pendingLoadURLs.set(key, requestURL);
     this.pendingLoadIntegrities.set(key, integrity);
-    promise.then(() => { if (this.pendingLoads.get(key) === promise) { this.pendingLoads.delete(key); this.pendingLoadURLs.delete(key); this.pendingLoadIntegrities.delete(key); } }, () => { if (this.pendingLoads.get(key) === promise) { this.pendingLoads.delete(key); this.pendingLoadURLs.delete(key); this.pendingLoadIntegrities.delete(key); } });
+    if (controller) this.loadControllers.set(key, controller);
+    const clearPending = () => {
+      if (this.pendingLoads.get(key) !== promise) return;
+      this.pendingLoads.delete(key);
+      this.pendingLoadURLs.delete(key);
+      this.pendingLoadIntegrities.delete(key);
+      if (this.loadControllers.get(key) === controller) this.loadControllers.delete(key);
+    };
+    promise.then(clearPending, clearPending);
     return waitForAbort(promise, signal);
   }
 
@@ -411,6 +423,8 @@ export class AudioManager {
     if (this.destroyed) return;
     this.destroyed = true;
     this.generation += 1;
+    for (const controller of this.loadControllers.values()) controller?.abort?.();
+    this.loadControllers.clear();
     this.stopAll();
     for (const bus of this.buses.values()) bus.gain.disconnect();
     this.context?.close?.();

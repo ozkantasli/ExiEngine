@@ -17,6 +17,7 @@
     "test:clients": "node test/client-config-smoke.mjs",
     "test:clients:native": "node test/client-config-smoke.mjs --native",
     "test:mcp": "node test/mcp-smoke.mjs",
+    "test:e2e:browser": "node test/e2e/browser-e2e.mjs",
     "test": "node test/run-all.mjs",
     "test:unit": "node test/unit/run-unit.mjs",
     "test:typecheck": "node test/typecheck-syntax.mjs",

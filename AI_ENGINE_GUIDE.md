@@ -13,6 +13,7 @@ npm run lint     # zero-dep sözdizimi + anti-pattern taraması
 npm run test:typecheck  # index.d.ts bütünlüğü + TS consumer fixture
 npm run test:coverage   # unit suite coverage eşikleri
 npm run bench:regression  # benchmark baseline drift kapısı
+npm run test:e2e:browser  # gerçek Chrome/Chromium canvas + runtime telemetry
 npm run verify   # release gate ve tüm benchmark’lar
 node tools/exi-mcp-server.mjs  # AI CLI stdio bridge; stdout yalnızca JSON-RPC
 npm run test:clients:native  # kurulu host CLI’lar için bounded mcp list probe
@@ -83,11 +84,13 @@ Bridge ve browser RuntimeAgent; `eval`, `new Function`, dinamik import, uzaktan 
 - `test/typecheck-syntax.mjs`: `index.d.ts` bütünlüğü + `test/fixtures/typecheck.ts` consumer'ını `--experimental-strip-types` ile çalıştırır (Node 22.6+; Node 22'de SKIP, Node 24'te tam çalışır).
 - `test/benchmark/benchmark-regression.mjs`: 25 benchmark'ı baseline ile karşılaştırır (elapsed +%50, fps -%40 tolerans). İlk koşuda `benchmark-baseline.json` oluşturur.
 - `test/e2e/preview-e2e.mjs`: loopback server'ı başlatır, HTTP 200 + güvenlik başlıklarını doğrular.
+- `test/e2e/browser-e2e.mjs`: on-demand Playwright ile gerçek browser demo frame/FPS telemetry’sini ve WebGPU/WebGL2 kısa hardware-soak koşusunu doğrular; yerel kurulu Chrome için `EXI_PLAYWRIGHT_CHANNEL=chrome npm run test:e2e:browser` kullanılabilir. 30 saniyelik release soak için `EXI_PLAYWRIGHT_SECONDS=30` verilir.
 - CI: `.github/workflows/ci.yml` — push/PR'da test (Node 22+24), verify (Node 24), coverage (Node 24) ve preview-e2e (Node 24) job'ları. Node 20 deprecated olduğu için matristen çıkarıldı.
 
 ## Kaynak haritası
 
 - `src/index.js`: public runtime export yüzeyi.
+- `src/ai/public-methods.js`: MCP ve browser RuntimeAgent için ortak sınıf-bazlı public method allowlist’i; renderer/cache/validation yardımcıları AI çağrı yüzeyine girmez.
 - `src/ai/runtime-agent.js`: scaffold preview’ın token-korumalı, allowlisted browser runtime command client’ı; arbitrary script runner değildir.
 - `index.d.ts`: aynı API’nin TypeScript bildirimi; public API değişirse birlikte güncellenir.
 - `src/core/`: scene graph, camera, input, animation, physics, tilemap, text ve 2D primitives.

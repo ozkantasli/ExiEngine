@@ -163,6 +163,7 @@ with `exi_preview_call`. All tools and their safety limits:
 | `npm run lint` | Zero-dependency syntax and anti-pattern scan |
 | `npm run test:coverage` | Unit suite coverage thresholds |
 | `npm run test:mcp` | Modern and legacy MCP end-to-end smoke test |
+| `npm run test:e2e:browser` | Real Chrome/Chromium canvas and runtime telemetry test |
 | `npm run test:clients` | Real handshake test for every client config in the repo |
 | `npm run verify` | Release gate: `npm test` plus all benchmarks |
 | `npm run bench:regression` | Benchmark drift check against the local baseline |

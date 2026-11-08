@@ -168,7 +168,7 @@ export class Camera {
     if (!Number.isFinite(requestedAmplitude) || !Number.isFinite(requestedDuration) || requestedAmplitude <= 0 || requestedDuration <= 0) return this.clearShake();
     const requestedFrequency = Number(frequency);
     this.shakeAmplitude = Math.min(MAX_CAMERA_SHAKE_AMPLITUDE, Math.max(0, Math.abs(requestedAmplitude)));
-    this.shakeDuration = Math.min(MAX_CAMERA_SHAKE_DURATION, Math.max(0.0001, requestedDuration));
+    this.shakeDuration = this.shakeAmplitude > 0 ? Math.min(MAX_CAMERA_SHAKE_DURATION, Math.max(0.0001, requestedDuration)) : 0;
     this.shakeElapsed = 0;
     this.shakeFrequency = Number.isFinite(requestedFrequency) ? Math.min(MAX_CAMERA_SHAKE_FREQUENCY, Math.max(1, requestedFrequency)) : 24;
     this.shakePhase = (this.shakePhase + 0.754877666) % (Math.PI * 2);

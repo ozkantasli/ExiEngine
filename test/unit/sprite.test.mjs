@@ -67,6 +67,16 @@ test("nineSlice: 9 parça render ve flip", () => {
   assert.equal(hostile.left, 0);
 });
 
+test("nineSlice: kurucu tüm geometri aynalarını tanımlı değerle damglamalı", () => {
+  const nine = new NineSliceSprite({ width: 10, height: 10 });
+  const mirrorKeys = ["renderGeometryTexture", "renderGeometryWidth", "renderGeometryHeight", "renderGeometryAnchorX", "renderGeometryAnchorY", "renderGeometryFlipX", "renderGeometryFlipY", "renderGeometryLeft", "renderGeometryRight", "renderGeometryTop", "renderGeometryBottom"];
+  for (const key of mirrorKeys) {
+    assert.ok(Object.hasOwn(nine, key), `kurucu ${key} alanını damglamalı`);
+    assert.notEqual(nine[key], undefined, `${key} undefined olamaz`);
+  }
+  assert.equal(nine.renderGeometryTexture, null);
+});
+
 test("animatedSprite: frame ilerleme, pingPong, callback'ler", () => {
   const frameOne = new Texture({ id: "frame-one" });
   const frameTwo = new Texture({ id: "frame-two" });
@@ -77,9 +87,20 @@ test("animatedSprite: frame ilerleme, pingPong, callback'ler", () => {
   assert.equal(animated.texture, frameTwo);
   animated.update(0.11);
   assert.equal(animated.playing, false);
+  assert.equal(animated.completed, true);
   assert.equal(completed, 1);
   animated.gotoFrame(0).play();
   assert.equal(animated.currentFrame, 0);
+  assert.equal(animated.completed, false);
+  const restarted = new AnimatedSprite({ frames: [frameOne, frameTwo], frameRate: 10, loop: false });
+  restarted.update(0.11);
+  restarted.update(0.11);
+  assert.equal(restarted.completed, true);
+  assert.equal(restarted.currentFrame, 1);
+  restarted.play();
+  assert.equal(restarted.completed, false);
+  assert.equal(restarted.currentFrame, 0);
+  assert.equal(restarted.texture, frameOne);
   const loops = [];
   const pingPong = new AnimatedSprite({ frames: [frameOne, frameTwo], frameRate: 10, pingPong: true, onLoop: (sprite) => loops.push(sprite) });
   pingPong.update(0.11);

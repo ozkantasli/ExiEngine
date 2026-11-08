@@ -272,6 +272,48 @@ test("physics: contact begin/stay/end lifecycle", () => {
   world.clear();
 });
 
+test("physics: contact kayıtları retained kabul edilebilir (paylaşılmaz)", () => {
+  const scene = new Scene();
+  const a = new Sprite({ width: 10, height: 10, x: 0, y: 0 });
+  const b = new Sprite({ width: 10, height: 10, x: 5, y: 0 });
+  const c = new Sprite({ width: 10, height: 10, x: 0, y: 60 });
+  const d = new Sprite({ width: 10, height: 10, x: 112, y: 60 });
+  scene.add(a, b, c, d);
+  const beginContacts = [];
+  let retained = null;
+  let retainedSnapshot = null;
+  const world = new PhysicsWorld({
+    scene,
+    gravityY: 0,
+    onBeginContact: (body, other, contact) => {
+      beginContacts.push(contact);
+      if (!retained) {
+        retained = contact;
+        retainedSnapshot = { body, other, phase: contact.phase, normalX: contact.normal.x, normalY: contact.normal.y, penetration: contact.penetration };
+      }
+    },
+  });
+  world.add(new PhysicsBody(a));
+  world.add(new PhysicsBody(b));
+  world.add(new PhysicsBody(c));
+  world.add(new PhysicsBody(d));
+  world.step(1 / 60);
+  assert.equal(beginContacts.length, 1);
+  assert.ok(retained);
+  b.position.x = 30;
+  d.position.x = 9;
+  world.step(1 / 60);
+  assert.equal(beginContacts.length, 2);
+  assert.notEqual(beginContacts[1], retained);
+  assert.equal(retained.body, retainedSnapshot.body);
+  assert.equal(retained.other, retainedSnapshot.other);
+  assert.equal(retained.phase, retainedSnapshot.phase);
+  assert.equal(retained.normal.x, retainedSnapshot.normalX);
+  assert.equal(retained.normal.y, retainedSnapshot.normalY);
+  assert.equal(retained.penetration, retainedSnapshot.penetration);
+  world.clear();
+});
+
 test("physics: onStayContact ve clear end-contact", () => {
   const scene = new Scene();
   const a = new Sprite({ width: 10, height: 10 });

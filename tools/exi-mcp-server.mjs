@@ -5,6 +5,7 @@ import { createServer as createNetServer } from "node:net";
 import path from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
+import { isPublicMethod } from "../src/ai/public-methods.js";
 import * as engineExports from "../src/index.js";
 
 const configuredRoot = process.env.EXI_MCP_ROOT || process.env.CLAUDE_PROJECT_DIR;
@@ -26,6 +27,7 @@ const MAX_BASE64_STRING_LENGTH = Math.ceil(MAX_BINARY_BYTES / 3) * 4;
 const MAX_CHUNKED_ASSET_BYTES = 64 * 1024 * 1024;
 const MAX_PENDING_ASSET_BYTES = 64 * 1024 * 1024;
 const MAX_ASSET_UPLOADS = 8;
+const MAX_UPLOAD_IDLE_MS = 15 * 60_000;
 const MAX_PROJECT_FILE_BYTES = 64 * 1024;
 const MAX_PROJECT_PATCH_TEXT_BYTES = 64 * 1024;
 const MAX_PROJECT_APPLY_FILES = 16;
@@ -521,7 +523,49 @@ async function removeAssetUpload(upload) {
   try { await unlink(upload.tempPath); } catch (error) { if (error?.code !== "ENOENT") throw error; }
 }
 
+async function pruneAssetUploads() {
+  const deadline = Date.now() - MAX_UPLOAD_IDLE_MS;
+  for (const upload of [...assetUploads.values()]) {
+    if ((upload.lastActivityAt || upload.createdAt || 0) >= deadline) continue;
+    try { await removeAssetUpload(upload); } catch { /* stale upload cleanup is best effort */ }
+  }
+}
+
+// Ghost temps from a previously killed process would make the next `wx` temp create fail with
+// EEXIST forever, so every upload-begins/open unlinks untracked `.exi-upload-*` / `.exi-file-upload-*`
+// leftovers in the affected directory. Tracked in-flight temps (and `.exi-backup-*`, a deliberate
+// recovery affordance) are never touched.
+async function sweepStaleUploadTemps(parentDir) {
+  const protectedPaths = new Set();
+  for (const upload of assetUploads.values()) protectedPaths.add(upload.tempPath);
+  for (const upload of projectFileUploads.values()) protectedPaths.add(upload.tempPath);
+  let entries;
+  try { entries = await readdir(parentDir, { withFileTypes: true }); } catch (error) {
+    if (error?.code === "ENOENT") return;
+    throw error;
+  }
+  for (const entry of entries) {
+    if (!entry.isFile()) continue;
+    if (!/\.exi-(?:upload|file-upload)-/.test(entry.name)) continue;
+    const tempPath = path.join(parentDir, entry.name);
+    if (protectedPaths.has(tempPath)) continue;
+    try { await unlink(tempPath); } catch { /* stale temp cleanup is best effort */ }
+  }
+}
+
+async function writeUploadTempExclusive(tempPath, data, options = {}) {
+  const optionsWithFlag = { ...options, flag: "wx" };
+  try {
+    await writeFile(tempPath, data, optionsWithFlag);
+  } catch (error) {
+    if (error?.code !== "EEXIST") throw error;
+    try { await unlink(tempPath); } catch { throw error; }
+    await writeFile(tempPath, data, optionsWithFlag);
+  }
+}
+
 async function beginAssetUpload({ path: filePath, size, overwrite = false, expectedVersion, expectedSha256 } = {}) {
+  await pruneAssetUploads();
   if (assetUploads.size >= MAX_ASSET_UPLOADS) fail("Aktif asset upload limiti aşıldı.", "EXI_MCP_UPLOAD_LIMIT");
   if (typeof overwrite !== "boolean") fail("overwrite boolean olmalı.");
   const expectedBytes = assertChunkedAssetSize(size);
@@ -531,22 +575,24 @@ async function beginAssetUpload({ path: filePath, size, overwrite = false, expec
   requireScaffoldFile(target);
   const normalizedSha256 = normalizeExpectedSha256(expectedSha256, `Asset ${target.relative}`);
   await ensureProjectParent(target);
+  await sweepStaleUploadTemps(path.dirname(target.resolved));
   const existing = await inspectProjectFile(target);
   assertExpectedVersion(existing, expectedVersion, `Asset ${target.relative}`);
   if (existing && !overwrite) fail(`Asset dosyası zaten var: ${target.relative}. overwrite=true gerekli.`, "EXI_MCP_FILE_EXISTS");
   const id = `u${nextAssetUploadId++}`;
   const tempPath = `${target.resolved}.exi-upload-${process.pid}-${id}`;
   try {
-    await writeFile(tempPath, new Uint8Array(), { flag: "wx" });
-    assetUploads.set(id, { id, target, tempPath, expectedBytes, receivedBytes: 0, overwrite: Boolean(overwrite), expectedVersion, expectedSha256: normalizedSha256, hash: normalizedSha256 ? createHash("sha256") : null });
+    await writeUploadTempExclusive(tempPath, new Uint8Array());
+    assetUploads.set(id, { id, target, tempPath, expectedBytes, receivedBytes: 0, state: expectedBytes === 0 ? "complete" : "receiving", createdAt: Date.now(), lastActivityAt: Date.now(), overwrite: Boolean(overwrite), expectedVersion, expectedSha256: normalizedSha256, hash: normalizedSha256 ? createHash("sha256") : null });
   } catch (error) {
     try { await unlink(tempPath); } catch { /* cleanup best effort */ }
     throw error;
   }
-  return { uploadId: id, path: target.relative, expectedBytes, receivedBytes: 0, chunkBytes: MAX_BINARY_BYTES, ...(normalizedSha256 ? { expectedSha256: normalizedSha256 } : {}) };
+  return { uploadId: id, path: target.relative, expectedBytes, receivedBytes: 0, state: expectedBytes === 0 ? "complete" : "receiving", complete: expectedBytes === 0, chunkBytes: MAX_BINARY_BYTES, ...(normalizedSha256 ? { expectedSha256: normalizedSha256 } : {}) };
 }
 
 async function writeAssetChunk({ uploadId, offset, bytes } = {}) {
+  await pruneAssetUploads();
   const upload = requireAssetUpload(uploadId);
   if (!Number.isSafeInteger(offset) || offset < 0 || offset !== upload.receivedBytes) fail("Asset chunk offset önceki receivedBytes ile aynı olmalı.", "EXI_MCP_UPLOAD_ORDER");
   const data = resolveArgument(bytes);
@@ -556,7 +602,9 @@ async function writeAssetChunk({ uploadId, offset, bytes } = {}) {
   await appendFile(upload.tempPath, data);
   upload.hash?.update(data);
   upload.receivedBytes += data.byteLength;
-  return { uploadId, path: upload.target.relative, receivedBytes: upload.receivedBytes, expectedBytes: upload.expectedBytes, remainingBytes: upload.expectedBytes - upload.receivedBytes, complete: upload.receivedBytes === upload.expectedBytes };
+  upload.lastActivityAt = Date.now();
+  upload.state = upload.receivedBytes === upload.expectedBytes ? "complete" : "receiving";
+  return { uploadId, path: upload.target.relative, receivedBytes: upload.receivedBytes, expectedBytes: upload.expectedBytes, remainingBytes: upload.expectedBytes - upload.receivedBytes, complete: upload.state === "complete", state: upload.state };
 }
 
 async function replaceUploadedFile(upload, existing) {
@@ -582,8 +630,9 @@ async function replaceUploadedFile(upload, existing) {
 }
 
 async function commitAssetUpload({ uploadId } = {}) {
+  await pruneAssetUploads();
   const upload = requireAssetUpload(uploadId);
-  if (upload.receivedBytes !== upload.expectedBytes) fail(`Asset upload tamamlanmadı: ${upload.receivedBytes}/${upload.expectedBytes} byte.`, "EXI_MCP_UPLOAD_INCOMPLETE");
+  if (upload.state !== "complete" || upload.receivedBytes !== upload.expectedBytes) fail(`Asset upload tamamlanmadı: ${upload.receivedBytes}/${upload.expectedBytes} byte.`, "EXI_MCP_UPLOAD_INCOMPLETE");
   const tempEntry = await lstat(upload.tempPath);
   if (tempEntry.isSymbolicLink() || !tempEntry.isFile()) fail("Asset geçici upload dosyası güvenli değil.", "EXI_MCP_PATH_LINK");
   const existing = await inspectProjectFile(upload.target);
@@ -783,7 +832,16 @@ async function removeProjectFileUpload(upload) {
   try { await unlink(upload.tempPath); } catch (error) { if (error?.code !== "ENOENT") throw error; }
 }
 
+async function pruneProjectFileUploads() {
+  const deadline = Date.now() - MAX_UPLOAD_IDLE_MS;
+  for (const upload of [...projectFileUploads.values()]) {
+    if ((upload.lastActivityAt || upload.createdAt || 0) >= deadline) continue;
+    try { await removeProjectFileUpload(upload); } catch { /* stale upload cleanup is best effort */ }
+  }
+}
+
 async function beginProjectFileUpload({ path: filePath, size, overwrite = false, expectedVersion, expectedSha256 } = {}) {
+  await pruneProjectFileUploads();
   if (projectFileUploads.size >= MAX_PROJECT_FILE_UPLOADS) fail("Aktif proje file upload limiti aşıldı.", "EXI_MCP_UPLOAD_LIMIT");
   if (typeof overwrite !== "boolean") fail("overwrite boolean olmalı.");
   const expectedBytes = assertChunkedProjectFileSize(size);
@@ -793,22 +851,24 @@ async function beginProjectFileUpload({ path: filePath, size, overwrite = false,
   requireScaffoldFile(target);
   const normalizedSha256 = normalizeExpectedSha256(expectedSha256, `Proje dosyası ${target.relative}`);
   await ensureProjectParent(target);
+  await sweepStaleUploadTemps(path.dirname(target.resolved));
   const existing = await inspectProjectFile(target);
   assertExpectedVersion(existing, expectedVersion, `Proje dosyası ${target.relative}`);
   if (existing && !overwrite) fail(`Proje dosyası zaten var: ${target.relative}. overwrite=true gerekli.`, "EXI_MCP_FILE_EXISTS");
   const id = `f${nextProjectFileUploadId++}`;
   const tempPath = `${target.resolved}.exi-file-upload-${process.pid}-${id}`;
   try {
-    await writeFile(tempPath, "", { encoding: "utf8", flag: "wx" });
-    projectFileUploads.set(id, { id, target, tempPath, expectedBytes, receivedBytes: 0, overwrite: Boolean(overwrite), expectedVersion, expectedSha256: normalizedSha256, hash: normalizedSha256 ? createHash("sha256") : null });
+    await writeUploadTempExclusive(tempPath, "", { encoding: "utf8" });
+    projectFileUploads.set(id, { id, target, tempPath, expectedBytes, receivedBytes: 0, state: expectedBytes === 0 ? "complete" : "receiving", createdAt: Date.now(), lastActivityAt: Date.now(), overwrite: Boolean(overwrite), expectedVersion, expectedSha256: normalizedSha256, hash: normalizedSha256 ? createHash("sha256") : null });
   } catch (error) {
     try { await unlink(tempPath); } catch { /* cleanup best effort */ }
     throw error;
   }
-  return { fileUploadId: id, path: target.relative, expectedBytes, receivedBytes: 0, chunkBytes: MAX_PROJECT_FILE_CHUNK_BYTES, ...(normalizedSha256 ? { expectedSha256: normalizedSha256 } : {}) };
+  return { fileUploadId: id, path: target.relative, expectedBytes, receivedBytes: 0, state: expectedBytes === 0 ? "complete" : "receiving", complete: expectedBytes === 0, chunkBytes: MAX_PROJECT_FILE_CHUNK_BYTES, ...(normalizedSha256 ? { expectedSha256: normalizedSha256 } : {}) };
 }
 
 async function writeProjectFileChunk({ fileUploadId, offset, content } = {}) {
+  await pruneProjectFileUploads();
   const upload = requireProjectFileUpload(fileUploadId);
   if (!Number.isSafeInteger(offset) || offset < 0 || offset !== upload.receivedBytes) fail("Proje file chunk offset önceki receivedBytes ile aynı olmalı.", "EXI_MCP_UPLOAD_ORDER");
   const chunk = assertProjectFileChunk(content);
@@ -818,12 +878,15 @@ async function writeProjectFileChunk({ fileUploadId, offset, content } = {}) {
   const entry = await lstat(upload.tempPath);
   if (entry.isSymbolicLink() || !entry.isFile() || entry.size !== upload.receivedBytes + chunk.bytes) fail("Proje file upload boyutu doğrulanamadı.", "EXI_MCP_UPLOAD_SIZE");
   upload.receivedBytes = entry.size;
-  return { fileUploadId, path: upload.target.relative, receivedBytes: upload.receivedBytes, expectedBytes: upload.expectedBytes, remainingBytes: upload.expectedBytes - upload.receivedBytes, complete: upload.receivedBytes === upload.expectedBytes };
+  upload.lastActivityAt = Date.now();
+  upload.state = upload.receivedBytes === upload.expectedBytes ? "complete" : "receiving";
+  return { fileUploadId, path: upload.target.relative, receivedBytes: upload.receivedBytes, expectedBytes: upload.expectedBytes, remainingBytes: upload.expectedBytes - upload.receivedBytes, complete: upload.state === "complete", state: upload.state };
 }
 
 async function commitProjectFileUpload({ fileUploadId } = {}) {
+  await pruneProjectFileUploads();
   const upload = requireProjectFileUpload(fileUploadId);
-  if (upload.receivedBytes !== upload.expectedBytes) fail(`Proje file upload tamamlanmadı: ${upload.receivedBytes}/${upload.expectedBytes} byte.`, "EXI_MCP_UPLOAD_INCOMPLETE");
+  if (upload.state !== "complete" || upload.receivedBytes !== upload.expectedBytes) fail(`Proje file upload tamamlanmadı: ${upload.receivedBytes}/${upload.expectedBytes} byte.`, "EXI_MCP_UPLOAD_INCOMPLETE");
   const tempEntry = await lstat(upload.tempPath);
   if (tempEntry.isSymbolicLink() || !tempEntry.isFile() || tempEntry.size !== upload.expectedBytes) fail("Proje file geçici upload dosyası güvenli değil.", "EXI_MCP_PATH_LINK");
   const existing = await inspectProjectFile(upload.target);
@@ -948,8 +1011,9 @@ function publicPrototypeMethods(value) {
   const names = new Set();
   let prototype = value?.prototype;
   while (prototype && prototype !== Object.prototype) {
+    const ownerName = prototype.constructor?.name;
     for (const name of Object.getOwnPropertyNames(prototype)) {
-      if (name === "constructor" || name.startsWith("_") || forbiddenKeys.has(name)) continue;
+      if (name === "constructor" || !isPublicMethod(ownerName, name) || forbiddenKeys.has(name)) continue;
       const descriptor = Object.getOwnPropertyDescriptor(prototype, name);
       if (typeof descriptor?.value === "function") names.add(name);
     }
@@ -1228,8 +1292,10 @@ function getPublicMethod(object, method) {
   // Callback-valued instance fields are application code, not engine methods.
   let prototype = Object.getPrototypeOf(object);
   while (prototype && prototype !== Object.prototype) {
+    const ownerName = prototype.constructor?.name;
     const descriptor = Object.getOwnPropertyDescriptor(prototype, method);
     if (descriptor) {
+      if (!isPublicMethod(ownerName, method)) fail(`Public method değil: ${method}`);
       if (typeof descriptor.value !== "function") fail(`Public method değil: ${method}`);
       return descriptor.value;
     }
@@ -1256,8 +1322,9 @@ function inspectHandle(object, handle) {
   const properties = new Map();
   let target = object;
   while (target && target !== Object.prototype) {
+    const ownerName = target.constructor?.name;
     for (const name of Object.getOwnPropertyNames(target)) {
-      if (name === "constructor" || name.startsWith("_") || forbiddenKeys.has(name) || methods.has(name) || properties.has(name)) continue;
+      if (name === "constructor" || !isPublicMethod(ownerName, name) || forbiddenKeys.has(name) || methods.has(name) || properties.has(name)) continue;
       const descriptor = Object.getOwnPropertyDescriptor(target, name);
       if (!descriptor) continue;
       if (typeof descriptor.value === "function") {
@@ -1316,8 +1383,8 @@ function scaffoldFiles(relativeDirectory) {
   const projectUrl = `/${safeDirectory.replaceAll("\\", "/").replace(/^\/+/, "").split("/").map(encodeURIComponent).join("/")}`;
   return {
     "index.html": `<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${projectName}</title></head><body><canvas id="game" width="960" height="540"></canvas><output id="exi-runtime" aria-label="ExiEngine runtime" hidden></output><script type="module" src="${projectUrl}/game.js"></script></body></html>\n`,
-    "game.js": `import * as Exi from "/src/index.js";\nimport { RuntimeAgent } from "/src/ai/runtime-agent.js";\n\nconst { ExiEngine, Graphics, Scene } = Exi;\nconst canvas = document.querySelector("#game");\nconst runtimeNode = document.querySelector("#exi-runtime");\nconst runtimeToken = await fetch("/__exi/runtime-token").then((response) => response.ok ? response.text() : "").then((value) => value.trim()).catch(() => "");\nlet lastEvent = "starting";\nlet lastTelemetryAt = 0;\nconst scene = new Scene();\nscene.add(new Graphics({ x: 432, y: 222 }).rect(0, 0, 96, 96, { fill: 0x5eead4 }));\nconst publishRuntime = (currentEngine) => {\n  const info = currentEngine.getInfo();\n  const state = { ready: true, status: currentEngine.running ? "running" : "stopped", event: lastEvent, backend: info.backend || "unknown", fps: Math.round(info.profiler?.fps || 0), draws: info.drawCalls || 0, nodes: info.nodeCount || 0 };\n  for (const [key, value] of Object.entries(state)) runtimeNode.dataset[key] = String(value);\n  runtimeNode.dataset.ready = "true";\n  runtimeNode.textContent = JSON.stringify(state);\n  const now = performance.now();\n  if (runtimeToken && (now - lastTelemetryAt >= 250 || state.status !== "running")) {\n    lastTelemetryAt = now;\n    void fetch("/__exi/runtime", { method: "POST", headers: { "content-type": "application/json", "x-exi-runtime-token": runtimeToken }, body: JSON.stringify(state), keepalive: true }).catch(() => {});\n  }\n};\nconst engine = await ExiEngine.create({ canvas, scene, width: 960, height: 540, onStatus: (event) => { lastEvent = event.type; }, onRender: publishRuntime });\nengine.start();\nconst runtimeAgent = new RuntimeAgent({ api: Exi, roots: { engine, scene }, token: runtimeToken });\nruntimeAgent.start();\n\n// Add your own Nodes, Sprites, input and game loop here.\nwindow.game = { engine, scene, runtimeAgent };\n`,
-    "README.md": `# ${projectName}\n\nThis game was scaffolded by ExiEngine's AI tool bridge.\n\nRun from the repository root with \`npm run dev\`, then open ${projectUrl}/index.html.\n\nThe hidden \`#exi-runtime\` output publishes bounded status/backend/fps/draws/nodes telemetry for browser-capable AI CLI verification; after a real browser load, MCP can read the matching token-managed report with \`exi_preview_probe({ path: "/__exi/runtime" })\`. See the \`exi://runtime\` MCP resource.\n\nThe engine has no runtime dependency on another game engine.\n`,
+    "game.js": `import * as Exi from "/src/index.js";\nimport { RuntimeAgent } from "/src/ai/runtime-agent.js";\n\nconst { ExiEngine, Graphics, Scene } = Exi;\nconst canvas = document.querySelector("#game");\nconst runtimeNode = document.querySelector("#exi-runtime");\nconst runtimeToken = await fetch("/__exi/runtime-token").then((response) => response.ok ? response.text() : "").then((value) => value.trim()).catch(() => "");\nlet lastEvent = "starting";\nlet lastTelemetryAt = 0;\nconst scene = new Scene();\nconst player = new Graphics({ x: 432, y: 222 }).rect(0, 0, 96, 96, { fill: 0x5eead4 });\nscene.add(player);\nconst publishRuntime = (currentEngine) => {\n  const info = currentEngine.getInfo();\n  const state = { ready: true, status: currentEngine.running ? "running" : "stopped", event: lastEvent, backend: info.backend || "unknown", fps: Math.round(info.profiler?.fps || 0), draws: info.drawCalls || 0, nodes: info.nodeCount || 0 };\n  for (const [key, value] of Object.entries(state)) runtimeNode.dataset[key] = String(value);\n  runtimeNode.dataset.ready = "true";\n  runtimeNode.textContent = JSON.stringify(state);\n  const now = performance.now();\n  if (runtimeToken && (now - lastTelemetryAt >= 250 || state.status !== "running")) {\n    lastTelemetryAt = now;\n    void fetch("/__exi/runtime", { method: "POST", headers: { "content-type": "application/json", "x-exi-runtime-token": runtimeToken }, body: JSON.stringify(state), keepalive: true }).catch(() => {});\n  }\n};\nconst engine = await ExiEngine.create({\n  canvas,\n  scene,\n  width: 960,\n  height: 540,\n  inputAxes: { moveX: { type: "key-axis", positive: "ArrowRight", negative: "ArrowLeft" }, moveY: { type: "key-axis", positive: "ArrowDown", negative: "ArrowUp" } },\n  onStatus: (event) => { lastEvent = event.type; },\n  onUpdate: (delta, currentEngine) => {\n    const direction = currentEngine.input?.getVector("moveX", "moveY");\n    if (!direction) return;\n    player.position.x = Math.max(0, Math.min(864, player.position.x + direction.x * 180 * delta));\n    player.position.y = Math.max(0, Math.min(444, player.position.y + direction.y * 180 * delta));\n  },\n  onRender: publishRuntime,\n});\nengine.start();\nconst runtimeAgent = new RuntimeAgent({ api: Exi, roots: { engine, scene }, token: runtimeToken });\nruntimeAgent.start();\n\n// The starter is playable with the arrow keys; add your own Nodes, Sprites and rules here.\nwindow.game = { engine, scene, player, runtimeAgent };\n`,
+    "README.md": `# ${projectName}\n\nThis game was scaffolded by ExiEngine's AI tool bridge.\n\nRun from the repository root with \`npm run dev\`, then open ${projectUrl}/index.html.\n\nThe starter includes an arrow-key controlled square so a browser-capable AI CLI can verify input → fixed-step → scene movement immediately. The hidden \`#exi-runtime\` output publishes bounded status/backend/fps/draws/nodes telemetry; after a real browser load, MCP can read the matching token-managed report with \`exi_preview_probe({ path: "/__exi/runtime" })\`. See the \`exi://runtime\` MCP resource.\n\nThe engine has no runtime dependency on another game engine.\n`,
   };
 }
 
@@ -1411,6 +1478,7 @@ async function openProject({ path: directoryPath } = {}, signal, progressToken) 
   await assertSafeScaffoldTarget(target, []);
   const entry = await lstat(target.resolved);
   if (entry.isSymbolicLink() || !entry.isDirectory()) fail("Açılacak proje yolu klasör olmalı.", "EXI_MCP_FILE_PATH");
+  await sweepStaleUploadTemps(target.resolved);
   scaffoldDirectories.add(target.relative);
   try {
     const check = await checkProject({ path: target.relative }, signal, progressToken);
@@ -1660,6 +1728,18 @@ function requirePreview(previewId) {
   return previews.get(previewId);
 }
 
+function previewState(preview) {
+  if (preview.state === "stopping") return "stopping";
+  if (preview.exited || preview.child?.exitCode !== null) return "exited";
+  return preview.state === "ready" ? "ready" : "starting";
+}
+
+function pruneExitedPreviews() {
+  for (const [previewId, preview] of previews) {
+    if (previewState(preview) === "exited") previews.delete(previewId);
+  }
+}
+
 async function waitForPreview(preview, timeoutMs = MAX_PREVIEW_STARTUP_MS, signal, pagePath = "/") {
   const deadline = Date.now() + timeoutMs;
   const targetUrl = new URL(pagePath, preview.url).href;
@@ -1691,6 +1771,7 @@ function inferPreviewDirectory(pagePath) {
 async function startPreview({ port = null, path: pagePath = "/", directory = null } = {}, signal, progressToken) {
   throwIfCancelled(signal);
   sendProgress(progressToken, 0, 1, "Preview başlatılıyor.");
+  pruneExitedPreviews();
   if (previews.size >= MAX_PREVIEWS) fail(`Aynı anda en fazla ${MAX_PREVIEWS} preview çalışabilir.`, "EXI_MCP_PREVIEW_LIMIT");
   const safePagePath = safePreviewPath(pagePath);
   const previewDirectory = directory ?? inferPreviewDirectory(safePagePath);
@@ -1699,14 +1780,14 @@ async function startPreview({ port = null, path: pagePath = "/", directory = nul
   if (!Number.isSafeInteger(requestedPort) || requestedPort <= 0 || requestedPort > 65_535) fail("Preview portu geçersiz.");
   const previewId = `p${nextPreviewId++}`;
   const runtimeToken = randomBytes(18).toString("base64url");
-  const preview = { id: previewId, directory: previewDirectory, pagePath: safePagePath, port: requestedPort, url: `http://127.0.0.1:${requestedPort}/`, runtimeToken, child: null, exited: false, stdout: "", stderr: "" };
+  const preview = { id: previewId, directory: previewDirectory, pagePath: safePagePath, port: requestedPort, url: `http://127.0.0.1:${requestedPort}/`, runtimeToken, child: null, state: "starting", exited: false, stopPromise: null, stdout: "", stderr: "" };
   const child = spawn(process.execPath, [path.join(ROOT, "server.mjs"), "--port", String(requestedPort)], { cwd: ROOT, env: { ...process.env, EXI_RUNTIME_TOKEN: runtimeToken }, stdio: ["ignore", "pipe", "pipe"], shell: false, windowsHide: true });
   preview.child = child;
   const append = (target, chunk) => `${target}${chunk}`.slice(-MAX_OUTPUT_BYTES);
   child.stdout.on("data", (chunk) => { preview.stdout = append(preview.stdout, chunk.toString()); });
   child.stderr.on("data", (chunk) => { preview.stderr = append(preview.stderr, chunk.toString()); });
-  child.once("exit", () => { preview.exited = true; });
-  child.once("error", (error) => { preview.exited = true; preview.stderr = append(preview.stderr, error.message); });
+  child.once("exit", () => { preview.exited = true; if (preview.state !== "stopping") preview.state = "exited"; });
+  child.once("error", (error) => { preview.exited = true; preview.state = "exited"; preview.stderr = append(preview.stderr, error.message); });
   previews.set(previewId, preview);
   let ready;
   try {
@@ -1720,8 +1801,9 @@ async function startPreview({ port = null, path: pagePath = "/", directory = nul
     await stopPreview(previewId);
     fail(`Preview başlatılamadı: ${preview.stderr || "server hazır olmadı"}`, "EXI_MCP_PREVIEW_START");
   }
+  preview.state = "ready";
   sendProgress(progressToken, 1, 1, "Preview hazır.");
-  return { previewId, url: preview.url, pagePath: safePagePath, pageUrl: new URL(safePagePath, preview.url).href, port: preview.port, ready: true, runtime: { path: "/__exi/runtime", tokenManaged: true } };
+  return { previewId, url: preview.url, pagePath: safePagePath, pageUrl: new URL(safePagePath, preview.url).href, port: preview.port, state: "ready", ready: true, runtime: { path: "/__exi/runtime", tokenManaged: true } };
 }
 
 async function projectPreview({ path: directoryPath, port = null } = {}, signal, progressToken) {
@@ -1746,10 +1828,12 @@ async function projectStatus({ path: directoryPath } = {}, signal, progressToken
   const assets = await listProjectAssets({ path: target.relative });
   throwIfCancelled(signal);
   const projectCheck = await checkProject({ path: target.relative }, signal, progressToken);
+  pruneExitedPreviews();
   const activePreviews = [];
   for (const preview of previews.values()) {
     if (preview.directory !== target.relative) continue;
     throwIfCancelled(signal);
+    const state = previewState(preview);
     let runtime = null;
     try {
       const probe = await probePreview({ previewId: preview.id, path: "/__exi/runtime" }, signal);
@@ -1763,12 +1847,13 @@ async function projectStatus({ path: directoryPath } = {}, signal, progressToken
       if (error?.code === "EXI_MCP_CANCELLED") throw error;
       runtime = { status: null, ok: false, telemetry: null, error: { code: error?.code || "EXI_MCP_PREVIEW_PROBE", message: String(error?.message || error) } };
     }
-    activePreviews.push({ previewId: preview.id, directory: preview.directory, pagePath: preview.pagePath, pageUrl: new URL(preview.pagePath, preview.url).href, port: preview.port, ready: !preview.exited, runtime });
+    activePreviews.push({ previewId: preview.id, directory: preview.directory, pagePath: preview.pagePath, pageUrl: new URL(preview.pagePath, preview.url).href, port: preview.port, state, ready: state === "ready", runtime });
   }
   return { directory: target.relative, ok: projectCheck.ok, projectCheck, files: files.files, assets: assets.assets, previews: activePreviews };
 }
 
 function sessionStatus() {
+  pruneExitedPreviews();
   return {
     handleCount: handles.size,
     protectedHandleCount: protectedHandles.size,
@@ -1785,7 +1870,10 @@ function sessionStatus() {
       expectedBytes: upload.expectedBytes,
       receivedBytes: upload.receivedBytes,
       remainingBytes: upload.expectedBytes - upload.receivedBytes,
-      complete: upload.receivedBytes === upload.expectedBytes,
+      complete: upload.state === "complete",
+      state: upload.state,
+      createdAt: upload.createdAt,
+      lastActivityAt: upload.lastActivityAt,
     })),
     projectFileUploads: [...projectFileUploads.values()].map((upload) => ({
       fileUploadId: upload.id,
@@ -1793,7 +1881,10 @@ function sessionStatus() {
       expectedBytes: upload.expectedBytes,
       receivedBytes: upload.receivedBytes,
       remainingBytes: upload.expectedBytes - upload.receivedBytes,
-      complete: upload.receivedBytes === upload.expectedBytes,
+      complete: upload.state === "complete",
+      state: upload.state,
+      createdAt: upload.createdAt,
+      lastActivityAt: upload.lastActivityAt,
     })),
     previews: [...previews.values()].map((preview) => ({
       previewId: preview.id,
@@ -1801,7 +1892,8 @@ function sessionStatus() {
       pagePath: preview.pagePath,
       pageUrl: new URL(preview.pagePath, preview.url).href,
       port: preview.port,
-      ready: !preview.exited && preview.child?.exitCode === null,
+      state: previewState(preview),
+      ready: previewState(preview) === "ready",
       runtime: { tokenManaged: true },
     })),
   };
@@ -1904,11 +1996,27 @@ async function probePreview({ previewId, path: requestPath = "/" } = {}, signal)
 }
 
 async function stopPreview(previewId) {
-  const preview = requirePreview(previewId);
-  previews.delete(previewId);
-  if (!preview.child || preview.exited || preview.child.exitCode !== null) return { stopped: previewId };
-  await terminateProcessTree(preview.child);
-  return { stopped: previewId };
+  if (typeof previewId !== "string" || !/^p[1-9][0-9]*$/.test(previewId)) fail(`Preview bulunamadı: ${previewId}`);
+  const preview = previews.get(previewId);
+  if (!preview) return { stopped: previewId, alreadyStopped: true, state: "exited" };
+  if (preview.stopPromise) {
+    await preview.stopPromise;
+    return { stopped: previewId, alreadyStopped: true, state: "exited" };
+  }
+  const wasActive = Boolean(preview.child && !preview.exited && preview.child.exitCode === null);
+  preview.state = "stopping";
+  const stopPromise = (async () => {
+    try {
+      if (wasActive) await terminateProcessTree(preview.child);
+    } finally {
+      preview.exited = true;
+      preview.state = "exited";
+      previews.delete(previewId);
+    }
+  })();
+  preview.stopPromise = stopPromise;
+  await stopPromise;
+  return { stopped: previewId, alreadyStopped: !wasActive, state: "exited" };
 }
 
 const expectedVersionSchema = { type: "object", required: ["bytes", "mtimeMs"], additionalProperties: false, properties: { bytes: { type: "integer", minimum: 0 }, mtimeMs: { type: "number", minimum: 0 } }, description: "Önceki read/list sonucundaki version; stale overwrite'ı reddetmek için kullanılır." };

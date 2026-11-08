@@ -1,6 +1,7 @@
 // ExiEngine unit test — ExiEngine core
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { getEventListeners } from "node:events";
 import { ExiEngine, Scene, Node, Sprite, Camera, Animator, Tween, PhysicsWorld, RenderTexture, Texture } from "../../src/index.js";
 import { WebGL2Renderer } from "../../src/render/webgl2-renderer.js";
 
@@ -190,6 +191,70 @@ test("engine: callback hatası runtime-error + input endFrame", () => {
   engine.destroy();
 });
 
+test("engine: concurrent init shares backend and input lifecycle", async (t) => {
+  const canvas = Object.assign(new EventTarget(), { getContext() {} });
+  const engine = new ExiEngine({ canvas, renderer: "webgl2" });
+  t.after(() => engine.destroy());
+  let backendCalls = 0;
+  let releaseBackend;
+  const ready = new Promise((resolve) => { releaseBackend = resolve; });
+  engine.selectBackend = async () => {
+    backendCalls += 1;
+    await ready;
+    engine.renderer = { resize() {}, getInfo: () => ({}), destroy() {} };
+  };
+  const first = engine.init();
+  const second = engine.init();
+  releaseBackend();
+  assert.deepEqual(await Promise.all([first, second]), [engine, engine]);
+  assert.equal(backendCalls, 1);
+  assert.equal(getEventListeners(canvas, "pointerdown").length, 1);
+  assert.equal(await engine.init(), engine);
+  assert.equal(backendCalls, 1);
+  engine.destroy();
+  assert.equal(getEventListeners(canvas, "pointerdown").length, 0);
+});
+
+test("engine: late initialization failure releases partial resources", async (t) => {
+  const canvas = Object.assign(new EventTarget(), { getContext() {} });
+  const engine = new ExiEngine({ canvas, renderer: "webgl2" });
+  t.after(() => engine.destroy());
+  let rendererDestroys = 0;
+  engine.selectBackend = async () => {
+    engine.renderer = { resize() {}, getInfo: () => ({}), destroy() { rendererDestroys += 1; } };
+  };
+  const failure = new Error("pageshow registration failed");
+  engine.eventTarget = new EventTarget();
+  const addListener = engine.eventTarget.addEventListener;
+  t.mock.method(engine.eventTarget, "addEventListener", function (type, ...args) {
+    if (type === "pageshow") throw failure;
+    return addListener.call(this, type, ...args);
+  });
+  const results = await Promise.allSettled([engine.init(), engine.init()]);
+  assert.ok(results.every((result) => result.status === "rejected" && result.reason === failure));
+  assert.equal(rendererDestroys, 1);
+  assert.equal(engine.renderer, null);
+  assert.equal(engine.input, null);
+  assert.equal(engine.destroyed, true);
+  assert.equal(engine.initialized, false);
+  assert.equal(engine.assets.destroyed, true);
+  assert.equal(engine.audio.destroyed, true);
+  assert.equal(engine.scene.destroyed, false);
+  assert.equal(getEventListeners(canvas, "pointerdown").length, 0);
+  assert.equal(getEventListeners(engine.eventTarget, "resize").length, 0);
+  assert.equal(getEventListeners(engine.eventTarget, "pagehide").length, 0);
+  await assert.rejects(engine.init(), /yok edilmiş/);
+});
+
+test("engine: create cleans renderer when input configuration is invalid", async (t) => {
+  let renderer;
+  const canvas = Object.assign(new EventTarget(), { getContext() {} });
+  t.mock.method(WebGL2Renderer.prototype, "init", function () { renderer = this; });
+  await assert.rejects(ExiEngine.create({ canvas, renderer: "webgl2", inputActions: { jump: [] } }), /binding/);
+  assert.equal(renderer.destroyed, true);
+  assert.equal(getEventListeners(canvas, "pointerdown").length, 0);
+});
+
 test("engine: late-init destroy yarışı", async () => {
   const previousInit = WebGL2Renderer.prototype.init;
   WebGL2Renderer.prototype.init = () => new Promise((resolve) => { setTimeout(resolve, 10); });
@@ -225,6 +290,66 @@ test("engine: handleRendererLost fallback davranışı", async () => {
   destroyed.handleRendererLost(new Error("after-destroy"));
   await Promise.resolve();
   assert.equal(destroyedCalls, 0);
+});
+
+test("engine: lifecycleState geçişleri ve stop audio suspend", () => {
+  const engine = stubEngine({ renderer: "auto" });
+  assert.equal(engine.lifecycleState, "created");
+  engine.initialized = true;
+  assert.equal(engine.lifecycleState, "ready");
+  engine.running = true;
+  assert.equal(engine.lifecycleState, "running");
+  engine.running = false;
+  engine.paused = true;
+  assert.equal(engine.lifecycleState, "paused");
+  engine.visibilityPaused = true;
+  assert.equal(engine.lifecycleState, "visibility-paused");
+  engine.visibilityPaused = false;
+  engine.paused = false;
+  let suspendCalls = 0;
+  engine.audio.context = { state: "running", suspend() { suspendCalls += 1; return Promise.resolve(); } };
+  engine.running = true;
+  engine.stop();
+  assert.equal(engine.lifecycleState, "stopped");
+  assert.equal(engine.audioSuspendedByEngine, true);
+  assert.equal(suspendCalls, 1);
+  engine.destroy();
+  assert.equal(engine.lifecycleState, "destroyed");
+});
+
+test("engine: recoverable renderer kaybı pause ve context-restored resume", () => {
+  const previousRaf = globalThis.requestAnimationFrame;
+  const previousCancel = globalThis.cancelAnimationFrame;
+  globalThis.requestAnimationFrame = () => 1;
+  globalThis.cancelAnimationFrame = () => {};
+  const engine = stubEngine({ renderer: "auto" });
+  engine.initialized = true;
+  try {
+    engine.start();
+    assert.equal(engine.lifecycleState, "running");
+    const recoverable = new Error("context lost");
+    recoverable.recoverable = true;
+    engine.handleRendererLost(recoverable);
+    assert.equal(engine.lifecycleState, "paused");
+    assert.equal(engine._rendererLost, true);
+    assert.equal(engine._rendererLostPaused, true);
+    engine.handleRendererStatus({ type: "context-restored" });
+    assert.equal(engine.lifecycleState, "running");
+    assert.equal(engine._rendererLost, false);
+    assert.equal(engine._rendererLostPaused, false);
+    engine.pause();
+    const externallyPaused = new Error("context lost again");
+    externallyPaused.recoverable = true;
+    engine.handleRendererLost(externallyPaused);
+    assert.equal(engine.lifecycleState, "paused");
+    assert.equal(engine._rendererLostPaused, false);
+    engine.handleRendererStatus({ type: "context-restored" });
+    assert.equal(engine.lifecycleState, "paused");
+  } finally {
+    engine.destroy();
+    if (previousRaf) globalThis.requestAnimationFrame = previousRaf; else delete globalThis.requestAnimationFrame;
+    if (previousCancel) globalThis.cancelAnimationFrame = previousCancel; else delete globalThis.cancelAnimationFrame;
+  }
 });
 
 test("engine: destroy assets temizliği ve pauseAudio opt-out", () => {

@@ -403,3 +403,14 @@ Fresh `ai-e2e-runtime-20260818b` scaffold klasörü aynı MCP stdio oturumunda o
 - `glyphComplexScriptFallbacks` sıfırdan büyük olmalı; bu, Arapça örneğinin GlyphAtlas yerine Canvas shaping yoluna kontrollü geçtiğini kanıtlar.
 - WebGPU’da `peakGpuCullBytes` cihaz limitinin altında kalmalı; WebGL2’da GPU culling sayacı `0` olmalı.
 - Fiziksel cihaz satırları doldurulmadan performans veya güvenilirlik iddiası masaüstü browser sonucu ile sınırlı tutulmalı.
+
+## 14 Eylül 2026 browser E2E runner + WebGPU/WebGL2 kısa soak
+
+Council’ın kanıt/iddia ayrımı doğrultusunda browser E2E koşusu gerçek sistem Chrome’unda tekrarlandı. E2E runner’ın Playwright paket çözümlemesi ve `shell:true` çağrısı düzeltildi; mevcut server `.mjs` public-module yolu için regresyon testi kondu. `EXI_PLAYWRIGHT_CHANNEL=chrome EXI_PLAYWRIGHT_SECONDS=30 EXI_PLAYWRIGHT_SPRITES=200 npm run test:e2e:browser` sonucu Windows üzerinde Chrome 153.0.8010.36 ile `1 passed`, demo WebGPU `60 FPS`, RuntimeAgent `scenario` ile gerçek ok tuşu hareketi ve her iki seçili backend’de 30 saniye / 200 sprite hardware-soak geçti; browser console warning/error `0` kaldı.
+
+| Backend | Demo FPS | Hardware-soak | Frames | Device error | Console warning/error |
+| --- | ---: | --- | ---: | --- | ---: |
+| WebGPU | 60 | `passed` | 1788 | false | 0 |
+| WebGL2 | — | `passed` | 1798 | false | 0 |
+
+Bu gerçek masaüstü Chrome + GPU üzerinde 30 saniyelik bounded koşudur; 30 saniye üstü ve farklı sprite yükleri için `EXI_PLAYWRIGHT_SECONDS` / `EXI_PLAYWRIGHT_SPRITES` değiştirilebilir. Aynı koşuda root demo `RuntimeAgent scenario` hareketi `x=0→25.999999999999996`, MCP ile oluşturulan scaffold oyunu `x=432→447` olarak gözlendi. Manuel device/context-loss, fiziksel mobil cihaz ve native AI CLI davranışı bu koşudan kanıtlanmaz.

@@ -24,6 +24,7 @@ export class AnimatedSprite extends Sprite {
     this.loop = loop !== false;
     this.pingPong = Boolean(pingPong);
     this.playing = playing !== false;
+    this.completed = false;
     this.onComplete = onComplete;
     this.onLoop = onLoop;
     this.onFrameChange = onFrameChange;
@@ -40,6 +41,7 @@ export class AnimatedSprite extends Sprite {
     this.currentFrame = Math.min(this.currentFrame, normalizedFrames.length - 1);
     this.direction = 1;
     this.elapsed = 0;
+    this.completed = false;
     this.setTexture(normalizedFrames[this.currentFrame]);
     if (previousFrame !== this.currentFrame || previousTexture !== this.texture) this.onFrameChange?.(this, this.currentFrame);
     return this;
@@ -56,12 +58,24 @@ export class AnimatedSprite extends Sprite {
     this.currentFrame = nextFrame;
     this.direction = 1;
     this.elapsed = 0;
+    this.completed = false;
     this.setTexture(this.frames[this.currentFrame]);
     if (changed) this.onFrameChange?.(this, this.currentFrame);
     return this;
   }
 
-  play() { this.playing = true; return this; }
+  play() {
+    if (this.completed) {
+      this.completed = false;
+      this.currentFrame = 0;
+      this.direction = 1;
+      this.elapsed = 0;
+      this.setTexture(this.frames[0]);
+      this.onFrameChange?.(this, 0);
+    }
+    this.playing = true;
+    return this;
+  }
   stop() { this.playing = false; return this; }
 
   update(delta) {
@@ -83,7 +97,7 @@ export class AnimatedSprite extends Sprite {
         else { this.direction = 1; this.currentFrame += 1; this.onLoop?.(this); }
       } else if (this.currentFrame < this.frames.length - 1) this.currentFrame += 1;
       else if (this.loop) { this.currentFrame = 0; this.onLoop?.(this); }
-      else { this.playing = false; this.onComplete?.(this); break; }
+      else { this.playing = false; this.completed = true; this.onComplete?.(this); break; }
       this.setTexture(this.frames[this.currentFrame]);
       this.onFrameChange?.(this, this.currentFrame);
     }

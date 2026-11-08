@@ -7,6 +7,7 @@ import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import * as engineExports from "../src/index.js";
 import { createCanvasObserver, createEngineObserver, RuntimeAgent } from "../src/ai/runtime-agent.js";
+import { isPublicMethod } from "../src/ai/public-methods.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const serverPath = path.join(root, "tools", "exi-mcp-server.mjs");
@@ -336,8 +337,9 @@ try {
     const names = new Set();
     let prototype = value?.prototype;
     while (prototype && prototype !== Object.prototype) {
+      const ownerName = prototype.constructor?.name;
       for (const name of Object.getOwnPropertyNames(prototype)) {
-        if (name === "constructor" || name.startsWith("_") || forbiddenManifestNames.has(name)) continue;
+        if (name === "constructor" || !isPublicMethod(ownerName, name) || forbiddenManifestNames.has(name)) continue;
         if (typeof Object.getOwnPropertyDescriptor(prototype, name)?.value === "function") names.add(name);
       }
       prototype = Object.getPrototypeOf(prototype);
@@ -361,6 +363,24 @@ try {
   assert.equal(toolResult(await request("tools/call", { name: "exi_function", arguments: { name: "clamp", args: [2, 0, 1] } })), 1);
   assert.equal(toolResult(await request("tools/call", { name: "exi_function", arguments: { name: "degToRad", args: [180] } })).toFixed(6), Math.PI.toFixed(6));
   assert.equal(toolResult(await request("tools/call", { name: "exi_function", arguments: { name: "lerp", args: [0, 10, 0.25] } })), 2.5);
+  assert.equal(toolResult(await request("tools/call", { name: "exi_function", arguments: { name: "radToDeg", args: [Math.PI] } })), 180);
+  assert.equal(toolResult(await request("tools/call", { name: "exi_function", arguments: { name: "pointInAABB", args: [{ left: 0, top: 0, right: 2, bottom: 2 }, 1, 1] } })), true);
+  assert.equal(toolResult(await request("tools/call", { name: "exi_function", arguments: { name: "containsAABB", args: [{ left: 0, top: 0, right: 4, bottom: 4 }, { left: 1, top: 1, right: 2, bottom: 2 }] } })), true);
+  const validKtx2 = new Uint8Array(120);
+  validKtx2.set([0xab, 0x4b, 0x54, 0x58, 0x20, 0x32, 0x30, 0xbb, 0x0d, 0x0a, 0x1a, 0x0a]);
+  const validKtx2View = new DataView(validKtx2.buffer);
+  validKtx2View.setUint32(12, 37, true);
+  validKtx2View.setUint32(16, 1, true);
+  validKtx2View.setUint32(20, 2, true);
+  validKtx2View.setUint32(24, 2, true);
+  validKtx2View.setUint32(36, 1, true);
+  validKtx2View.setUint32(40, 1, true);
+  validKtx2View.setUint32(80, 104, true);
+  validKtx2View.setUint32(88, 16, true);
+  validKtx2View.setUint32(96, 16, true);
+  const validKtx2Info = toolResult(await request("tools/call", { name: "exi_function", arguments: { name: "inspectKTX2", args: [{ $bytes: Array.from(validKtx2) }] } }));
+  assert.equal(validKtx2Info.rgba8, true);
+  assert.equal(validKtx2Info.levels[0].byteLength, 16);
   const mcpPath = toolResult(await request("tools/call", { name: "exi_function", arguments: { name: "findGridPath", args: [[[0, 0, 1], [1, 0, 0], [0, 0, 0]], { x: 0, y: 0 }, { x: 2, y: 2 }] } }));
   assert.equal(mcpPath.reached, true);
   assert.deepEqual({ x: mcpPath.path.at(-1).x, y: mcpPath.path.at(-1).y }, { x: 2, y: 2 });
@@ -387,6 +407,9 @@ try {
   assert.equal(callableNodeInspection.handle, callableNode.$handle);
   assert.ok(callableNodeInspection.methods.includes("add"));
   assert.ok(callableNodeInspection.properties.some((property) => property.name === "position" && property.readable));
+  const hiddenMethod = await request("tools/call", { name: "exi_call", arguments: { handle: callableNode.$handle, method: "collectSprites" } });
+  assert.equal(hiddenMethod.result.isError, true);
+  assert.match(hiddenMethod.result.content[0].text, /Public method değil/);
   const callableCollider = toolResult(await request("tools/call", { name: "exi_create", arguments: { type: "Collider", args: [{ $handle: callableNode.$handle }] } }));
   const callableColliderInspection = toolResult(await request("tools/call", { name: "exi_inspect", arguments: { handle: callableCollider.$handle } }));
   const layerProperty = callableColliderInspection.properties.find((property) => property.name === "layer");
@@ -579,6 +602,7 @@ try {
   assert.match(runtimeNode.$handle, /^[A-Za-z][A-Za-z0-9_-]*$/);
   const runtimeInspection = toolResult(await request("tools/call", { name: "exi_preview_call", arguments: { previewId, operation: "inspect", handle: runtimeNode.$handle } }));
   assert.ok(runtimeInspection.methods.includes("setAlpha"));
+  assert.ok(!runtimeInspection.methods.includes("collectSprites"));
   toolResult(await request("tools/call", { name: "exi_preview_call", arguments: { previewId, operation: "release", handle: runtimeNode.$handle } }));
   const runtimeBatch = toolResult(await request("tools/call", { name: "exi_preview_batch", arguments: { previewId, calls: [
     { operation: "create", type: "Node" },
@@ -617,7 +641,14 @@ try {
   toolResult(await request("tools/call", { name: "exi_release", arguments: { handle: loader.$handle } }));
   const previewTraversal = await request("tools/call", { name: "exi_preview_probe", arguments: { previewId, path: "/%2e%2e/package.json" } });
   assert.equal(previewTraversal.result.isError, true);
-  toolResult(await request("tools/call", { name: "exi_preview_stop", arguments: { previewId } }));
+  const stoppedPreview = toolResult(await request("tools/call", { name: "exi_preview_stop", arguments: { previewId } }));
+  assert.equal(stoppedPreview.stopped, previewId);
+  assert.equal(stoppedPreview.alreadyStopped, false);
+  assert.equal(stoppedPreview.state, "exited");
+  const stoppedPreviewAgain = toolResult(await request("tools/call", { name: "exi_preview_stop", arguments: { previewId } }));
+  assert.equal(stoppedPreviewAgain.stopped, previewId);
+  assert.equal(stoppedPreviewAgain.alreadyStopped, true);
+  assert.equal(stoppedPreviewAgain.state, "exited");
   previewId = null;
   const modernPreview = toolResult(await modernRequest("tools/call", { name: "exi_preview_start", arguments: {} }));
   previewId = modernPreview.previewId;
@@ -661,11 +692,14 @@ try {
   await mkdir(openPath, { recursive: true });
   await writeFile(path.join(openPath, "index.html"), '<!doctype html><script type="module" src="./game.js"></script>\n', "utf8");
   await writeFile(path.join(openPath, "game.js"), "export const existing = true;\n", "utf8");
+  const openGhostTemp = path.join(openPath, "ghost.exi-file-upload-424242-99");
+  await writeFile(openGhostTemp, Buffer.from([9]));
   const opened = toolResult(await request("tools/call", { name: "exi_project_open", arguments: { path: openRelative } }));
   assert.equal(opened.directory, openRelative);
   assert.equal(opened.opened, true);
   assert.equal(opened.ok, true, JSON.stringify(opened));
   assert.equal(opened.checked, 2);
+  assert.equal(await stat(openGhostTemp).then(() => true, () => false), false);
   const openedRead = toolResult(await request("tools/call", { name: "exi_file_read", arguments: { path: `${openRelative}/game.js` } }));
   assert.equal(openedRead.content, "export const existing = true;\n");
   const versionedPath = `${scaffoldRelative}/src/generated/versioned.js`;
@@ -741,17 +775,29 @@ try {
   const chunkedDigest = sha256(Buffer.concat([chunkedFirstBytes, chunkedSecondBytes]));
   const chunkedUpload = toolResult(await request("tools/call", { name: "exi_asset_begin", arguments: { path: `${scaffoldRelative}/assets/large.ktx2`, size: chunkedSize, expectedSha256: chunkedDigest } }));
   assert.match(chunkedUpload.uploadId, /^u[0-9]+$/);
+  assert.equal(chunkedUpload.state, "receiving");
   const chunkedFirst = toolResult(await request("tools/call", { name: "exi_asset_chunk", arguments: { uploadId: chunkedUpload.uploadId, offset: 0, bytes: { $bytes: chunkedFirstBytes.toString("base64") } } }));
   assert.equal(chunkedFirst.receivedBytes, 400_000);
+  assert.equal(chunkedFirst.state, "receiving");
   const wrongOffset = await request("tools/call", { name: "exi_asset_chunk", arguments: { uploadId: chunkedUpload.uploadId, offset: 0, bytes: { $bytes: [1] } } });
   assert.equal(wrongOffset.result.isError, true);
   const chunkedSecond = toolResult(await request("tools/call", { name: "exi_asset_chunk", arguments: { uploadId: chunkedUpload.uploadId, offset: 400_000, bytes: { $bytes: chunkedSecondBytes.toString("base64") } } }));
   assert.equal(chunkedSecond.complete, true);
+  assert.equal(chunkedSecond.state, "complete");
   const committedAsset = toolResult(await request("tools/call", { name: "exi_asset_commit", arguments: { uploadId: chunkedUpload.uploadId } }));
   assert.equal(committedAsset.bytes, chunkedSize);
   assert.equal(committedAsset.sha256, chunkedDigest);
   const abortedUpload = toolResult(await request("tools/call", { name: "exi_asset_begin", arguments: { path: `${scaffoldRelative}/assets/aborted.png`, size: 1 } }));
   assert.equal(toolResult(await request("tools/call", { name: "exi_asset_abort", arguments: { uploadId: abortedUpload.uploadId } })).aborted, true);
+  const staleGhostUploadTemp = path.join(scaffoldPath, "assets", "ghost.png.exi-upload-424242-99");
+  const staleGhostFileTemp = path.join(scaffoldPath, "assets", "ghost.js.exi-file-upload-424242-99");
+  await writeFile(staleGhostUploadTemp, Buffer.from([9]));
+  await writeFile(staleGhostFileTemp, Buffer.from([9]));
+  const sweptUpload = toolResult(await request("tools/call", { name: "exi_asset_begin", arguments: { path: `${scaffoldRelative}/assets/swept.png`, size: 2 } }));
+  toolResult(await request("tools/call", { name: "exi_asset_chunk", arguments: { uploadId: sweptUpload.uploadId, offset: 0, bytes: { $bytes: [5, 6] } } }));
+  toolResult(await request("tools/call", { name: "exi_asset_commit", arguments: { uploadId: sweptUpload.uploadId } }));
+  assert.equal(await stat(staleGhostUploadTemp).then(() => true, () => false), false);
+  assert.equal(await stat(staleGhostFileTemp).then(() => true, () => false), false);
   const assetsAfterChunk = toolResult(await request("tools/call", { name: "exi_asset_list", arguments: { path: scaffoldRelative } }));
   assert.ok(assetsAfterChunk.assets.some((asset) => asset.path === `${scaffoldRelative}/assets/large.ktx2` && asset.bytes === chunkedSize));
   assert.ok(!assetsAfterChunk.assets.some((asset) => asset.path === `${scaffoldRelative}/assets/aborted.png`));
@@ -801,6 +847,7 @@ try {
   assert.equal(projectStatus.previews.length, 1);
   assert.equal(projectStatus.previews[0].previewId, projectPreview.preview.previewId);
   assert.equal(projectStatus.previews[0].pagePath, `/${scaffoldRelative}/index.html`);
+  assert.equal(projectStatus.previews[0].state, "ready");
   assert.equal(projectStatus.previews[0].ready, true);
   assert.equal(projectStatus.previews[0].runtime.ok, false);
   toolResult(await request("tools/call", { name: "exi_preview_stop", arguments: { previewId: projectPreview.preview.previewId } }));
@@ -845,12 +892,16 @@ try {
   const largeDigest = sha256(Buffer.from(largeSource, "utf8"));
   const largeFileBegin = toolResult(await request("tools/call", { name: "exi_file_begin", arguments: { path: `${scaffoldRelative}/src/generated/large.js`, size: Buffer.byteLength(largeSource, "utf8"), expectedSha256: largeDigest } }));
   assert.match(largeFileBegin.fileUploadId, /^f[0-9]+$/);
+  assert.equal(largeFileBegin.state, "receiving");
   const largeChunks = [largeSource.slice(0, 40_000), largeSource.slice(40_000, 80_000), largeSource.slice(80_000)];
+  const largeChunkStates = [];
   let largeOffset = 0;
   for (const largeChunk of largeChunks) {
     const largeChunkResult = toolResult(await request("tools/call", { name: "exi_file_chunk", arguments: { fileUploadId: largeFileBegin.fileUploadId, offset: largeOffset, content: largeChunk } }));
     largeOffset = largeChunkResult.receivedBytes;
+    largeChunkStates.push(largeChunkResult.state);
   }
+  assert.deepEqual(largeChunkStates, ["receiving", "receiving", "complete"]);
   const largeFileCommit = toolResult(await request("tools/call", { name: "exi_file_commit", arguments: { fileUploadId: largeFileBegin.fileUploadId } }));
   assert.equal(largeFileCommit.bytes, Buffer.byteLength(largeSource, "utf8"));
   assert.equal(largeFileCommit.sha256, largeDigest);
@@ -914,6 +965,9 @@ try {
   assert.match(generatedGameSource.body, /\/src\/ai\/runtime-agent\.js/);
   assert.match(generatedGameSource.body, /runtimeCallbacks/);
   assert.match(generatedGameSource.body, /\$callback/);
+  assert.match(generatedGameSource.body, /inputAxes/);
+  assert.match(generatedGameSource.body, /getVector\("moveX", "moveY"\)/);
+  assert.match(generatedGameSource.body, /player\.position\.x/);
   const uploadedAssetProbe = toolResult(await request("tools/call", { name: "exi_preview_probe", arguments: { previewId, path: `/${scaffoldRelative}/assets/player.png` } }));
   assert.equal(uploadedAssetProbe.contentType, "image/png");
   const assetLoader = toolResult(await request("tools/call", { name: "exi_create", arguments: { type: "AssetLoader", args: [{ baseURL: assetPreview.url }] } }));

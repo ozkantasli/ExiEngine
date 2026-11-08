@@ -233,7 +233,9 @@ const nativeCommands = {
 };
 function resolvedNativeCommand(name, fallback) {
   const candidates = hostCli[name]?.paths || [];
-  if (process.platform === "win32") return candidates.find((candidate) => candidate.toLowerCase().endsWith(".exe")) || candidates[0] || fallback;
+  // Windows where.exe may emit the active code page; executing the PATH name
+  // avoids corrupting non-ASCII user paths before Node calls CreateProcess.
+  if (process.platform === "win32") return fallback;
   return candidates[0] || fallback;
 }
 const nativeProbe = {};

@@ -613,18 +613,20 @@ export class WebGL2Renderer {
         if (entry?.buffer) this.gl.bindBuffer?.(this.gl.ARRAY_BUFFER, entry.buffer);
         throw error;
       }
-      entry = entry || { buffer: null, size: 0, key: null };
+      entry = entry || { buffer: null, size: 0, key: null, vertexCount: 0 };
       if (entry.buffer) this.gl.deleteBuffer?.(entry.buffer);
       entry.buffer = nextBuffer;
       entry.size = size;
       entry.key = batch.staticKey;
+      entry.vertexCount = batch.vertexCount;
       this.staticBuffers.set(batch.staticOwner, entry);
       this.staticBufferResizes += 1;
     } else {
       this.gl.bindBuffer(this.gl.ARRAY_BUFFER, entry.buffer);
-      if (entry.key !== batch.staticKey) {
+      if (entry.key !== batch.staticKey || entry.vertexCount !== batch.vertexCount) {
         this.gl.bufferSubData(this.gl.ARRAY_BUFFER, 0, batch.data);
         entry.key = batch.staticKey;
+        entry.vertexCount = batch.vertexCount;
       }
     }
     return entry.buffer;

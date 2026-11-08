@@ -3,6 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { getScissorRect } from "../../src/render/scissor.js";
 import { renderGroupWithPostProcess } from "../../src/render/post-process.js";
+import { updateStaticRenderKey } from "../../src/render/batch.js";
 import { RenderGroup, Scene, Sprite, Camera, RenderTexture } from "../../src/index.js";
 
 test("scissor: null rect ve viewport sınırlama", () => {
@@ -84,4 +85,20 @@ test("postProcess: getPostProcessState yoksa güvenli fallback", () => {
   renderGroupWithPostProcess(renderer, 0, group);
   assert.equal(calls.length, 1);
   group.destroy();
+});
+
+test("updateStaticRenderKey: texture version değişimi yeni statik key üretir", () => {
+  const camera = { position: { x: 0, y: 0 }, zoom: 1, pixelRatio: 1, rotation: 0, width: 320, height: 180 };
+  const matrix = { a: 1, b: 0, c: 0, d: 1, tx: 0, ty: 0 };
+  const state = { version: 0, contentVersion: -1 };
+  const args = [state, 1, camera, 320, 180, matrix, null, 1, "none", 1, null, null];
+  const first = updateStaticRenderKey(...args, 0);
+  const second = updateStaticRenderKey(...args, 0);
+  assert.equal(second, first);
+  const third = updateStaticRenderKey(...args, 1);
+  assert.notEqual(third, second);
+  const fourth = updateStaticRenderKey(...args, 1);
+  assert.equal(fourth, third);
+  const withoutTexture = updateStaticRenderKey(...args);
+  assert.notEqual(withoutTexture, fourth);
 });

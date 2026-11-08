@@ -105,9 +105,10 @@ interface EngineOptions {
 Ana lifecycle metotları:
 
 - `static create(options): Promise<ExiEngine>`: browser’da async backend kurulumu.
-- `init(): Promise<this>`: renderer ve input hazırlığı.
-- `start(): this`, `stop(): this`: RAF loop yönetimi.
-- `pause(): this`, `resume(): this`: simülasyonu kontrollü durdurma.
+- `init(): Promise<this>`: renderer ve input hazırlığı; eşzamanlı çağrılar tek kurulumu paylaşır. Kurulum başarısızsa engine kendi kaynaklarını temizleyip yok edilir; yeniden denemek için yeni engine oluşturulur. Dışarıdan verilen scene yok edilmez.
+- `start(): this`, `stop(): this`: RAF loop yönetimi; `stop()` engine-owned audio’yu da askıya alır.
+- `pause(): this`, `resume(): this`: simülasyonu kontrollü durdurma; gizli sekme kaynaklı duraklama `visibilityPaused` ile ayrılır.
+- `lifecycleState`: `created | ready | running | paused | visibility-paused | stopped | destroyed` türetilmiş durumu; `running`/`paused` alanları geriye dönük uyumluluk için yazılabilir kalır.
 - `step(delta): this`: custom loop için tek bounded frame.
 - `destroy(): void`: renderer, input, audio, asset ve event listener teardown’ı.
 - `prepare(): { batches, uploads }`: ilk görünür frame allocation/upload hazırlığı.
@@ -237,7 +238,7 @@ batch.markDirty();
 
 ### `AnimatedSprite`
 
-`setFrames`, `gotoFrame`, `play`, `stop`, `update` sağlar. `TextureAtlas.getClip()` çıktısı doğrudan constructor’a verilebilir; frame dizisi snapshot’lanır.
+`setFrames`, `gotoFrame`, `play`, `stop`, `update` sağlar. `TextureAtlas.getClip()` çıktısı doğrudan constructor’a verilebilir; frame dizisi snapshot’lanır. `loop: false` animasyon doğal olarak bittiğinde `completed` true olur; `play()` tamamlanmış animasyonu frame 0’dan yeniden başlatır.
 
 ### `ParticleEmitter`
 
@@ -662,7 +663,7 @@ Known tool execution hataları MCP `result.isError=true` ve bounded text ile dö
 
 Result serialization, `exi_inspect`, `exi_session_status` ve browser `RuntimeAgent` nesne türünü prototype data descriptor’ından belirler; normal `constructor`/`destroy` property erişimiyle accessor çalıştırmaz. Getter içeren gerçek engine property’leri yalnızca açık `exi_get`, `exi_export_get` veya public method çağrısında okunur.
 
-Bridge limitleri: 1 MiB JSON-RPC mesajı, 64 KiB string, 32 JSON derinliği, 128 object key, 4096 array item, 512 KiB binary argüman, 4096 active handle, 1024 scene node, 32 scene depth, 256 KiB resource, 64 KiB tool output, 64 KiB preview response, 4 KiB runtime telemetry body ve browser batch başına 8 call. Engine `exi_check` timeout’ları `doctor=60s`, `test=180s`, `verify=300s`; örnek Codex/Gemini/OpenCode istemci timeout’u 360 saniyedir. Engine method/property çözümü engine prototype zinciriyle ve static çağrılar own-property allowlist’iyle sınırlıdır; `Object.prototype`, `Function.prototype`, `__proto__`, `prototype`, `constructor`, private method, eval, `new Function`, dynamic import ve arbitrary shell yoktur.
+Bridge limitleri: 1 MiB JSON-RPC mesajı, 64 KiB string, 32 JSON derinliği, 128 object key, 4096 array item, 512 KiB binary argüman, 4096 active handle, 1024 scene node, 32 scene depth, 256 KiB resource, 64 KiB tool output, 64 KiB preview response, 4 KiB runtime telemetry body ve browser batch başına 8 call. Engine `exi_check` timeout’ları `doctor=60s`, `test=180s`, `verify=300s`; örnek Codex/Gemini/OpenCode istemci timeout’u 360 saniyedir. Engine method/property çözümü engine prototype zinciri ve `src/ai/public-methods.js` sınıf-bazlı public allowlist’iyle, static çağrılar own-property allowlist’iyle sınırlıdır; renderer/cache/validation iç yardımcıları gösterilmez. `Object.prototype`, `Function.prototype`, `__proto__`, `prototype`, `constructor`, private method, eval, `new Function`, dynamic import ve arbitrary shell yoktur.
 
 MCP local process boundary’dir; authentication veya OS sandbox değildir. Yalnızca güvenilen AI CLI’lara bağlanmalı, production’da process/container izinleri ayrıca uygulanmalıdır. Tam tehdit modeli için [SECURITY.md](SECURITY.md) okunmalıdır.
 

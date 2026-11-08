@@ -52,8 +52,15 @@ const MAX_RUNTIME_COMMAND_QUEUE = 64;
 const MAX_RUNTIME_COMMAND_BATCH = 8;
 const MAX_RUNTIME_RESULTS = 64;
 const RUNTIME_RESULT_TTL_MS = 30_000;
+const runtimeDuration = (name, fallback, min, max) => {
+  const value = Number(process.env[name]);
+  return Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : fallback;
+};
+const RUNTIME_STATE_TTL_MS = runtimeDuration("EXI_RUNTIME_STATE_TTL_MS", 10_000, 100, 60_000);
+const RUNTIME_COMMAND_LEASE_MS = runtimeDuration("EXI_RUNTIME_COMMAND_LEASE_MS", 15_000, 100, 60_000);
 let runtimeState = null;
 const runtimeCommands = [];
+const runtimeInFlight = new Map();
 const runtimeResults = new Map();
 const runtimeCommandFields = new Set(["id", "operation", "name", "path", "type", "method", "handle", "args", "property", "value", "calls", "stopOnError"]);
 const runtimeResultFields = new Set(["id", "ok", "value", "error"]);
@@ -119,6 +126,25 @@ function pruneRuntimeResults() {
   while (runtimeResults.size > MAX_RUNTIME_RESULTS) runtimeResults.delete(runtimeResults.keys().next().value);
 }
 
+function requeueExpiredRuntimeCommands() {
+  const deadline = Date.now() - RUNTIME_COMMAND_LEASE_MS;
+  const expired = [];
+  for (const [id, entry] of runtimeInFlight) {
+    if (entry.deliveredAt > deadline) continue;
+    runtimeInFlight.delete(id);
+    expired.push(entry.command);
+  }
+  if (expired.length > 0) runtimeCommands.unshift(...expired);
+}
+
+function runtimeCommandCount() {
+  return runtimeCommands.length + runtimeInFlight.size;
+}
+
+function runtimeStateExpired(state) {
+  return !state || Date.now() - state.receivedAt > RUNTIME_STATE_TTL_MS;
+}
+
 function normalizeRuntimeState(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const integer = (candidate) => Number.isSafeInteger(candidate) && candidate >= 0 ? candidate : 0;
@@ -150,16 +176,20 @@ async function handleRuntimeRequest(request, response, requestURL) {
       return true;
     }
     if (request.method === "GET") {
+      requeueExpiredRuntimeCommands();
       const commands = runtimeCommands.splice(0, MAX_RUNTIME_COMMAND_BATCH);
+      const deliveredAt = Date.now();
+      for (const command of commands) runtimeInFlight.set(command.id, { command, deliveredAt });
       sendJSON(response, 200, { commands });
       return true;
     }
     if (request.method === "POST") {
       try {
-        if (runtimeCommands.length >= MAX_RUNTIME_COMMAND_QUEUE) throw new Error("Runtime command queue full.");
+        requeueExpiredRuntimeCommands();
+        if (runtimeCommandCount() >= MAX_RUNTIME_COMMAND_QUEUE) throw new Error("Runtime command queue full.");
         const command = normalizeRuntimeCommand(JSON.parse(await readBoundedBody(request, MAX_RUNTIME_COMMAND_BODY_BYTES)));
         if (!command) throw new Error("Invalid runtime command.");
-        if (runtimeCommands.some((entry) => entry.id === command.id) || runtimeResults.has(command.id)) throw new Error("Duplicate runtime command id.");
+        if (runtimeCommands.some((entry) => entry.id === command.id) || runtimeInFlight.has(command.id) || runtimeResults.has(command.id)) throw new Error("Duplicate runtime command id.");
         runtimeCommands.push(command);
         sendJSON(response, 202, { accepted: true, id: command.id });
       } catch {
@@ -176,6 +206,7 @@ async function handleRuntimeRequest(request, response, requestURL) {
         return true;
       }
       for (let index = runtimeCommands.length - 1; index >= 0; index -= 1) if (runtimeCommands[index].id === id) runtimeCommands.splice(index, 1);
+      runtimeInFlight.delete(id);
       response.writeHead(204, securityHeaders);
       response.end();
       return true;
@@ -195,6 +226,7 @@ async function handleRuntimeRequest(request, response, requestURL) {
         const result = normalizeRuntimeResult(JSON.parse(await readBoundedBody(request, MAX_RUNTIME_RESULT_BODY_BYTES)));
         if (!result || (result.ok === false && (!result.error || typeof result.error !== "object"))) throw new Error("Invalid runtime result.");
         pruneRuntimeResults();
+        runtimeInFlight.delete(result.id);
         runtimeResults.set(result.id, { ...result, receivedAt: Date.now() });
         response.writeHead(204, securityHeaders);
         response.end();
@@ -229,7 +261,8 @@ async function handleRuntimeRequest(request, response, requestURL) {
     return true;
   }
   if (request.method === "GET") {
-    if (!runtimeState) {
+    if (runtimeStateExpired(runtimeState)) {
+      runtimeState = null;
       response.writeHead(404, securityHeaders);
       response.end("Runtime Not Ready");
       return true;

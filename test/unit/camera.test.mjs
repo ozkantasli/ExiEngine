@@ -102,6 +102,9 @@ test("camera: shake", () => {
   assert.deepEqual({ x: cam.position.x, y: cam.position.y }, { x: 10, y: 20 });
   cam.shake(Infinity, 1);
   assert.equal(cam.isShaking, false);
+  cam.shake(0, 1);
+  assert.equal(cam.isShaking, false);
+  assert.equal(cam.shakeDuration, 0);
 });
 
 test("camera: getVisibleBounds", () => {

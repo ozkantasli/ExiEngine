@@ -4,6 +4,26 @@ import assert from "node:assert/strict";
 import { Scene, Texture, TileMap, PhysicsWorld, PhysicsBody, Sprite, Camera } from "../../src/index.js";
 import { buildRenderBatches } from "../../src/render/batch.js";
 
+test("tilemap: setTile sonrası getInstanceItems getRenderItems'ı bozamaz (ayrı dirty)", () => {
+  const map = new TileMap({ texture: new Texture({ sourceWidth: 64, sourceHeight: 32 }), tileWidth: 16, tileHeight: 16, columns: 2, rows: 1 });
+  const camera = new Camera({ width: 320, height: 180 });
+  map.setTiles([0, -1]);
+  map.getInstanceItems(camera, 320, 180);
+  assert.equal(map.getInstanceItems(camera, 320, 180)[0].instanceCount, 1);
+  map.setTile(1, 0, 1);
+  map.getInstanceItems(camera, 320, 180);
+  assert.equal(map.getInstanceItems(camera, 320, 180)[0].instanceCount, 2);
+  assert.equal(map.getRenderItems().length, 2);
+  map.setTiles([0, -1]);
+  assert.equal(map.getRenderItems().length, 1);
+  map.rebuild();
+  map.getInstanceItems(camera, 320, 180);
+  assert.equal(map.getRenderItems().length, 1);
+  map.destroy();
+  assert.deepEqual(map.getRenderItems(), []);
+  assert.deepEqual(map.getInstanceItems(camera, 320, 180), []);
+});
+
 test("tilemap: temel setTile/getTile/getFrame", () => {
   const map = new TileMap({ texture: new Texture({ sourceWidth: 64, sourceHeight: 32 }), tileWidth: 16, tileHeight: 16, columns: 2, rows: 1 });
   map.setTiles([0, 1]);

@@ -405,7 +405,7 @@ export class AssetLoader {
     const key = `${resolved}|${maxBytes}`;
     const pending = this.trackPending(this.pendingBytes, key, async () => {
       this.ensureActive();
-      const request = this.createRequestSignal(null);
+      const request = this.createRequestSignal(options.requestSignal || null);
       try {
         const response = await fetch(resolved, { signal: request.signal, credentials: "same-origin", redirect: "error" });
         const bytes = await readLimited(response, maxBytes);
