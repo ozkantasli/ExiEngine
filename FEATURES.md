@@ -78,7 +78,7 @@
 - Opt-in `PhysicsWorld.step(fixedStep)` integration with `physics: physicsWorld`; if a world is given it is bound to the engine scene and removes manual `onUpdate` boilerplate, and the default path is unaffected
 - Opt-in `Animator.update(fixedStep)` integration with `animator: animator`; the fixed-step order is applied as `scene → animator → physics → onUpdate` and removes manual update boilerplate
 - An allocation-free action layer that combines keyboard, pointer and gamepad bindings into a single `down/pressed/released` API with `Input.bindAction()`
-- The pointer dispatch path, hit/hover results and pick predicates reuse engine scratch memory in drag/move flows; scene/overlay transitions clear old target references (`npm run bench:pointer`)
+- The pointer dispatch path, hit/hover results and pick predicates reuse engine scratch memory in drag/move flows; scene/overlay transitions clear old target references (`npm run bench -- pointer`)
 - Direct `isGamepadButtonDown()`, `wasGamepadButtonPressed()` and `wasGamepadButtonReleased()` queries without using an action map
 - Combining keyboard pairs and gamepad analog axes into an allocation-free `getAxis()` API with deadzone/scale clamping via `Input.bindAxis()`
 - Moving validated action/axis maps to JSON/SaveStore settings with `Input.getBindings()`/`setBindings()`; the import is atomic and a bad entry does not corrupt the existing map
@@ -115,12 +115,12 @@
 - `AssetLoader.loadAtlas()` starts the texture and JSON metadata sources independently in parallel; the shared abort and byte/JSON limits are kept
 - Safe KTX2 header/range inspection, dependency-free uncompressed RGBA8 KTX2 loading, and an explicit decoder adapter (`loadKTX2()`) for compressed KTX2 flows such as Basis/UASTC; the decoder only returns a `CanvasImageSource` and the loader keeps ownership
 - URL/signal-based deduplication for concurrent same-origin asset requests; a render-item cache for unchanged Graphics geometry, and reuse of item/positions/bounds memory on dirty rebuilds
-- Reuse of the item, positions and UV array on frame/texture/size/flip changes in single-Sprite render geometry; tint/alpha updates make no allocations (`npm run bench:sprite`)
+- Reuse of the item, positions and UV array on frame/texture/size/flip changes in single-Sprite render geometry; tint/alpha updates make no allocations (`npm run bench -- sprite`)
 - The Sprite geometry key uses a scalar cache; `SpriteBatch.setSprite()` changes the existing record in place on hot updates
 - Instanced `SpriteBatch` and `TileMap` camera/world caches are compared with scalar fields without producing template strings each frame
 - Static `Graphics`, regular `SpriteBatch` and CPU `TileMap` cache/culling keys also reuse the same numeric version state; no long key string is built in a stable frame
 - The CPU instance path is recomputed when the camera changes even with `cullable: false`; nested scissor clip intersections reuse a per-node scratch rect
-- Engine interpolation roots and WebGL2/WebGPU RenderGroup traversal lists are reused as persistent scratch across frames; the scene reference is cleared on transitions (`npm run bench:frame-scratch`)
+- Engine interpolation roots and WebGL2/WebGPU RenderGroup traversal lists are reused as persistent scratch across frames; the scene reference is cleared on transitions (`npm run bench -- frame-scratch`)
 - A dependency-free TypeScript API contract with the root `index.d.ts`
 - Vertex/instance buffers whose capacity is kept in WebGL2, and narrowed in WebGPU according to a 64 MB global limit and the device limit
 
@@ -327,34 +327,34 @@ Node.js is all you need:
 npm test
 npm run verify
 npm run dev
-npm run bench:streaming
-npm run bench:instanced
-npm run bench:regular
-npm run bench:culling
-npm run bench:sprite-culling
-npm run bench:graphics:culling
-npm run bench:subtree-culling
-npm run bench:transform
-npm run bench:text
-npm run bench:glyph
-npm run bench:particles
-npm run bench:particles:cpu
-npm run bench:particles:culling
-npm run bench:particles:gpu-culling
-npm run bench:input
-npm run bench:tilemap
-npm run bench:queue
-npm run bench:collision
-npm run bench:physics
+npm run bench -- streaming
+npm run bench -- instanced
+npm run bench -- regular
+npm run bench -- culling
+npm run bench -- sprite-culling
+npm run bench -- graphics:culling
+npm run bench -- subtree-culling
+npm run bench -- transform
+npm run bench -- text
+npm run bench -- glyph
+npm run bench -- particles
+npm run bench -- particles:cpu
+npm run bench -- particles:culling
+npm run bench -- particles:gpu-culling
+npm run bench -- input
+npm run bench -- tilemap
+npm run bench -- queue
+npm run bench -- collision
+npm run bench -- physics
 ```
 
 In addition to the static dependency/security scan, `npm test` also runs a real HTTP server smoke test; CSP, `nosniff`, traversal and method limits are verified with live requests.
 
 `npm run verify` combines the `npm test` scope with all allocation/streaming benchmarks and is the single-command, dependency-free acceptance gate before a release. Real browser/GPU and physical device runs do not replace this command; `test/hardware-soak.html` and the physical matrix are run separately.
 
-`bench:input`, `bench:tilemap`, `bench:tilemap:regular` and `bench:queue` measure the reuse of gamepad state, action queries, TileMap instance/regular streams and the renderer batch/upload queue across frames. Renderer prepare measurements use a single scalar pass per queue.
-`bench:particles:culling` measures that off-screen particles do not enter the packed instance stream and that the visible fixed stream view is not reallocated.
-`bench:particles:gpu-culling` measures that no CPU world→screen transform is done on the `gpuCulling: true` particle source stream, and the 16-float WebGPU contract.
+`npm run bench -- input`, `npm run bench -- tilemap`, `npm run bench -- tilemap:regular` and `npm run bench -- queue` measure the reuse of gamepad state, action queries, TileMap instance/regular streams and the renderer batch/upload queue across frames. Renderer prepare measurements use a single scalar pass per queue.
+`npm run bench -- particles:culling` measures that off-screen particles do not enter the packed instance stream and that the visible fixed stream view is not reallocated.
+`npm run bench -- particles:gpu-culling` measures that no CPU world→screen transform is done on the `gpuCulling: true` particle source stream, and the 16-float WebGPU contract.
 
 Demo: `http://127.0.0.1:4173/`
 
@@ -370,34 +370,34 @@ The size, resize, pixel-ratio, texture budget and fixed-step fields of the engin
 Unchanged `Graphics` rect/circle/line geometry uses an opt-in static GPU buffer cache with `staticCache: true` so it does not create extra draws in small scenes.
 To specifically use the CPU screen-space path for unchanged large tilemaps, `TileMap({ staticCache: true, instanced: false })` caches the static vertex transform across frames; on the instanced path, the GPU transform is preferred.
 The WebGL2/CPU instanced TileMap path, with the default `cullTiles: true`, does not write tiles outside the camera's visible local range into the instance stream; use `cullTiles: false` to deliberately send all tiles, and `cullable: false` to also turn off node-level culling.
-The `TileMap({ instanced: false })` regular CPU/WebGL2 fallback reuses render item, positions and UV arrays on dirty updates; `npm run bench:tilemap:regular` measures this identity contract.
+The `TileMap({ instanced: false })` regular CPU/WebGL2 fallback reuses render item, positions and UV arrays on dirty updates; `npm run bench -- tilemap:regular` measures this identity contract.
 In chunk streaming, `setRegion(x, y, width, height, values)` only changes the region atomically; an invalid tile index is rejected without changing the whole region.
 For TileMap physics, use `createStaticBodies(physics, { solidTiles: new Set([0, 1]) })`; when the tile data changes, the controller's `rebuild()` is called. Solid rect generation merges adjacent cells and creates no colliders for empty tiles.
 SpriteBatch and TileMap apply coarse bounds culling before producing render items/vertices when off-screen.
-Single Sprites and Text are culled early with local bounds when off-screen; visible objects use the same scratch transform flow for bounds corners and render corners. `npm run bench:sprite-culling` verifies this path with 2000 off-screen sprites.
-The Graphics primitive culling path is verified with 2000 off-screen commands by `npm run bench:graphics:culling`.
-Scene graph world matrices are not recomputed for an unchanged local transform and parent version; `npm run bench:transform` measures this path.
+Single Sprites and Text are culled early with local bounds when off-screen; visible objects use the same scratch transform flow for bounds corners and render corners. `npm run bench -- sprite-culling` verifies this path with 2000 off-screen sprites.
+The Graphics primitive culling path is verified with 2000 off-screen commands by `npm run bench -- graphics:culling`.
+Scene graph world matrices are not recomputed for an unchanged local transform and parent version; `npm run bench -- transform` measures this path.
 The render queue reuses the global z-sort list across frames while the same renderable membership/`worldZ` order is kept; if the z-order or sibling order changes, it safely rebuilds.
-The persistent renderer batch state also reuses the render queue result wrapper; `npm run bench:queue` reports queue/batch/data reallocations separately.
+The persistent renderer batch state also reuses the render queue result wrapper; `npm run bench -- queue` reports queue/batch/data reallocations separately.
 When the scene shrinks, old static owner, texture, mask and GPU resource references in the batch pool are released; only a bounded reuse window is kept.
 Render queue clip merging does not produce a string key for each drawable; it compares equal scissor values with four numeric fields and merges separate clip objects into a single batch.
 Dense SpriteBatches are split into chunks of 256 by default; `chunkSize` can be tuned for the visibility/memory balance, and chunks with the same texture merge into a single draw.
 For many entries at startup, use `addSprites([...])`; nothing is written to the batch until all texture and sprite limits are validated.
 A SpriteBatch is limited to 100,000 sprites in total; for larger scenes, use several batches/chunks.
 For irregular large worlds that keep insertion order, `spatialCulling: true` and `cellSize` use a spatial index.
-Spatial culling reuses the visible index list and bounds scratch areas across frames; by reducing the camera's visible area to a local cell range, it does not scan distant spatial cells every frame. `npm run bench:culling` measures the scratch/bounds and cell visibility.
+Spatial culling reuses the visible index list and bounds scratch areas across frames; by reducing the camera's visible area to a local cell range, it does not scan distant spatial cells every frame. `npm run bench -- culling` measures the scratch/bounds and cell visibility.
 `CollisionWorld({ spatial: true, cellSize: 128 })` uses an optional broadphase; when a generic collider transform changes, you can update only the related entry on a clean index with `syncCollider(collider)` or call `rebuild()` after bulk changes. If `autoSync: true` is chosen, this check is done automatically before queries and carries an O(n) cost. The default `spatial: false` path keeps its order and API behavior.
 `PhysicsWorld` only runs when it is used; it provides `gravity`, velocity, static/kinematic/trigger colliders, 32-bit `layer`/`mask`, bounded fixed substeps, X/Y axis resolution, the `grounded` state and a reused `overlaps()` list. `PhysicsBody({ kinematic: true })` receives no gravity; it moves first with its velocity and carries dynamic bodies that are grounded on it by the same bounded delta, so moving platforms can be built. `Collider`/`PhysicsBody` can use a smaller foot box or an offset hitbox than the sprite visual with an optional finite local `bounds` override; on a static/kinematic collider, `oneWay: "up"` lets things pass from below and only stops movement coming down from above, and the other directions follow the same contract. `setBounds(null)` returns to the node's own local bounds. Axis resolution scans the movement path with a single-pass scratch filter on a swept-AABB broadphase, stops at the closest solid contact and keeps the existing correction fallback for unexpected end-position overlaps; this way fast bodies do not skip thin colliders. Dynamic body movement now only updates the cell entries of the related collider incrementally; the whole broadphase is not rebuilt every frame. `autoSync: true` also catches non-transform geometry changes of static colliders before queries; this opt-in path does an O(n) stale-shape check. Dynamic bodies are resolved kinematically against static/kinematic bodies; a full rigid-body impulse/rotation solver was deliberately not added to the core.
-`Sprite.getLocalBounds()` and `Collider.bounds` reuse the same object for as long as the geometry/transform is unchanged; `npm run bench:collision` reports bounds and query list reallocations separately.
+`Sprite.getLocalBounds()` and `Collider.bounds` reuse the same object for as long as the geometry/transform is unchanged; `npm run bench -- collision` reports bounds and query list reallocations separately.
 `instanced: true` removes CPU quad generation; transform, atlas UV and tint/alpha go to the GPU through the instance buffer. Instance buffer capacity is reused and has a 64 MB safety limit.
-On the WebGL2 CPU-instanced fallback, a same-size instance buffer is also reused across frames; `npm run bench:instanced` measures this path separately.
-The CPU/WebGL2 regular SpriteBatch benchmark also measures that chunk position/UV/color arrays are kept across updates; `npm run bench:regular` expects 0 buffer reallocations over a 1000-sprite / 60-frame run.
+On the WebGL2 CPU-instanced fallback, a same-size instance buffer is also reused across frames; `npm run bench -- instanced` measures this path separately.
+The CPU/WebGL2 regular SpriteBatch benchmark also measures that chunk position/UV/color arrays are kept across updates; `npm run bench -- regular` expects 0 buffer reallocations over a 1000-sprite / 60-frame run.
 `gpuCulling: true` produces the visible instance list with a compute shader on WebGPU; `gpuCulling` alone does not bypass the CPU fallback, and no compute emulation is done on WebGL2.
 On the GPU culling path, the CPU only packs the local sprite record; world/camera transform, rotation, visibility and compact output are left to the compute stage.
 GPU culling input/output capacity is limited per batch and in the renderer total; an invalid instance count is rejected before GPU allocation.
-The GPU culling source stream reuses its typed-array memory across frames as long as it stays the same size; `npm run bench:streaming` verifies this contract independently of hardware.
+The GPU culling source stream reuses its typed-array memory across frames as long as it stays the same size; `npm run bench -- streaming` verifies this contract independently of hardware.
 `SpriteBatch.setFrame()` changes a synchronized animation frame within the same atlas with a single invalidation; the GPU source buffer is reused.
-`SpriteBatch.addAnimatedSprite()`/`setSpriteAnimation()` advance independent frame animations within the same atlas inside a single batch; `updateAnimations()` makes a single invalidation only when a frame changes and keeps the instanced GPU source buffer. `npm run bench:animation` measures frame progress and buffer reallocation in this flow.
+`SpriteBatch.addAnimatedSprite()`/`setSpriteAnimation()` advance independent frame animations within the same atlas inside a single batch; `updateAnimations()` makes a single invalidation only when a frame changes and keeps the instanced GPU source buffer. `npm run bench -- animation` measures frame progress and buffer reallocation in this flow.
 High-frequency code that changes `SpriteBatch.sprites` records directly can call `markDirty()` after finishing its changes; this path keeps the instance buffer capacity and does not do an automatic O(n) change scan every frame.
 
 The demo shows 37 render nodes, an atlased background, the collision state and backend/FPS/draw/node measurements. The `Auto`, `WebGL2` and `WebGPU` options switch the same scene.
@@ -419,7 +419,7 @@ To collect physical iOS/Android/WebView results, use the matrix, acceptance crit
 - The local server only listens on `127.0.0.1`, blocks traversal and sends CSP/`nosniff`/CORP/referrer headers.
 - External engine imports, `eval` or `new Function` in the source are rejected by the static test.
 
-See [SECURITY.md](SECURITY.md) for the detailed threat model and [RESEARCH_GAPS.md](RESEARCH_GAPS.md) for the research gap matrix.
+See [SECURITY.md](SECURITY.md) for the detailed threat model and [RESEARCH_GAPS.md](docs/internal/RESEARCH_GAPS.md) for the research gap matrix.
 
 ## Deliberate limits
 

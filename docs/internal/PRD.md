@@ -85,7 +85,7 @@ competitors (Godot, PixiJS, Bevy, Babylon, melonJS) **none** has this agent-firs
 1. `npm run doctor` and `npm test` are clean; `npm run verify` passes the release gate.
 2. An AI agent can generate, run and verify a game end to end over the MCP bridge with
    **zero runtime dependencies**, backed by `exi://runtime` evidence.
-3. 60fps benchmark gates (`bench:*`) and the determinism snapshot test are green.
+3. 60fps benchmark gates (`npm run bench`, `npm run verify`) and the determinism snapshot test are green.
 4. No public API drift between `index.d.ts` and `src/index.js` (static smoke).
 
 ## 7. Next decisions (open)

@@ -1,7 +1,6 @@
+# Local AI tool state
 .wrongstack/
-!/.wrongstack/
-/.wrongstack/*
-!/.wrongstack/project.json
+.commandcode/
 
 # Test scratch artifacts (mcp-smoke.mjs ve runtime preview'ları sert kesintilerde bırakabilir)
 mcp-smoke-*/

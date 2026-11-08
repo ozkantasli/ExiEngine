@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-0.2.0-f87171.svg)](package.json)
 [![Node](https://img.shields.io/badge/node-22%20%7C%2024-22d3ee.svg)](.github/workflows/ci.yml)
-[![Renderer](https://img.shields.io/badge/renderer-WebGPU%20%2B%20WebGL2-22d3ee.svg)](ADR-001-language-graphics-api.md)
+[![Renderer](https://img.shields.io/badge/renderer-WebGPU%20%2B%20WebGL2-22d3ee.svg)](docs/internal/ADR-001-language-graphics-api.md)
 [![Dependencies](https://img.shields.io/badge/runtime%20deps-0-brightgreen.svg)](package.json)
 [![Unit tests](https://img.shields.io/badge/unit%20tests-225-blue.svg)](test/unit)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-blue.svg)](CONTRIBUTING.md)
@@ -122,7 +122,7 @@ flowchart LR
 | [`tools`](tools) | Zero-dependency MCP bridge and lint tool |
 | [`test`](test) | Smoke, unit, typecheck, coverage, e2e and benchmarks |
 
-The rationale for the language and graphics API choice is in [ADR-001](ADR-001-language-graphics-api.md).
+The rationale for the language and graphics API choice is in [ADR-001](docs/internal/ADR-001-language-graphics-api.md).
 
 ## Using with AI agents
 
@@ -167,7 +167,7 @@ with `exi_preview_call`. All tools and their safety limits:
 | `npm run test:clients` | Real handshake test for every client config in the repo |
 | `npm run verify` | Release gate: `npm test` plus all benchmarks |
 | `npm run bench:regression` | Benchmark drift check against the local baseline |
-| `npm run bench:<name>` | A single benchmark (`streaming`, `sprite`, `tilemap`, `physics` …) |
+| `npm run bench -- <name>` | A single benchmark (`sprite`, `tilemap`, `physics` …); `npm run bench` lists all names |
 
 CI ([`ci.yml`](.github/workflows/ci.yml)) runs test, lint, typecheck, verify,
 coverage and preview-e2e jobs on Node 22 and 24 for every push and pull request.
@@ -187,10 +187,11 @@ Physical device results are collected in [test/HARDWARE_MATRIX.md](test/HARDWARE
 | MCP client setup | [MCP.md](MCP.md) |
 | All features and behavior details | [FEATURES.md](FEATURES.md) |
 | Threat model and security contract | [SECURITY.md](SECURITY.md) |
-| Product requirements | [PRD.md](PRD.md) |
+| Product requirements | [PRD.md](docs/internal/PRD.md) |
 | Roadmap | [ROADMAP.md](ROADMAP.md) |
-| Comparison with other engines | [ENGINE_FEATURE_MATRIX.md](ENGINE_FEATURE_MATRIX.md), [ENGINE_GAP_ANALYSIS.md](ENGINE_GAP_ANALYSIS.md) |
-| Research gaps | [RESEARCH_GAPS.md](RESEARCH_GAPS.md) |
+| Comparison with other engines | [ENGINE_FEATURE_MATRIX.md](docs/internal/ENGINE_FEATURE_MATRIX.md), [ENGINE_GAP_ANALYSIS.md](docs/internal/ENGINE_GAP_ANALYSIS.md) |
+| Research gaps | [RESEARCH_GAPS.md](docs/internal/RESEARCH_GAPS.md) |
+| Implicit state machine audit | [IMPLICIT_STATE_MACHINES.md](docs/internal/IMPLICIT_STATE_MACHINES.md) |
 
 ## FAQ
 

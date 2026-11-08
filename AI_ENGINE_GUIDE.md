@@ -100,7 +100,7 @@ For `Node.traverse`, `Node.find`, `Scene.pick`, input/physics filters and other 
 - `test/engine-smoke.mjs`: the main test of the behavior, security and lifecycle contract.
 - `test/*-benchmark.mjs`: allocation/streaming/culling identity gates; not physical FPS claims.
 - `test/hardware-soak.html`: real browser WebGL2/WebGPU/device-loss/audio evidence.
-- `SECURITY.md` and `RESEARCH_GAPS.md`: threat model and deliberate limits.
+- `SECURITY.md` and `docs/internal/RESEARCH_GAPS.md`: threat model and deliberate limits; `docs/internal/` also holds the PRD, ADR, engine comparisons and the implicit state machine audit.
 
 ## Change protocol
 

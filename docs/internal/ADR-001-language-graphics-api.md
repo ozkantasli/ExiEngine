@@ -39,7 +39,7 @@ Status: **Accepted (implemented in code)** · Date: 2026-08-17 · Phase: Archite
 ## Tradeoffs and consequences
 
 - **Performance:** JS is slower than native C++/Rust; the balance is accepted given the 2D scope
-  and GPU-side work (WebGPU compute, indirect draw). The `bench:*` gates protect hot paths.
+  and GPU-side work (WebGPU compute, indirect draw). The benchmark gates (`npm run bench`, `npm run verify`) protect hot paths.
 - **No native distribution:** console/desktop binaries are not possible (gap #10). Accepted for a
   web-first PRD.
 - **WebGPU support gap:** mitigated for older browsers with the WebGL2 fallback (dual backend).
