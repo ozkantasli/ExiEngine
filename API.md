@@ -1,21 +1,21 @@
-# ExiEngine API ve AI/MCP referansı
+# ExiEngine API and AI/MCP reference
 
-Bu dosya ExiEngine’in çalışma zamanı API’sini ve AI CLI bridge’ini tek yerde anlatır. JavaScript’in doğrulanmış export yüzeyi [src/index.js](src/index.js), TypeScript imzaları [index.d.ts](index.d.ts), güvenlik kuralları [SECURITY.md](SECURITY.md), MCP istemci ayarları [MCP.md](MCP.md) içindedir. Bu belge kavramsal başlangıç ve örnekli referanstır; imza değişikliklerinde `index.d.ts` esas alınır.
+This file describes ExiEngine's runtime API and the AI CLI bridge in one place. The verified JavaScript export surface is in [src/index.js](src/index.js), the TypeScript signatures in [index.d.ts](index.d.ts), the security rules in [SECURITY.md](SECURITY.md) and the MCP client settings in [MCP.md](MCP.md). This document is a conceptual starting point and a reference with examples; for signature changes, `index.d.ts` is authoritative.
 
-## 1. Tasarım sözleşmesi
+## 1. Design contract
 
-ExiEngine başka bir oyun motoruna runtime import’u yapmaz. Çekirdek scene graph, 2D geometry, input, physics, audio, asset, batching ve WebGL2/WebGPU backend’leri repo içindedir.
+ExiEngine does not import another game engine at runtime. The core scene graph, 2D geometry, input, physics, audio, assets, batching and the WebGL2/WebGPU backends live in the repository.
 
-- Runtime dependency yoktur.
-- WebGPU tercih edilir; destek yoksa veya seçim `webgl2` ise WebGL2 kullanılır.
-- Node.js test, MCP bridge ve yerel preview içindir; browser canvas ve Web Audio gerçek runtime’dır.
-- Asset, JSON, URL, input, callback ve GPU kaynakları güvenilmeyen veya sınırlı sınır olarak ele alınır.
-- Public koleksiyonlar ve config alanları doğrudan değiştirilebilir görünse bile hot path girişlerinde tekrar doğrulanır.
-- Browser/GPU sonucu Node smoke testinden çıkarılamaz; gerçek cihaz kanıtı `test/hardware-soak.html` ile ayrıca alınır.
+- There are no runtime dependencies.
+- WebGPU is preferred; WebGL2 is used when it is not supported or when `webgl2` is selected.
+- Node.js is for tests, the MCP bridge and the local preview; the browser canvas and Web Audio are the real runtime.
+- Assets, JSON, URLs, input, callbacks and GPU resources are treated as untrusted or bounded boundaries.
+- Public collections and config fields are re-validated on hot-path inputs even when they look directly mutable.
+- Browser/GPU results cannot be inferred from the Node smoke test; real device evidence is collected separately with `test/hardware-soak.html`.
 
-## 2. Kurulum ve ilk oyun
+## 2. Setup and first game
 
-Repo kökünde Node.js ile:
+With Node.js in the repository root:
 
 ```powershell
 npm run doctor
@@ -23,7 +23,7 @@ npm test
 npm run dev
 ```
 
-`index.html` içindeki canvas’a veya kendi HTML sayfanıza aşağıdaki minimal oyun eklenebilir:
+The following minimal game can be added to the canvas in `index.html` or to your own HTML page:
 
 ```js
 import { ExiEngine, Graphics, Scene } from "/src/index.js";
@@ -43,9 +43,9 @@ const engine = await ExiEngine.create({
 engine.start();
 ```
 
-`ExiEngine.create()` renderer’ı kurar, canvas’ı boyutlandırır, scene’i bağlar ve hazır bir engine döndürür. Manuel lifecycle gerekiyorsa `new ExiEngine(options)`, `await engine.init()`, `engine.start()` kullanılabilir. `step(delta)` yalnızca engine çalışmıyorken deterministic/custom loop içindir.
+`ExiEngine.create()` sets up the renderer, sizes the canvas, binds the scene and returns a ready engine. If you need a manual lifecycle, use `new ExiEngine(options)`, `await engine.init()` and `engine.start()`. `step(delta)` is only for a deterministic/custom loop while the engine is not running.
 
-## 3. Tipler ve ortak değerler
+## 3. Types and common values
 
 `RendererKind`: `"auto" | "webgpu" | "webgl2"`.
 
@@ -55,15 +55,15 @@ engine.start();
 
 `FilterKind`: `"none" | "grayscale" | "invert" | "brightness" | "sepia" | "contrast" | "saturate"`.
 
-`Point` `{ x, y }`, `ClipRect` `{ x, y, width, height }` ve `MAX_WORLD_COORDINATE` finite dünya koordinatı sınırını ifade eder. Tüm önemli sayısal değerler finite ve bounded olmalıdır.
+`Point` `{ x, y }`, `ClipRect` `{ x, y, width, height }`, and `MAX_WORLD_COORDINATE` expresses the finite world-coordinate limit. All significant numeric values must be finite and bounded.
 
-`Vec2` mutable 2D vektördür: `set`, `copy`, `clone`, `add`, `subtract`, `multiplyScalar`, `length`, `lengthSquared`, `normalize`, `dot`, `distanceTo`, `distanceSquared`, `angle`, `rotate`, `equals`. `Mat3` 2D affine matristir: `identity`, `setTransform`, `multiply`, `transformPoint`.
+`Vec2` is a mutable 2D vector: `set`, `copy`, `clone`, `add`, `subtract`, `multiplyScalar`, `length`, `lengthSquared`, `normalize`, `dot`, `distanceTo`, `distanceSquared`, `angle`, `rotate`, `equals`. `Mat3` is a 2D affine matrix: `identity`, `setTransform`, `multiply`, `transformPoint`.
 
-Pointer, keyboard, focus ve gamepad callback tipleri `index.d.ts` içindeki `EnginePointerEvent`, `EngineKeyEvent`, `EngineFocusEvent`, `GamepadSnapshot` ile tanımlıdır. Event’ler transient’tir; callback dışında saklanmamalıdır.
+Pointer, keyboard, focus and gamepad callback types are defined in `index.d.ts` as `EnginePointerEvent`, `EngineKeyEvent`, `EngineFocusEvent` and `GamepadSnapshot`. Events are transient; do not keep them outside the callback.
 
-Safely utility export’ları: `clamp(value, min, max)`, `lerp(from, to, amount)`, `degToRad(degrees)`, `radToDeg(radians)`, `getAABB(node, output?)`, `intersectsAABB(first, second)`, `pointInAABB(bounds, x, y)`, `containsAABB(parent, child)`. KTX2 için `inspectKTX2(bytes, options?)` ve `VK_FORMAT_R8G8B8A8_UNORM` export edilir. Bu top-level fonksiyonlar state tutmaz ve MCP’de `exi_function` ile çağrılır; nested export fonksiyonları `exi_export_call` kullanır.
+Safe utility exports: `clamp(value, min, max)`, `lerp(from, to, amount)`, `degToRad(degrees)`, `radToDeg(radians)`, `getAABB(node, output?)`, `intersectsAABB(first, second)`, `pointInAABB(bounds, x, y)`, `containsAABB(parent, child)`. For KTX2, `inspectKTX2(bytes, options?)` and `VK_FORMAT_R8G8B8A8_UNORM` are exported. These top-level functions hold no state and are called over MCP with `exi_function`; nested export functions use `exi_export_call`.
 
-`findGridPath(grid, start, goal, options?)` dikdörtgen bir grid üzerinde bağımlılıksız ve deterministik A* çalıştırır. Varsayılan olarak `1` hücreleri engeldir; `blockedValues`, `diagonal`, `allowCornerCutting` ve `maxNodes` seçenekleriyle davranış sınırlandırılabilir. `grid` değiştirilmez. Sonuç `{ path, reached, expanded, truncated }` döner; `path` başlangıç ve hedef dahil `{ x, y }` noktalarıdır. Grid en fazla `MAX_GRID_PATH_CELLS` hücre, `maxNodes` ise 1 ile hücre sayısı arasında olabilir. Başlangıç/hedef engelliyse veya limit nedeniyle erişilemiyorsa `reached:false` döner.
+`findGridPath(grid, start, goal, options?)` runs dependency-free, deterministic A* on a rectangular grid. By default, cells with value `1` are obstacles; behavior can be bounded with the `blockedValues`, `diagonal`, `allowCornerCutting` and `maxNodes` options. `grid` is not modified. The result is `{ path, reached, expanded, truncated }`; `path` is a list of `{ x, y }` points including the start and the goal. The grid can have at most `MAX_GRID_PATH_CELLS` cells, and `maxNodes` must be between 1 and the cell count. If the start/goal is blocked or unreachable within the limit, `reached:false` is returned.
 
 ```js
 const result = findGridPath(
@@ -75,11 +75,11 @@ const result = findGridPath(
 // { reached: true, truncated: false, expanded: ..., path: [...] }
 ```
 
-## 4. Engine lifecycle ve renderer
+## 4. Engine lifecycle and renderer
 
 ### `ExiEngine`
 
-Constructor seçenekleri:
+Constructor options:
 
 ```ts
 interface EngineOptions {
@@ -102,29 +102,29 @@ interface EngineOptions {
 }
 ```
 
-Ana lifecycle metotları:
+Main lifecycle methods:
 
-- `static create(options): Promise<ExiEngine>`: browser’da async backend kurulumu.
-- `init(): Promise<this>`: renderer ve input hazırlığı; eşzamanlı çağrılar tek kurulumu paylaşır. Kurulum başarısızsa engine kendi kaynaklarını temizleyip yok edilir; yeniden denemek için yeni engine oluşturulur. Dışarıdan verilen scene yok edilmez.
-- `start(): this`, `stop(): this`: RAF loop yönetimi; `stop()` engine-owned audio’yu da askıya alır.
-- `pause(): this`, `resume(): this`: simülasyonu kontrollü durdurma; gizli sekme kaynaklı duraklama `visibilityPaused` ile ayrılır.
-- `lifecycleState`: `created | ready | running | paused | visibility-paused | stopped | destroyed` türetilmiş durumu; `running`/`paused` alanları geriye dönük uyumluluk için yazılabilir kalır.
-- `step(delta): this`: custom loop için tek bounded frame.
-- `destroy(): void`: renderer, input, audio, asset ve event listener teardown’ı.
-- `prepare(): { batches, uploads }`: ilk görünür frame allocation/upload hazırlığı.
-- `getInfo(): Record<string, unknown>`: backend, limit, texture, batch, frame ve lifecycle metrikleri.
-- `setScene(scene, camera?)`, `setOverlay(scene, camera?)`: sahne değişimini pointer/cache yaşam döngüsüyle atomik yapar.
-- `setLogicalSize(width, height)`, `setResizeMode(mode)`, `resize()`: responsive canvas sözleşmesi.
-- `setTimeScale(value)`: `0..16` bounded simulation scale.
-- `focus(node?)`, `blur()`, `focusNext(reverse?)`: canvas UI odağı.
+- `static create(options): Promise<ExiEngine>`: async backend setup in the browser.
+- `init(): Promise<this>`: renderer and input preparation; concurrent calls share a single setup. If setup fails, the engine cleans up its own resources and is destroyed; create a new engine to retry. An externally provided scene is not destroyed.
+- `start(): this`, `stop(): this`: RAF loop management; `stop()` also suspends engine-owned audio.
+- `pause(): this`, `resume(): this`: controlled pausing of the simulation; a pause caused by a hidden tab is tracked separately as `visibilityPaused`.
+- `lifecycleState`: the derived state `created | ready | running | paused | visibility-paused | stopped | destroyed`; the `running`/`paused` fields stay writable for backward compatibility.
+- `step(delta): this`: a single bounded frame for a custom loop.
+- `destroy(): void`: teardown of the renderer, input, audio, assets and event listeners.
+- `prepare(): { batches, uploads }`: allocation/upload preparation for the first visible frame.
+- `getInfo(): Record<string, unknown>`: backend, limit, texture, batch, frame and lifecycle metrics.
+- `setScene(scene, camera?)`, `setOverlay(scene, camera?)`: make scene changes atomic together with the pointer/cache lifecycle.
+- `setLogicalSize(width, height)`, `setResizeMode(mode)`, `resize()`: the responsive canvas contract.
+- `setTimeScale(value)`: bounded `0..16` simulation scale.
+- `focus(node?)`, `blur()`, `focusNext(reverse?)`: canvas UI focus.
 - `renderToTexture(target, scene?, camera?, time?)`: offscreen render pass.
-- `captureFrame({ columns?, rows? })`: en fazla 64×64 geçici RenderTexture’a render edip GPU readback sonucu (`pixels`, `format`, `flipY`) döndürür; AI gözlemcisi bunu ham görüntü yerine bounded grid’e çevirir.
+- `captureFrame({ columns?, rows? })`: renders into a temporary RenderTexture of at most 64×64 and returns the GPU readback result (`pixels`, `format`, `flipY`); the AI observer turns this into a bounded grid instead of a raw image.
 
-Renderer hataları `onStatus` ile `renderer-error`, `runtime-error`, `device-lost` gibi metadata’lı olaylar olarak bildirilir. Callback exception’ı lifecycle’ı bozmamalıdır.
+Renderer errors are reported through `onStatus` as events with metadata such as `renderer-error`, `runtime-error` and `device-lost`. A callback exception must not break the lifecycle.
 
 ## 5. Scene graph
 
-### `Node` ve `Scene`
+### `Node` and `Scene`
 
 ```js
 const root = new Scene();
@@ -134,21 +134,21 @@ player.setAlpha(0.9).setBlendMode("normal");
 player.setCullBounds({ x: -32, y: -32, width: 64, height: 64 });
 ```
 
-`Node` transform alanları `position`, `scale`, `rotation`, `zIndex`; görünürlük alanları `visible`, `alpha`, `filter`, `blendMode`; etkileşim alanları `interactive`, `hitArea`, focus ve pointer callback’leridir.
+`Node` transform fields are `position`, `scale`, `rotation` and `zIndex`; visibility fields are `visible`, `alpha`, `filter` and `blendMode`; interaction fields are `interactive`, `hitArea`, and the focus and pointer callbacks.
 
-Temel metotlar:
+Core methods:
 
-- `add(...nodes)`: child ekler ve reparent eder; cycle, duplicate, destroyed node ve capacity kontrolü yapar.
-- `remove(node)`: child’ı ayırır.
-- `destroy()`: child graph ve bağlı kaynakları yaşam döngüsünden çıkarır.
-- `setClipRect`, `setMaskRect`, `setMaskTexture`, `setCullBounds`, `setHitArea` ve ilgili `clear*` metotları.
+- `add(...nodes)`: adds and reparents children; checks for cycles, duplicates, destroyed nodes and capacity.
+- `remove(node)`: detaches a child.
+- `destroy()`: removes the child graph and attached resources from the lifecycle.
+- `setClipRect`, `setMaskRect`, `setMaskTexture`, `setCullBounds`, `setHitArea` and the related `clear*` methods.
 - `setInteractive`, `setPointerHandlers`, `setUpdateHandler`, `setFocusHandlers`, `setFocusable`.
-- `setLayout`, `clearLayout`, `applyLayout`: overlay viewport layout’ı.
-- `traverse(callback)`, `find(predicate)`, `findByName(name)`: sahne grafiğinde güvenli arama ve dolaşma.
+- `setLayout`, `clearLayout`, `applyLayout`: overlay viewport layout.
+- `traverse(callback)`, `find(predicate)`, `findByName(name)`: safe search and traversal of the scene graph.
 - `containsPoint(worldX, worldY)`, `isAncestorOf(node)`, `collectFocusables`.
-- `update(delta)`, `updateWorldMatrix(...)`, `collectRenderables(...)`, `collectHitTestables(...)`: çoğunlukla engine tarafından çağrılır.
+- `update(delta)`, `updateWorldMatrix(...)`, `collectRenderables(...)`, `collectHitTestables(...)`: mostly called by the engine.
 
-`Scene.pick(worldX, worldY, predicate?)` world transform ve z-order’a göre interactive node seçer. Pointer olayları child’dan parent’a bubble eder; `stopPropagation()` ve `preventDefault()` kullanılabilir.
+`Scene.pick(worldX, worldY, predicate?)` selects an interactive node by world transform and z-order. Pointer events bubble from child to parent; `stopPropagation()` and `preventDefault()` are available.
 
 ### `Camera`
 
@@ -160,9 +160,9 @@ camera.shake(8, 0.25, { frequency: 30 });
 const visibleBounds = camera.getVisibleBounds();
 ```
 
-`worldToScreen`, `screenToWorld`, `getVisibleBounds`, `setViewport`, `setScreenViewport`, `setPixelRatio`, `setRoundPixels`, `setBounds`, `zoomAt`, `follow`, `clearFollow`, `shake`, `clearShake`, `update` sağlar. `contain` modunda letterbox alanı pointer için geçersizdir.
+Provides `worldToScreen`, `screenToWorld`, `getVisibleBounds`, `setViewport`, `setScreenViewport`, `setPixelRatio`, `setRoundPixels`, `setBounds`, `zoomAt`, `follow`, `clearFollow`, `shake`, `clearShake` and `update`. In `contain` mode, the letterbox area is not valid for pointers.
 
-## 6. Renderable sınıfları
+## 6. Renderable classes
 
 ### `Texture`, `RenderTexture`
 
@@ -173,9 +173,9 @@ const frame = spriteTexture.subTexture({ x: 0, y: 0, width: 32, height: 32 });
 const target = new RenderTexture({ id: "minimap", width: 320, height: 180 });
 ```
 
-`Texture` static `white`, `fromImage`, `subTexture`, `setFilter`, `markDirty`, `updateSource`, `destroy` içerir. `Texture` subtexture base GPU kaynağını paylaşır; subtexture destroy edilmesi base texture’ı sahiplenmez.
+`Texture` includes the static `white`, `fromImage`, `subTexture`, `setFilter`, `markDirty`, `updateSource` and `destroy`. A `Texture` subtexture shares the base GPU resource; destroying a subtexture does not take ownership of the base texture.
 
-`RenderTexture` `resize`, `subTexture`, `updateSource` ile minimap/portal/UI hedefidir. `renderToTexture` sırasında kaynak hedefle aynı texture’a render edilmesi feedback loop olarak reddedilir.
+`RenderTexture` is the target for minimaps/portals/UI with `resize`, `subTexture` and `updateSource`. During `renderToTexture`, rendering a source into the same texture as the target is rejected as a feedback loop.
 
 ### `Sprite`
 
@@ -189,11 +189,11 @@ sprite.setTint("#f97316").setFlip(true, false);
 scene.add(sprite);
 ```
 
-`setTexture`, `setTint`, `setFlip`, `getLocalBounds` sağlar. `flipX/flipY` UV seviyesinde uygulanır; geometri stride’ını büyütmez.
+Provides `setTexture`, `setTint`, `setFlip` and `getLocalBounds`. `flipX/flipY` are applied at the UV level; they do not grow the geometry stride.
 
 ### `NineSliceSprite`
 
-Panel texture’ını `left/right/top/bottom` border’larıyla ölçekler. `setBorders`, `setSize`, `getLocalBounds` kullanılır.
+Scales a panel texture with `left/right/top/bottom` borders. Use `setBorders`, `setSize` and `getLocalBounds`.
 
 ### `Text`, `TextCache`, `GlyphAtlas`
 
@@ -204,7 +204,7 @@ hud.add(score);
 score.setText("SCORE 001");
 ```
 
-`Text.setText`, `setStyle`, `redraw` Canvas 2D raster cache’ini yönetir. `TextCache` aynı stil/metin tekrarlarını bounded referans sayımıyla paylaşır. `GlyphAtlas` glyph rasterizasyonunu azaltır; `getInfo`, `clear`, `destroy` sağlar. Karmaşık shaping için Canvas fallback’i korunur.
+`Text.setText`, `setStyle` and `redraw` manage the Canvas 2D raster cache. `TextCache` shares repeated identical style/text pairs with bounded reference counting. `GlyphAtlas` reduces glyph rasterization and provides `getInfo`, `clear` and `destroy`. The Canvas fallback is kept for complex shaping.
 
 ### `Graphics`
 
@@ -221,11 +221,11 @@ const shape = new Graphics({ staticCache: true })
   .polygon([0, 120, 40, 120, 20, 150], { fill: 0xef4444 });
 ```
 
-`clear`, `rect`, `roundedRect`, `circle`, `ellipse`, `triangle`, `line`, `strokeRect`, `strokeCircle`, `polygon`, `getLocalBounds` vardır. Polygon ear-clipping ve komut/point limitleri engine tarafından bounded tutulur.
+Provides `clear`, `rect`, `roundedRect`, `circle`, `ellipse`, `triangle`, `line`, `strokeRect`, `strokeCircle`, `polygon` and `getLocalBounds`. Polygon ear-clipping and command/point limits are kept bounded by the engine.
 
 ### `SpriteBatch`
 
-Tek texture/atlas kullanan yoğun sprite layer’larında node başına overhead’i kaldırır:
+Removes per-node overhead in dense sprite layers that use a single texture/atlas:
 
 ```js
 const batch = new SpriteBatch({ texture: Texture.white, instanced: true, gpuCulling: true });
@@ -234,15 +234,15 @@ batch.setSprite(index, { x: 40 });
 batch.markDirty();
 ```
 
-`addSprite`, `addSprites`, `setSprite`, `removeSprite`, `clear`, `setTexture`, `setFrame`, `getLocalBounds` ve animasyon için `addAnimatedSprite`, `setSpriteAnimation`, `playSprite`, `stopSprite`, `gotoSpriteFrame`, `updateAnimations` sağlar. `instanced` WebGL2/WebGPU instancing; `gpuCulling` WebGPU compute/indirect yolu, WebGL2 güvenli CPU fallback’idir.
+Provides `addSprite`, `addSprites`, `setSprite`, `removeSprite`, `clear`, `setTexture`, `setFrame`, `getLocalBounds`, and for animation `addAnimatedSprite`, `setSpriteAnimation`, `playSprite`, `stopSprite`, `gotoSpriteFrame` and `updateAnimations`. `instanced` is WebGL2/WebGPU instancing; `gpuCulling` is the WebGPU compute/indirect path, with a safe CPU fallback on WebGL2.
 
 ### `AnimatedSprite`
 
-`setFrames`, `gotoFrame`, `play`, `stop`, `update` sağlar. `TextureAtlas.getClip()` çıktısı doğrudan constructor’a verilebilir; frame dizisi snapshot’lanır. `loop: false` animasyon doğal olarak bittiğinde `completed` true olur; `play()` tamamlanmış animasyonu frame 0’dan yeniden başlatır.
+Provides `setFrames`, `gotoFrame`, `play`, `stop` and `update`. The output of `TextureAtlas.getClip()` can be passed directly to the constructor; the frame array is snapshotted. With `loop: false`, `completed` becomes true when the animation ends naturally; `play()` restarts a completed animation from frame 0.
 
 ### `ParticleEmitter`
 
-`emit(count, options?)`, `burst(count, options?)`, `clear()`, `count` ve `update(delta)` ile bounded object pool kullanır. `gpuCulling: true` WebGPU’da world/cull işini compute aşamasına bırakır.
+Uses a bounded object pool with `emit(count, options?)`, `burst(count, options?)`, `clear()`, `count` and `update(delta)`. `gpuCulling: true` leaves world/cull work to the compute stage on WebGPU.
 
 ### `TileMap`
 
@@ -253,13 +253,13 @@ map.setRegion(0, 0, 10, 10, values);
 const staticBodies = map.createStaticBodies(physics, { solidTiles: new Set([1, 2]) });
 ```
 
-`index`, `inBounds`, `setTile`, `getTile`, `setTiles`, `setRegion`, `rebuild`, `getCollisionRects`, `createStaticBodies` sağlar. Tile başına Sprite üretmez; typed-array ve region girişleri atomik doğrulanır.
+Provides `index`, `inBounds`, `setTile`, `getTile`, `setTiles`, `setRegion`, `rebuild`, `getCollisionRects` and `createStaticBodies`. It does not create a Sprite per tile; typed-array and region inputs are validated atomically.
 
 ### `RenderGroup`
 
-Çocukları RenderTexture pass’inde toplar. `resize`, `setEffects`, `clearEffects`, `getEffects`, `getRenderCamera` sağlar. Effect listesi allowlist filtrelerden oluşur ve sınırlı ping-pong target kullanır.
+Collects its children in a RenderTexture pass. Provides `resize`, `setEffects`, `clearEffects`, `getEffects` and `getRenderCamera`. The effect list consists of allowlisted filters and uses a bounded ping-pong target.
 
-## 7. Atlas ve asset yükleme
+## 7. Atlases and asset loading
 
 ### `TextureAtlas`
 
@@ -271,7 +271,7 @@ const atlas = TextureAtlas.fromGrid(texture, {
 const clip = atlas.getClip(["idle-0", "idle-1"], { frameRate: 8, loop: true });
 ```
 
-`get`, `getFrames`, `getClip`, `has`, `destroy`, `fromJSON`, `fromGrid`, `pack` sağlar. Frame’ler atlas texture sınırları içinde olmalı; `rotated`/`trimmed` metadata bilinçli olarak reddedilir.
+Provides `get`, `getFrames`, `getClip`, `has`, `destroy`, `fromJSON`, `fromGrid` and `pack`. Frames must stay within the atlas texture bounds; `rotated`/`trimmed` metadata is deliberately rejected.
 
 ### `AssetLoader`
 
@@ -289,19 +289,19 @@ const texture = await assets.loadTexture("images/player.png", { mimeType: "image
 const atlas = await assets.loadAtlas("images/player.png", "data/player.json");
 ```
 
-Metotlar: `resolve`, `loadBytes`, `loadJSON`, `loadTexture`, `loadAtlas`, `inspectKTX2`, `loadKTX2`, `loadMany`, `release`, `clear`, `destroy`.
+Methods: `resolve`, `loadBytes`, `loadJSON`, `loadTexture`, `loadAtlas`, `inspectKTX2`, `loadKTX2`, `loadMany`, `release`, `clear`, `destroy`.
 
-`loadMany` entry biçimi `{ key, type, url, atlasUrl?, options?, decoder? }` şeklindedir. `type`: `texture`, `json`, `bytes`, `ktx2`, `atlas`. Aynı URL/sinyal işlerini paylaşır; caller abort yalnızca o caller promise’ini keser. Origin, redirect, credential URL, byte/image/pixel/JSON/cache limitleri ve optional integrity doğrulaması uygulanır.
+The `loadMany` entry format is `{ key, type, url, atlasUrl?, options?, decoder? }`. `type`: `texture`, `json`, `bytes`, `ktx2`, `atlas`. It shares work for the same URL/signal; a caller's abort only cancels that caller's promise. Origin, redirect, credential URL, byte/image/pixel/JSON/cache limits and optional integrity verification are applied.
 
 ### KTX2
 
-`inspectKTX2(bytes)` bounded header/level bilgisi döndürür. `loadKTX2` RGBA8’i kendi yolu ile açabilir; sıkıştırılmış Basis/KTX2 için uygulama açıkça güvenilen `decoder` adaptörü vermelidir. Decoder dış asset kodu olarak otomatik yüklenmez.
+`inspectKTX2(bytes)` returns bounded header/level information. `loadKTX2` can open RGBA8 on its own path; for compressed Basis/KTX2 the application must provide an explicitly trusted `decoder` adapter. The decoder is never loaded automatically as external asset code.
 
-## 8. Input, animation ve physics
+## 8. Input, animation and physics
 
 ### `Input`
 
-Input engine tarafından canvas’a bağlanır; doğrudan kullanım için `new Input(canvas, options)` mümkündür. `bindAction`, `unbindAction`, `bindAxis`, `unbindAxis`, `getBindings`, `setBindings`, `getAxis`, `getActionAxis`, `getVector`, action/key/pointer/gamepad sorguları, `getPointerWorld`, `rumbleGamepad`, bounded `injectKeyDown`/`injectKeyUp`/`injectPointer`/`inject`, `beginFrame`, `endFrame`, `destroy` sağlar.
+Input is attached to the canvas by the engine; `new Input(canvas, options)` is possible for direct use. Provides `bindAction`, `unbindAction`, `bindAxis`, `unbindAxis`, `getBindings`, `setBindings`, `getAxis`, `getActionAxis`, `getVector`, action/key/pointer/gamepad queries, `getPointerWorld`, `rumbleGamepad`, bounded `injectKeyDown`/`injectKeyUp`/`injectPointer`/`inject`, `beginFrame`, `endFrame` and `destroy`.
 
 ```js
 engine.input.bindAction("jump", "Space");
@@ -313,9 +313,9 @@ player.position.x += move.x * 240 * delta;
 player.position.y += move.y * 240 * delta;
 ```
 
-Binding ve raw state kapasitesi bounded’dir; gamepad hot-plug snapshot verir, native Gamepad nesnesini dışarı sızdırmaz.
+Binding and raw state capacity is bounded; gamepad hot-plug gives a snapshot and does not leak the native Gamepad object.
 
-AI testleri ve replay için native DOM event’i üretmeden deterministic input tape uygulanabilir:
+For AI tests and replays, a deterministic input tape can be applied without generating native DOM events:
 
 ```js
 engine.stop();
@@ -325,7 +325,7 @@ engine.input.inject([{ type: "keyup", code: "ArrowRight" }]);
 engine.step(1 / 60);
 ```
 
-`inject` en fazla 128 event alır; key code, pointer koordinatı, pointerId, button ve modifier alanları sınırlandırılır. Bu yöntem gerçek kullanıcı izni/OS input’u değildir; yalnızca sayfanın kendi Input state’ini kontrollü biçimde besler.
+`inject` accepts up to 128 events; key codes, pointer coordinates, pointerId, button and modifier fields are bounded. This method is not real user permission/OS input; it only feeds the page's own Input state in a controlled way.
 
 ### `Tween`, `Animator`, `easing`
 
@@ -335,7 +335,7 @@ animator.add(new Tween(player.position, "x", 600, 0.8, { ease: easing.outCubic }
 const engine = await ExiEngine.create({ canvas, scene, animator });
 ```
 
-`Tween.update`, `Animator.add/remove/update/clear`, `easing` (linear, smooth, in/out/inOut quad, cubic, sine, expo, bounce, elastic) fonksiyonları vardır. Engine animator’ı fixed-step sırasına bağlarsa sıra `scene → animator → physics → onUpdate` olur.
+Provides `Tween.update`, `Animator.add/remove/update/clear` and the `easing` functions (linear, smooth, in/out/inOut quad, cubic, sine, expo, bounce, elastic). If the engine binds the animator to the fixed-step order, the order is `scene → animator → physics → onUpdate`.
 
 ### `Collider`, `CollisionWorld`, `PhysicsBody`, `PhysicsWorld`
 
@@ -349,49 +349,49 @@ const nearbyBodies = physics.overlapCircle(100, 100, 50);
 const engine = await ExiEngine.create({ canvas, scene, physics });
 ```
 
-`Collider` generic AABB, `CollisionWorld` broadphase/query/raycast/overlapCircle; `PhysicsBody` velocity/static/kinematic ayarı; `PhysicsWorld` add/remove/sync/overlaps/overlapCircle/step/clear ve begin/stay/end contact callback’leri sağlar. Layer/mask, one-way, trigger, local bounds, finite velocity ve body/cell kapasitesi uygulanır.
+`Collider` is a generic AABB, `CollisionWorld` provides broadphase/query/raycast/overlapCircle; `PhysicsBody` sets velocity/static/kinematic; `PhysicsWorld` provides add/remove/sync/overlaps/overlapCircle/step/clear and begin/stay/end contact callbacks. Layers/masks, one-way, triggers, local bounds, finite velocity and body/cell capacity are enforced.
 
-## 9. Save, audio ve profiler
+## 9. Save, audio and profiler
 
 ### `SaveStore`
 
-`new SaveStore({ namespace, storage, maxBytes })`, `key`, `get`, `set`, `remove` sağlar. Yalnızca JSON veri saklar; namespace/key/byte/node/depth sınırları vardır. Executable/script veri yoktur.
+`new SaveStore({ namespace, storage, maxBytes })` provides `key`, `get`, `set` and `remove`. It only stores JSON data; there are namespace/key/byte/node/depth limits. There is no executable/script data.
 
 ### `AudioManager`
 
-`ensureContext`, `createBus`, `getBus`, `getBusNames`, `setBusVolume`, `getBusVolume`, `setBusMuted`, `isBusMuted`, `fadeBus`, `stopBus`, `unlock`, `load`, `loadMany`, `play`, `stopVoice`, `stopAll`, `suspend`, `resume`, `setVoiceVolume`, `setVoicePan`, `has`, `unload`, `destroy` sağlar.
+Provides `ensureContext`, `createBus`, `getBus`, `getBusNames`, `setBusVolume`, `getBusVolume`, `setBusMuted`, `isBusMuted`, `fadeBus`, `stopBus`, `unlock`, `load`, `loadMany`, `play`, `stopVoice`, `stopAll`, `suspend`, `resume`, `setVoiceVolume`, `setVoicePan`, `has`, `unload` and `destroy`.
 
-AudioContext browser autoplay politikasına tabidir; `unlock()` kullanıcı gesture sonrasında çağrılmalıdır. Decode byte, decoded byte, voice, bus ve lifecycle sınırları uygulanır.
+The AudioContext is subject to the browser's autoplay policy; `unlock()` must be called after a user gesture. Decode byte, decoded byte, voice, bus and lifecycle limits are enforced.
 
 ### `Profiler`
 
-`begin(time)`, `end(time, metrics?)`, `snapshot()` ile frame/fps/frameMs ve renderer metriklerini taşır.
+Carries frame/fps/frameMs and renderer metrics with `begin(time)`, `end(time, metrics?)` and `snapshot()`.
 
 ## 10. AI CLI MCP bridge
 
-Bridge komutu (MCP stdio’da npm başlığı stdout’a karışmaması için doğrudan Node):
+Bridge command (direct Node, so the npm banner does not mix into stdout in MCP stdio):
 
 ```powershell
 node tools/exi-mcp-server.mjs
 ```
 
-Transport yalnızca newline-delimited JSON-RPC stdio’dur. stdout’a log yazılmaz; hata tanısı stderr’dedir. Engine state’ine dokunan `tools/call` istekleri arrival sırasıyla tek kuyrukta işlenir; birden fazla asset yükünü tek çağrıda `loadMany()` ile toplamak önerilir. Uzun çalışan aktif veya kuyrukta bekleyen tool isteği, JSON-RPC cancellation bildirimiyle yanıt üretmeden iptal edilebilir:
+The transport is newline-delimited JSON-RPC stdio only. No logs are written to stdout; error diagnostics go to stderr. `tools/call` requests that touch engine state are processed in a single queue in arrival order; batching several asset loads into one call with `loadMany()` is recommended. A long-running active or queued tool request can be cancelled without producing a response through a JSON-RPC cancellation notification:
 
 ```json
 {"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":42,"reason":"agent stopped waiting"}}
 ```
 
-`requestId`, iptal edilecek `tools/call` id’siyle aynı olmalıdır. `exi_check`, `exi_project_check` ve `exi_project_open` child/syntax-check akışlarını; `exi_preview_start` ise başarısız/iptal başlangıç preview’ını bounded cleanup ile sonlandırır. Cancellation bir tool değildir ve response gönderilmez. MCP lifecycle sırası:
+`requestId` must be the same as the id of the `tools/call` to cancel. `exi_check`, `exi_project_check` and `exi_project_open` end their child/syntax-check flows, and `exi_preview_start` ends a failed/cancelled preview start, with bounded cleanup. Cancellation is not a tool and no response is sent. The MCP lifecycle order:
 
-Uzun çağrılarda istemci request `params._meta.progressToken` verirse bridge `notifications/progress` gönderir; örneğin `exi_check` için `progress: 0` başlangıç, `progress: 1` tamamlanma bildirir. Progress yalnızca kullanıcı arayüzü/heartbeat bilgisidir; doğrulanabilir sonuç yine `tools/call` yanıtıdır.
+If the client gives a request `params._meta.progressToken` on long calls, the bridge sends `notifications/progress`; for example, for `exi_check`, `progress: 0` reports the start and `progress: 1` completion. Progress is only user-interface/heartbeat information; the verifiable result is still the `tools/call` response.
 
-Güncel MCP `2026-07-28` modern akışında `initialize` yoktur. İstemci önce `server/discover` çağırır; her modern request `params._meta` içinde `io.modelcontextprotocol/protocolVersion`, `io.modelcontextprotocol/clientCapabilities` ve isteğe bağlı `io.modelcontextprotocol/clientInfo` taşır:
+The current MCP `2026-07-28` modern flow has no `initialize`. The client first calls `server/discover`; every modern request carries `io.modelcontextprotocol/protocolVersion`, `io.modelcontextprotocol/clientCapabilities` and the optional `io.modelcontextprotocol/clientInfo` in `params._meta`:
 
 ```json
 {"jsonrpc":"2.0","id":"discover-1","method":"server/discover","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientInfo":{"name":"my-agent","version":"1"},"io.modelcontextprotocol/clientCapabilities":{}}}}
 ```
 
-Modern result yanıtlarında `resultType: "complete"` ve `result._meta["io.modelcontextprotocol/serverInfo"]` bulunur. Legacy istemciler aşağıdaki `initialize` akışını kullanmaya devam eder; bridge iki dönemi aynı stdio process içinde kabul eder.
+Modern result responses contain `resultType: "complete"` and `result._meta["io.modelcontextprotocol/serverInfo"]`. Legacy clients keep using the `initialize` flow below; the bridge accepts both eras in the same stdio process.
 
 ```json
 {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"my-agent","version":"1"}}}
@@ -400,143 +400,143 @@ Modern result yanıtlarında `resultType: "complete"` ve `result._meta["io.model
 {"jsonrpc":"2.0","id":3,"method":"tools/list"}
 ```
 
-Server `2026-07-28` modern sürümünü ve `2025-11-25`, `2025-06-18`, `2025-03-26`, `2024-11-05` legacy sürümlerini destekler. Standard MCP kaynakları:
+The server supports the modern `2026-07-28` version and the legacy `2025-11-25`, `2025-06-18`, `2025-03-26` and `2024-11-05` versions. Standard MCP resources:
 
-| URI | İçerik |
+| URI | Content |
 | --- | --- |
-| `exi://api` | Runtime reflection manifesti |
+| `exi://api` | Runtime reflection manifest |
 | `exi://types` | `index.d.ts` |
-| `exi://guide` | AI çalışma sözleşmesi |
-| `exi://security` | Tehdit modeli ve limitler |
-| `exi://runtime` | Browser runtime telemetry selector/attribute sözleşmesi |
-| `exi://clients` | Codex/Claude/OpenCode/Gemini/Cursor/Cline/Windsurf stdio config sözleşmeleri |
+| `exi://guide` | AI working contract |
+| `exi://security` | Threat model and limits |
+| `exi://runtime` | Browser runtime telemetry selector/attribute contract |
+| `exi://clients` | Codex/Claude/OpenCode/Gemini/Cursor/Cline/Windsurf stdio config contracts |
 
-### Prompt yüzeyi
+### Prompt surface
 
-`prompts/list` iki reusable workflow döndürür: `exi_create_game` (oyun oluşturma) ve `exi_verify_runtime` (static preview + gerçek browser telemetry doğrulaması). `prompts/get` yalnızca bounded text prompt üretir; shell, dosya yazma veya runtime mutation yapmaz.
+`prompts/list` returns two reusable workflows: `exi_create_game` (game creation) and `exi_verify_runtime` (static preview + real browser telemetry verification). `prompts/get` only produces bounded text prompts; it performs no shell, file writes or runtime mutation.
 
 ```json
 {"jsonrpc":"2.0","id":4,"method":"prompts/get","params":{"name":"exi_create_game","arguments":{"goal":"top-down arena"}}}
 ```
 
-İstemci prompt içindeki adımları takip eder: `exi_api` → yeni proje için `exi_scaffold` veya mevcut proje için `exi_project_open` → normal AI CLI file editörü → `exi_asset_*` ile asset yükleme → `exi_project_preview` (veya ayrı `exi_project_check` + `exi_preview_start`) → browser içinde `AssetLoader.loadTexture`/`loadAtlas`/`loadJSON` → `exi://runtime` browser kanıtı → `exi_check` → cleanup. Browser yeteneği olmayan istemci runtime adımını static HTTP kanıtından ayrı raporlamalıdır.
+The client follows the steps in the prompt: `exi_api` → `exi_scaffold` for a new project or `exi_project_open` for an existing one → the normal AI CLI file editor → asset upload with `exi_asset_*` → `exi_project_preview` (or a separate `exi_project_check` + `exi_preview_start`) → `AssetLoader.loadTexture`/`loadAtlas`/`loadJSON` in the browser → `exi://runtime` browser evidence → `exi_check` → cleanup. A client without browser capability must report the runtime step separately from the static HTTP evidence.
 
-### Tool tablosu
+### Tool table
 
-| Tool | Görev |
+| Tool | Purpose |
 | --- | --- |
-| `exi_api` | Export, class, instance method, static method, nested member ve kanonik route manifesti |
-| `exi_create` | Public class constructor çağrısı |
-| `exi_function` | Top-level public function çağrısı |
-| `exi_export_get` | `Texture.white` veya başka allowlisted export/static property okuma |
-| `exi_export_call` | `easing.linear` gibi nested export ağacı fonksiyonu |
-| `exi_static_call` | Class static method çağrısı |
-| `exi_call` | Handle üzerindeki public method; sync/async sonucu beklenir |
-| `exi_inspect` | Handle’ın getter çalıştırmadan public method/property metadata’sını döndürme |
-| `exi_get` | Handle property/getter okuma |
-| `exi_set` | Public scalar veya başka handle ile property yazma; collection replacement yok |
-| `exi_release` | Handle’ı bırakma ve owned `destroy()` lifecycle’ı |
-| `exi_session_status` | Getter çalıştırmadan bounded handle, scope, upload ve preview session metadata’sı |
-| `exi_session_reset` | Oturum handle’larını temizleme |
-| `exi_build_scene` | Bounded JSON scene graph oluşturma |
-| `exi_scaffold` | Güvenli starter browser game üretme; staged multi-file commit/rollback |
-| `exi_project_open` | Mevcut repo-içi oyunu statik kontrol edip session scope’una açma |
-| `exi_project_apply` | En fazla 16 bounded text dosyasını transactional staging/commit/rollback ile uygulama |
-| `exi_file_list` | Scaffold edilen veya açılan proje içindeki allowlisted text dosyalarını bounded metadata ile listeleme |
-| `exi_file_read` | Repo içindeki allowlisted text proje dosyasını bounded okuma |
-| `exi_file_write` | Repo içindeki allowlisted text proje dosyasını oluşturma/güncelleme |
-| `exi_file_patch` | Mevcut text proje dosyasında tekil `find` eşleşmesini atomik olarak değiştirme |
-| `exi_file_begin` | 64 KiB üzeri text proje dosyası için sıralı chunk upload başlatma |
-| `exi_file_chunk` | Text chunk upload’a UTF-8 parçası ekleme |
-| `exi_file_commit` | Tamamlanan text upload’ı hedef dosyaya commit etme |
-| `exi_file_abort` | Text upload geçici dosyasını temizleme |
-| `exi_asset_list` | Scaffold edilen veya açılan proje içindeki allowlisted binary oyun asset’lerini metadata ile listeleme |
-| `exi_asset_read` | Allowlisted asset’in 32 KiB’a kadar bounded byte aralığını okuma |
-| `exi_asset_write` | Scaffold edilen veya açılan projeye bounded binary oyun asset’i yükleme |
-| `exi_asset_begin` | 512 KiB üzeri asset için sıralı chunk upload başlatma |
-| `exi_asset_chunk` | Chunk upload’a bounded byte parçası ekleme |
-| `exi_asset_commit` | Tamamlanan chunk upload’ı hedef dosyaya commit etme |
-| `exi_asset_abort` | Chunk upload geçici dosyasını temizleme |
-| `exi_file_check` | Scaffold edilen veya açılan proje `.html`/`.js`/`.mjs`/`.json` dosyasında shell’siz statik kontrol |
-| `exi_project_status` | Aynı session scope’undaki text dosyaları, asset metadata’sı, statik check ve eşleşen preview telemetry’sini tek read-only bounded sonuçta özetleme |
-| `exi_project_check` | Scaffold edilen veya açılan oyunun tüm checkable text dosyalarını tek bounded akışta doğrulama |
-| `exi_check` | Yalnızca `doctor`, `test`, `verify` |
-| `exi_preview_start` | Repo server’ını loopback’te başlatma ve preview telemetry kanalını hazırlama |
-| `exi_preview_call` | Token-korumalı demo veya scaffold browser RuntimeAgent üzerinden allowlisted engine işlemi çağırma |
-| `exi_preview_batch` | En fazla 8 browser RuntimeAgent operation’ını tek round-trip’te sıralı çalıştırma |
-| `exi_preview_probe` | Preview GET ile HTML/asset veya token-managed runtime telemetry doğrulama |
+| `exi_api` | Manifest of exports, classes, instance methods, static methods, nested members and canonical routes |
+| `exi_create` | Public class constructor call |
+| `exi_function` | Top-level public function call |
+| `exi_export_get` | Read `Texture.white` or another allowlisted export/static property |
+| `exi_export_call` | A function in the nested export tree, such as `easing.linear` |
+| `exi_static_call` | Class static method call |
+| `exi_call` | Public method on a handle; sync/async results are awaited |
+| `exi_inspect` | Return a handle's public method/property metadata without running getters |
+| `exi_get` | Read a handle property/getter |
+| `exi_set` | Write a property with a public scalar or another handle; no collection replacement |
+| `exi_release` | Release a handle and run the owned `destroy()` lifecycle |
+| `exi_session_status` | Bounded handle, scope, upload and preview session metadata without running getters |
+| `exi_session_reset` | Clear the session's handles |
+| `exi_build_scene` | Build a bounded JSON scene graph |
+| `exi_scaffold` | Generate a safe starter browser game; staged multi-file commit/rollback |
+| `exi_project_open` | Statically check an existing in-repo game and open it into the session scope |
+| `exi_project_apply` | Apply up to 16 bounded text files with transactional staging/commit/rollback |
+| `exi_file_list` | List allowlisted text files in a scaffolded or opened project with bounded metadata |
+| `exi_file_read` | Bounded read of an allowlisted text project file in the repository |
+| `exi_file_write` | Create/update an allowlisted text project file in the repository |
+| `exi_file_patch` | Atomically replace a single `find` match in an existing text project file |
+| `exi_file_begin` | Start a sequential chunk upload for a text project file over 64 KiB |
+| `exi_file_chunk` | Add a UTF-8 part to a text chunk upload |
+| `exi_file_commit` | Commit a completed text upload to the target file |
+| `exi_file_abort` | Clean up a text upload's temporary file |
+| `exi_asset_list` | List allowlisted binary game assets in a scaffolded or opened project with metadata |
+| `exi_asset_read` | Read a bounded byte range of up to 32 KiB of an allowlisted asset |
+| `exi_asset_write` | Upload a bounded binary game asset to a scaffolded or opened project |
+| `exi_asset_begin` | Start a sequential chunk upload for an asset over 512 KiB |
+| `exi_asset_chunk` | Add a bounded byte part to a chunk upload |
+| `exi_asset_commit` | Commit a completed chunk upload to the target file |
+| `exi_asset_abort` | Clean up a chunk upload's temporary file |
+| `exi_file_check` | Shell-free static check of a `.html`/`.js`/`.mjs`/`.json` file in a scaffolded or opened project |
+| `exi_project_status` | Summarize text files, asset metadata, static check and matching preview telemetry in the same session scope in one read-only bounded result |
+| `exi_project_check` | Verify all checkable text files of a scaffolded or opened game in one bounded flow |
+| `exi_check` | Only `doctor`, `test`, `verify` |
+| `exi_preview_start` | Start the repo server on loopback and prepare the preview telemetry channel |
+| `exi_preview_call` | Call an allowlisted engine operation through the token-protected demo or scaffold browser RuntimeAgent |
+| `exi_preview_batch` | Run up to 8 browser RuntimeAgent operations sequentially in one round trip |
+| `exi_preview_probe` | Verify HTML/assets or token-managed runtime telemetry with a preview GET |
 | `exi_preview_stop` | Preview process cleanup |
-| `exi_batch` | En fazla 128 public tool çağrısını sırayla çalıştırma |
+| `exi_batch` | Run up to 128 public tool calls in order |
 
-`tools/list` yanıtındaki MCP `annotations` alanları da güvenlik niyetini taşır: `exi_api`, `exi_inspect`, `exi_get`, `exi_session_status`, `exi_project_status`, `exi_project_check`, `exi_check` ve `exi_preview_probe` salt-okuma; `exi_set`, `exi_release`, `exi_scaffold`, `exi_preview_call`, `exi_preview_batch` ve `exi_preview_stop` destructive mutation olarak işaretlenir. Bunlar istemciye verilen hint’lerdir; gerçek güvenlik sınırı bridge doğrulamasıdır.
+The MCP `annotations` fields in the `tools/list` response also carry the security intent: `exi_api`, `exi_inspect`, `exi_get`, `exi_session_status`, `exi_project_status`, `exi_project_check`, `exi_check` and `exi_preview_probe` are read-only; `exi_set`, `exi_release`, `exi_scaffold`, `exi_preview_call`, `exi_preview_batch` and `exi_preview_stop` are marked as destructive mutations. These are hints given to the client; the real security boundary is the bridge's validation.
 
-### Tool parametreleri ve sonuçları
+### Tool parameters and results
 
-| Tool | Girdi | Başarılı sonuç |
+| Tool | Input | Successful result |
 | --- | --- | --- |
 | `exi_api` | `{}` | `{ protocol, supportedProtocols[], mcpEra, server, transport, resources, callRoutes, limits, workflow, exports[] }`; each export includes `route`, `methodRoutes`, `staticMethodRoutes`, `members[]` and `staticProperties[]` |
-| `exi_session_status` | `{}` | `{ handleCount, protectedHandleCount, handles[], scopes[], assetUploads[], projectFileUploads[], previews[] }`; token ve temp path içermez |
-| `exi_session_reset` | `{}` | `{ released: true }`; handle, upload ve aynı session preview process’lerini temizler |
+| `exi_session_status` | `{}` | `{ handleCount, protectedHandleCount, handles[], scopes[], assetUploads[], projectFileUploads[], previews[] }`; contains no tokens or temp paths |
+| `exi_session_reset` | `{}` | `{ released: true }`; clears handles, uploads and the same session's preview processes |
 | `exi_create` | `{ type, args? }` | `{$handle, type}` |
-| `exi_function` | `{ name, args? }` | Fonksiyon sonucu |
-| `exi_export_get` | `{ path }` | Sabit/static değer veya protected handle |
-| `exi_export_call` | `{ path, args? }` | Async beklenmiş fonksiyon sonucu |
-| `exi_static_call` | `{ type, method, args? }` | Async beklenmiş static method sonucu |
-| `exi_call` | `{ handle, method, args? }` | Async beklenmiş instance method sonucu |
-| `exi_inspect` | `{ handle }` | `{ handle, type, methods[], properties[] }`; getter değerleri okunmaz |
-| `exi_get` | `{ handle, property }` | Property/getter sonucu |
+| `exi_function` | `{ name, args? }` | Function result |
+| `exi_export_get` | `{ path }` | Constant/static value or protected handle |
+| `exi_export_call` | `{ path, args? }` | Awaited async function result |
+| `exi_static_call` | `{ type, method, args? }` | Awaited async static method result |
+| `exi_call` | `{ handle, method, args? }` | Awaited async instance method result |
+| `exi_inspect` | `{ handle }` | `{ handle, type, methods[], properties[] }`; getter values are not read |
+| `exi_get` | `{ handle, property }` | Property/getter result |
 | `exi_set` | `{ handle, property, value }` | `{ handle, property, value }` |
 | `exi_release` | `{ handle }` | `{ released: handle }` |
 | `exi_build_scene` | `{ scene: { type, options?, children? } }` | Root `{$handle, type}` |
 | `exi_scaffold` | `{ directory?, overwrite? }` | `{ directory, files[] }` |
-| `exi_project_apply` | `{ path, files: [{ path, content, expectedVersion? }], overwrite? }` | `{ directory, applied, bytes, files: [{ path, bytes, overwritten }] }`; 16 dosya/512 KiB toplam, hata halinde rollback ve stale version conflict |
+| `exi_project_apply` | `{ path, files: [{ path, content, expectedVersion? }], overwrite? }` | `{ directory, applied, bytes, files: [{ path, bytes, overwritten }] }`; 16 files/512 KiB total, rollback on error and stale version conflict |
 | `exi_file_list` | `{ path }` | `{ directory, files: [{ path, bytes, version: { bytes, mtimeMs } }] }` |
 | `exi_file_read` | `{ path, offset?, limit? }` | `{ path, offset, nextOffset, totalBytes, bytes, version: { bytes, mtimeMs }, complete, content }` |
-| `exi_file_write` | `{ path, content, overwrite?, expectedVersion?, expectedSha256? }` | `{ path, bytes, sha256, overwritten }`; eksik parent klasörler scaffold içinde oluşturulur, version uyuşmazlığı `EXI_MCP_FILE_CONFLICT`, hash uyuşmazlığı `EXI_MCP_UPLOAD_INTEGRITY` döndürür |
-| `exi_file_patch` | `{ path, find, replace }` | `{ path, bytes, replacedBytes, matchCount, overwritten }`; `find` tam olarak bir kez eşleşmelidir |
-| `exi_file_begin` | `{ path, size, overwrite?, expectedVersion?, expectedSha256? }` | `{ fileUploadId, path, expectedBytes, receivedBytes, chunkBytes, expectedSha256? }`; commit sırasında version ve içerik hash’i tekrar doğrulanır |
+| `exi_file_write` | `{ path, content, overwrite?, expectedVersion?, expectedSha256? }` | `{ path, bytes, sha256, overwritten }`; missing parent folders are created inside the scaffold, a version mismatch returns `EXI_MCP_FILE_CONFLICT`, a hash mismatch returns `EXI_MCP_UPLOAD_INTEGRITY` |
+| `exi_file_patch` | `{ path, find, replace }` | `{ path, bytes, replacedBytes, matchCount, overwritten }`; `find` must match exactly once |
+| `exi_file_begin` | `{ path, size, overwrite?, expectedVersion?, expectedSha256? }` | `{ fileUploadId, path, expectedBytes, receivedBytes, chunkBytes, expectedSha256? }`; the version and content hash are re-verified at commit |
 | `exi_file_chunk` | `{ fileUploadId, offset, content }` | `{ fileUploadId, path, receivedBytes, expectedBytes, remainingBytes, complete }` |
 | `exi_file_commit` | `{ fileUploadId }` | `{ fileUploadId, path, bytes, sha256?, overwritten }` |
 | `exi_file_abort` | `{ fileUploadId }` | `{ fileUploadId, aborted: true }` |
 | `exi_asset_list` | `{ path }` | `{ directory, assets: [{ path, bytes, type, version: { bytes, mtimeMs } }] }` |
-| `exi_asset_read` | `{ path, offset?, limit? }` | `{ path, offset, nextOffset, totalBytes, bytes, version: { bytes, mtimeMs }, complete, data: { "$bytes": base64 } }`; aralık en fazla 32 KiB |
-| `exi_asset_write` | `{ path, bytes: { "$bytes": [...]\|base64 }, overwrite?, expectedVersion?, expectedSha256? }` | `{ path, bytes, type, sha256, overwritten }`; eksik parent klasörler scaffold içinde oluşturulur, version uyuşmazlığı `EXI_MCP_FILE_CONFLICT`, hash uyuşmazlığı `EXI_MCP_UPLOAD_INTEGRITY` döndürür |
-| `exi_asset_begin` | `{ path, size, overwrite?, expectedVersion?, expectedSha256? }` | `{ uploadId, path, expectedBytes, receivedBytes, chunkBytes, expectedSha256? }`; commit sırasında version ve içerik hash’i tekrar doğrulanır |
+| `exi_asset_read` | `{ path, offset?, limit? }` | `{ path, offset, nextOffset, totalBytes, bytes, version: { bytes, mtimeMs }, complete, data: { "$bytes": base64 } }`; the range is at most 32 KiB |
+| `exi_asset_write` | `{ path, bytes: { "$bytes": [...]\|base64 }, overwrite?, expectedVersion?, expectedSha256? }` | `{ path, bytes, type, sha256, overwritten }`; missing parent folders are created inside the scaffold, a version mismatch returns `EXI_MCP_FILE_CONFLICT`, a hash mismatch returns `EXI_MCP_UPLOAD_INTEGRITY` |
+| `exi_asset_begin` | `{ path, size, overwrite?, expectedVersion?, expectedSha256? }` | `{ uploadId, path, expectedBytes, receivedBytes, chunkBytes, expectedSha256? }`; the version and content hash are re-verified at commit |
 | `exi_asset_chunk` | `{ uploadId, offset, bytes: { "$bytes": [...]\|base64 } }` | `{ uploadId, path, receivedBytes, expectedBytes, remainingBytes, complete }` |
 | `exi_asset_commit` | `{ uploadId }` | `{ uploadId, path, bytes, type, sha256?, overwritten }` |
 | `exi_asset_abort` | `{ uploadId }` | `{ uploadId, aborted: true }` |
 | `exi_file_check` | `{ path }` (`.html`, `.js`, `.mjs`, `.json`) | `{ path, kind, ok, code, stdout, stderr, references? }` |
 | `exi_project_check` | `{ path }` | `{ directory, ok, files, checked, skipped, failureCount, failures[] }` |
-| `exi_project_status` | `{ path }` | `{ directory, ok, projectCheck, files[], assets[], previews: [{ previewId, directory, pagePath, pageUrl, port, ready, runtime }] }`; aynı scope’taki `exi_project_preview` veya path’i bu proje altında olan doğrudan `exi_preview_start` preview’ları eşlenir, runtime report’u yoksa `runtime.ok=false` veya `telemetry:null` döner |
-| `exi_project_preview` | `{ path, port? }` | `{ ok, phase, directory, projectCheck, preview? }`; önce statik check yapar, başarısızsa preview başlatmaz; başarılıysa `preview.previewId/pageUrl` döndürür |
-| `exi_project_open` | `{ path }` | `{ directory, opened, ok, files, checked, skipped, failureCount, failures[] }`; statik kontrolden sonra aynı session file/asset scope’u |
+| `exi_project_status` | `{ path }` | `{ directory, ok, projectCheck, files[], assets[], previews: [{ previewId, directory, pagePath, pageUrl, port, ready, runtime }] }`; `exi_project_preview` previews in the same scope, or direct `exi_preview_start` previews whose path is under this project, are matched; without a runtime report it returns `runtime.ok=false` or `telemetry:null` |
+| `exi_project_preview` | `{ path, port? }` | `{ ok, phase, directory, projectCheck, preview? }`; runs a static check first and starts no preview on failure; on success returns `preview.previewId/pageUrl` |
+| `exi_project_open` | `{ path }` | `{ directory, opened, ok, files, checked, skipped, failureCount, failures[] }`; the same session's file/asset scope after the static check |
 | `exi_check` | `{ mode: "doctor" | "test" | "verify" }` | `{ ok, code, stdout, stderr }` |
-| `exi_preview_start` | `{ port?, path? }` | `{ previewId, url, pagePath, pageUrl, port, ready, runtime: { path, tokenManaged } }`; `path` verilirse o repo-içi sayfa HTTP 200 olmadan hazır dönmez |
-| `exi_preview_call` | `{ previewId, operation, name?, path?, type?, method?, handle?, property?, value?, args? }` | Browser RuntimeAgent sonucu; operation `function`, `create`, `export_get`, `export_call`, `static_call`, `call`, `inspect`, `get`, `set`, `release`, `observe`, `snapshot` veya `scenario` |
-| `exi_preview_batch` | `{ previewId, calls, stopOnError? }` | `{ completed, failed, stopped, results[] }`; en fazla 8 call, her call `operation` alanı ile aynı operation listesinden seçim yapar; `observe` bounded canvas grid/hash, `snapshot` bounded scene graph/hash, `scenario` bounded input/step/observation döndürür; sonraki call içinde `{"$result":0}` veya `{"$result":0,"$path":"value"}` referansı |
-| `exi_preview_probe` | `{ previewId, path? }` | `{ status, ok, contentType, body }`; `path: "/__exi/runtime"` token ile gerçek browser raporunu okur |
+| `exi_preview_start` | `{ port?, path? }` | `{ previewId, url, pagePath, pageUrl, port, ready, runtime: { path, tokenManaged } }`; if `path` is given, it does not return ready until that in-repo page answers HTTP 200 |
+| `exi_preview_call` | `{ previewId, operation, name?, path?, type?, method?, handle?, property?, value?, args? }` | Browser RuntimeAgent result; operation is `function`, `create`, `export_get`, `export_call`, `static_call`, `call`, `inspect`, `get`, `set`, `release`, `observe`, `snapshot` or `scenario` |
+| `exi_preview_batch` | `{ previewId, calls, stopOnError? }` | `{ completed, failed, stopped, results[] }`; at most 8 calls, each call picks from the same operation list via its `operation` field; `observe` returns a bounded canvas grid/hash, `snapshot` a bounded scene graph/hash, `scenario` a bounded input/step/observation; later calls can use `{"$result":0}` or `{"$result":0,"$path":"value"}` references |
+| `exi_preview_probe` | `{ previewId, path? }` | `{ status, ok, contentType, body }`; `path: "/__exi/runtime"` reads the real browser report with the token |
 | `exi_preview_stop` | `{ previewId }` | `{ stopped: previewId }` |
 | `exi_batch` | `{ calls: [{ name, arguments? }], stopOnError? }` | `{ completed, failed, stopped, results[] }` |
 
-`args` her public function/constructor/static/instance çağrısında JSON array olmalıdır; eksikse boş array kullanılır, başka türler `EXI_MCP_ARGS_TYPE` ile reddedilir. Dizi içindeki handle referansı yalnızca tam olarak `{ "$handle": "hN" }` biçiminde çözülür; iç içe option nesneleri de recursive çözülür. Binary API’ler için `{ "$bytes": [0, 1, 255] }` veya bounded base64 `{ "$bytes": "..." }` `Uint8Array` olarak çözülür. `exi_set` method overwrite’ını, collection replacement’ını ve handle olmayan canlı object replacement’ını reddeder.
+`args` must be a JSON array in every public function/constructor/static/instance call; if missing, an empty array is used, and other types are rejected with `EXI_MCP_ARGS_TYPE`. A handle reference inside the array is only resolved when it has exactly the form `{ "$handle": "hN" }`; nested option objects are resolved recursively too. For binary APIs, `{ "$bytes": [0, 1, 255] }` or bounded base64 `{ "$bytes": "..." }` is decoded as a `Uint8Array`. `exi_set` rejects method overwrites, collection replacement and replacement of live objects that are not handles.
 
-`tools/list` her MCP aracının üst seviye input schema’sını `additionalProperties:false` ile yayımlar. Bridge de aynı kapıyı uygular; şemada olmayan üst seviye alan `EXI_MCP_ARGUMENT_UNKNOWN`, tool argümanı object değilse `EXI_MCP_ARGS_TYPE`, eksik zorunlu alan `EXI_MCP_ARGUMENT_REQUIRED`, enum/type/limit/şema ihlalleri ise sırasıyla `EXI_MCP_ARGUMENT_ENUM`, `EXI_MCP_ARGUMENT_TYPE`/`EXI_MCP_ARGUMENT_LIMIT` ve `EXI_MCP_ARGUMENT_INVALID` olur. Asset upload şeması `$bytes` array veya base64 biçimini açıkça taşır; nested engine `args` JSON olduğu için handle/byte referansları yine recursive çözülür.
+`tools/list` publishes the top-level input schema of every MCP tool with `additionalProperties:false`. The bridge applies the same gate; a top-level field not in the schema becomes `EXI_MCP_ARGUMENT_UNKNOWN`, a non-object tool argument `EXI_MCP_ARGS_TYPE`, a missing required field `EXI_MCP_ARGUMENT_REQUIRED`, and enum/type/limit/schema violations `EXI_MCP_ARGUMENT_ENUM`, `EXI_MCP_ARGUMENT_TYPE`/`EXI_MCP_ARGUMENT_LIMIT` and `EXI_MCP_ARGUMENT_INVALID` respectively. The asset upload schema explicitly carries the `$bytes` array or base64 form; because nested engine `args` are JSON, handle/byte references are still resolved recursively.
 
-`exi_call`/`exi_function` sonucu bir typed array veya `DataView` ise bridge; `type`, `length`, `byteLength`, ilk 16 elemanlık `sample` ve byte’lar `bytes: { "$bytes": "base64" }` alanlarını döndürür. Inline byte payload’ı `exi_api.limits.maxInlineBinaryBytes` ile sınırlıdır (32 KiB); daha büyük sonuçlarda `bytes: { "truncated": true, "maxInlineBytes": 32768 }` gelir ve tam asset için `exi_asset_read` kullanılmalıdır. `exi_batch` içinde `{"$result":0,"$path":"bytes"}` bu bounded byte sonucunu sonraki binary API’ye yeniden `Uint8Array` olarak bağlar; bu sayede `AssetLoader.loadBytes()` sonucu AI çağrı zincirinde kaybolmaz. `DataView` sample’ı byte, BigInt typed-array sample değerleri JSON güvenliği için string olarak taşınır.
+If the result of `exi_call`/`exi_function` is a typed array or `DataView`, the bridge returns the `type`, `length`, `byteLength`, a 16-element `sample` and the bytes in `bytes: { "$bytes": "base64" }`. The inline byte payload is bounded by `exi_api.limits.maxInlineBinaryBytes` (32 KiB); larger results return `bytes: { "truncated": true, "maxInlineBytes": 32768 }`, and `exi_asset_read` must be used for the full asset. Inside `exi_batch`, `{"$result":0,"$path":"bytes"}` binds this bounded byte result back to the next binary API as a `Uint8Array`, so the result of `AssetLoader.loadBytes()` is not lost in the AI call chain. `DataView` samples are bytes, and BigInt typed-array sample values are carried as strings for JSON safety.
 
-`exi_project_open({ path })` mevcut repo-içi klasörü symlink/engine/test/tool/traversal sınırlarında doğrular, kontrol edilebilir HTML/JS/JSON dosyalarını statik kontrol eder ve başarılı scope kaydı döndürür; hatalı proje de düzeltilebilmesi için `ok: false` raporuyla açılabilir, kontrol edilebilir dosyası olmayan/allowlist dışı klasör açılamaz. Bundan sonra `exi_file_list`/`exi_file_read`/`exi_file_write`/`exi_file_patch` aynı MCP session’ında `exi_scaffold` ile oluşturulmuş veya `exi_project_open` ile açılmış proje klasörlerindeki `.css`, `.html`, `.js`, `.json`, `.mjs`, `.md`, `.svg`, `.ts` ve `.txt` uzantılarını kabul eder. Tek çağrılı `exi_file_write` ve `exi_file_patch` metinleri 64 KiB UTF-8 sınırındadır; patch sıfır veya birden fazla `find` eşleşmesinde dosyaya dokunmaz. Daha büyük kaynaklar `exi_file_begin` → `exi_file_chunk` → `exi_file_commit` akışıyla 4 MiB’a kadar yazılabilir. `exi_file_read` normal dosyada doğrudan, büyük dosyada UTF-8 sınırlarını koruyan `offset`/`limit` sayfalarıyla en fazla 48 KiB döndürür. Listeleme en fazla 1.024 dosya/32 klasör derinliği döndürür ve her dosya için `{ path, bytes, version: { bytes, mtimeMs } }` metadata verir. Okunan/listelenen `version`, `exi_file_write`, `exi_file_begin` veya `exi_project_apply` içindeki `expectedVersion` alanına verildiğinde başka bir değişiklik varsa `EXI_MCP_FILE_CONFLICT` ile stale overwrite reddedilir; bu optimistic guard kilit değildir ve son kontrol/yazma arasında dış yarış penceresi kalabilir. `exi_file_write` ve chunk commit eksik parent klasörleri proje scope’u içinde oluşturur; `exi_file_patch` mevcut dosya ister. Engine/test/tool kökleri, `.env`, credential uzantıları, binary dosyalar, traversal ve symlink reddedilir. Mevcut dosyayı yalnızca `overwrite: true` ile değiştirir; direct/chunk overwrite ve unique patch yeni içeriği önce geçici dosyaya yazar, eski dosyayı backup ile korur ve rename başarısız olursa geri yükler.
-`exi_asset_list`/`exi_asset_read`/`exi_asset_write` scaffold edilen veya `exi_project_open` ile açılan proje scope’unu ve symlink kontrollerini korur. Asset listesi yalnızca allowlisted image/audio/font/KTX2 uzantılarını metadata olarak döndürür ve her kaynağın `{ bytes, mtimeMs }` version’unu verir; `exi_asset_read` tam dosyayı belleğe almadan `offset`/`limit` ile en fazla 32 KiB byte aralığını `{ "$bytes": base64 }` olarak verir. Upload payload’ı `{ "$bytes": [0..255] }` veya bounded base64 olabilir ve mutlak 512 KiB ile sınırlıdır. Asset aracı arbitrary binary veya executable yazmaz; mevcut dosyayı `overwrite: true` ile değiştirirken `expectedVersion` verilirse stale asset overwrite’ı `EXI_MCP_FILE_CONFLICT` ile durdurur.
-512 KiB üzeri dosyalarda `exi_asset_begin` → `exi_asset_chunk` (offset her zaman önceki `receivedBytes`) → `exi_asset_commit` sırası kullanılır. Hata veya vazgeçme durumunda `exi_asset_abort` çağrılmalıdır. Chunk upload geçici dosyaya yazar; commit edilmemiş dosyalar session reset veya MCP process kapanışında temizlenir. Tek asset 64 MiB, bekleyen upload toplamı 64 MiB ve aktif upload sayısı 8 ile sınırlıdır.
+`exi_project_open({ path })` validates an existing in-repo folder against the symlink/engine/test/tool/traversal limits, statically checks its checkable HTML/JS/JSON files and returns a successful scope record; a broken project can also be opened with an `ok: false` report so it can be fixed, but a folder with no checkable file/outside the allowlist cannot be opened. After that, `exi_file_list`/`exi_file_read`/`exi_file_write`/`exi_file_patch` accept the `.css`, `.html`, `.js`, `.json`, `.mjs`, `.md`, `.svg`, `.ts` and `.txt` extensions in project folders created with `exi_scaffold` or opened with `exi_project_open` in the same MCP session. Single-call `exi_file_write` and `exi_file_patch` texts are limited to 64 KiB UTF-8; a patch does not touch the file on zero or several `find` matches. Larger sources can be written up to 4 MiB with the `exi_file_begin` → `exi_file_chunk` → `exi_file_commit` flow. `exi_file_read` returns at most 48 KiB, directly for a normal file and in `offset`/`limit` pages that preserve UTF-8 boundaries for a large file. Listing returns at most 1,024 files/32 folder levels and gives `{ path, bytes, version: { bytes, mtimeMs } }` metadata for each file. When the read/listed `version` is passed in the `expectedVersion` field of `exi_file_write`, `exi_file_begin` or `exi_project_apply` and another change exists, a stale overwrite is rejected with `EXI_MCP_FILE_CONFLICT`; this optimistic guard is not a lock, and an external race window can remain between the last check and the write. `exi_file_write` and chunk commits create missing parent folders inside the project scope; `exi_file_patch` requires an existing file. Engine/test/tool roots, `.env`, credential extensions, binary files, traversal and symlinks are rejected. An existing file is only replaced with `overwrite: true`; direct/chunk overwrites and unique patches first write the new content to a temporary file, keep the old file as a backup and restore it if the rename fails.
+`exi_asset_list`/`exi_asset_read`/`exi_asset_write` preserve the scaffolded or `exi_project_open`-opened project scope and the symlink checks. The asset list only returns allowlisted image/audio/font/KTX2 extensions as metadata and gives each resource's `{ bytes, mtimeMs }` version; `exi_asset_read` returns a byte range of at most 32 KiB as `{ "$bytes": base64 }` with `offset`/`limit` without loading the whole file into memory. The upload payload can be `{ "$bytes": [0..255] }` or bounded base64 and is limited to an absolute 512 KiB. The asset tool does not write arbitrary binaries or executables; when replacing an existing file with `overwrite: true`, giving `expectedVersion` stops a stale asset overwrite with `EXI_MCP_FILE_CONFLICT`.
+For files over 512 KiB, use the `exi_asset_begin` → `exi_asset_chunk` (offset is always the previous `receivedBytes`) → `exi_asset_commit` order. On an error or when abandoning, call `exi_asset_abort`. A chunk upload writes to a temporary file; uncommitted files are cleaned up on session reset or MCP process shutdown. A single asset is limited to 64 MiB, total pending uploads to 64 MiB and active uploads to 8.
 
-Örnek binary asset upload:
+Example binary asset upload:
 
 ```json
 {"name":"exi_asset_write","arguments":{"path":"ai-game/assets/player.png","bytes":{"$bytes":"iVBORw0KGgo="}}}
 ```
 
-Bu örnekteki payload yalnızca akış biçimini gösterir; gerçek PNG/audio/KTX2 byte’ları uygulama tarafından sağlanmalıdır. Upload sonrası `exi_asset_list`, `exi_preview_probe` ve `AssetLoader.loadBytes()` ile sırasıyla metadata, HTTP MIME ve engine fetch kanıtı alınabilir.
+The payload in this example only shows the flow format; real PNG/audio/KTX2 bytes must be supplied by the application. After the upload, `exi_asset_list`, `exi_preview_probe` and `AssetLoader.loadBytes()` give metadata, HTTP MIME and engine fetch evidence respectively.
 
-Büyük asset akışı:
+Large asset flow:
 
 ```json
 {"name":"exi_asset_begin","arguments":{"path":"ai-game/assets/world.ktx2","size":600000}}
@@ -544,28 +544,28 @@ Büyük asset akışı:
 {"name":"exi_asset_chunk","arguments":{"uploadId":"u1","offset":400000,"bytes":{"$bytes":"..."}}}
 {"name":"exi_asset_commit","arguments":{"uploadId":"u1"}}
 ```
-`exi_file_check` aynı session kapsamını ve 64 KiB sınırını korur; `.js`/`.mjs` için Node’un `--check` parse yolunu, `.json` için önce 16.384 düğüm/32 derinlik metin bütçesini ve sonra `JSON.parse()` yolunu, `.html` için ise local script/style referansı ve traversal/dış URL kontrolünü kullanır. Kod çalıştırmaz, shell açmaz ve browser/API runtime doğrulamasının yerine geçmez.
-`exi_project_check` aynı kontrolleri scaffold edilmiş veya `exi_project_open` ile açılmış klasördeki en fazla 128 checkable dosyaya uygular; dosya listesi, başarılı kontrol sayısı ve en fazla 32 hata özeti döndürür. Bu statik kapı browser runtime kanıtının yerine geçmez; sonrasında preview ve `#exi-runtime` kontrolü yapılmalıdır.
+`exi_file_check` preserves the same session scope and the 64 KiB limit; it uses Node's `--check` parse path for `.js`/`.mjs`, first a 16,384-node/32-depth text budget and then `JSON.parse()` for `.json`, and local script/style reference plus traversal/external URL checks for `.html`. It runs no code, opens no shell and does not replace browser/API runtime verification.
+`exi_project_check` applies the same checks to at most 128 checkable files in a folder scaffolded or opened with `exi_project_open`; it returns the file list, the number of successful checks and at most 32 error summaries. This static gate does not replace browser runtime evidence; preview and `#exi-runtime` checks must follow.
 
-`exi_api.resources` canonical `exi://api`, `exi://types`, `exi://guide`, `exi://security`, `exi://runtime` ve `exi://clients` belge URI’larını, `exi_api.callRoutes` ise constructor/function/nested export/static method/instance method/property/inspect ve browser runtime işlemlerinin tool eşlemesini verir. `exi_api.exports[]` içindeki export `route` alanı ile doğrudan kullanılacak tool’u, `methodRoutes`/`staticMethodRoutes` instance ve static method route’larını, nested `members[]` ve `staticProperties[]` alanları da kendi route’unu taşır; ajanlar bu alanları okuyarak isim ve URI tahmini yapmamalıdır. `exi_api.toolInput` strict üst seviye argüman politikasını, `EXI_MCP_ARGS_TYPE` üst seviye ve `EXI_MCP_ARGUMENT_TYPE` nested type hata kodlarını, diğer canonical hata kodlarını ve `$bytes` biçimini verir; `exi_api.limits` çalışma anındaki bridge sınırlarının canonical kaynağıdır. `exi_check` için timeout’lar `doctor=60s`, `test=180s`, `verify=300s`; `exi_preview_start` için readiness penceresi 10 saniyesidir. `exi_preview_start({ path: "/ai-game/index.html" })` ile hedef oyun sayfasını seç; sonuçtaki `pageUrl` doğrudan browser agent’a verilebilir ve sayfa HTTP 200 olmadan preview hazır kabul edilmez. Preview sunucusu yalnızca engine/game web uzantılarını servis eder, dot/credential ve dependency-lock dosyalarını dışarı vermez.
+`exi_api.resources` gives the canonical `exi://api`, `exi://types`, `exi://guide`, `exi://security`, `exi://runtime` and `exi://clients` document URIs, and `exi_api.callRoutes` gives the tool mapping for constructor/function/nested export/static method/instance method/property/inspect and browser runtime operations. The export `route` field in `exi_api.exports[]` carries the tool to use directly, `methodRoutes`/`staticMethodRoutes` the instance and static method routes, and the nested `members[]` and `staticProperties[]` fields their own routes; agents must read these fields and not guess names or URIs. `exi_api.toolInput` gives the strict top-level argument policy, the `EXI_MCP_ARGS_TYPE` top-level and `EXI_MCP_ARGUMENT_TYPE` nested type error codes, the other canonical error codes and the `$bytes` format; `exi_api.limits` is the canonical source of the bridge limits at run time. The timeouts for `exi_check` are `doctor=60s`, `test=180s` and `verify=300s`; the readiness window for `exi_preview_start` is 10 seconds. Select the target game page with `exi_preview_start({ path: "/ai-game/index.html" })`; the `pageUrl` in the result can be handed directly to a browser agent, and the preview is not considered ready until the page answers HTTP 200. The preview server only serves engine/game web extensions and does not expose dot/credential and dependency-lock files.
 
-`exi_preview_call` ve `exi_preview_batch`, root demo veya `exi_scaffold` tarafından eklenen `/src/ai/runtime-agent.js` istemcisine token-korumalı command/result kuyruğu üzerinden ulaşır. `RuntimeAgent` başlangıçta `engine` ve `scene` handle’larını sağlar; bu kök handle’lar bırakılamaz, yeni nesneler browser tarafında handle olarak tutulur. `exi_preview_batch` en fazla 8 çağrıyı sıralı çalıştırır ve create sonucundaki handle’ı sonraki call’a `{"$result":0}` ile taşır; herhangi bir önceki sonuç nesnesinin güvenli own-property alanı `{"$result":1,"$path":"handle"}` ile seçilebilir. `stopOnError:false` sonraki çağrıları sürdürür ama transaction/rollback sağlamaz; geçici handle’lar yine release edilmelidir. Operation isimleri MCP engine çağrılarıyla aynıdır, ancak browser API’sine ait handle’lar MCP process handle’larından ayrıdır. Bu kanal yalnızca `src/index.js` export ağacının prototype method/property’lerini ve `engine`/`scene` köklerini kullanır; instance üzerindeki `onUpdate`/`onRender` gibi oyun callback’leri `inspect` içinde callable method olarak listelenmez ve `exi_call` ile çalıştırılamaz. Browser `inspect` sonucu ayrıca sayfada kayıtlı callback isimlerini `callbacks` alanında verir; bu isimler yalnızca `{"$callback":"name"}` referansında kullanılabilir. Eval, `new Function`, arbitrary script veya callback serileştirmesi yoktur. Runtime command payload’ı 768 KiB, result 64 KiB ve bekleme 10 saniyedir. RuntimeAgent yüklenmemişse çağrı bounded timeout ile başarısız olur; static preview veya synthetic telemetry GPU kanıtı sayılmaz.
+`exi_preview_call` and `exi_preview_batch` reach the `/src/ai/runtime-agent.js` client added by the root demo or by `exi_scaffold` through a token-protected command/result queue. At startup `RuntimeAgent` provides the `engine` and `scene` handles; these root handles cannot be released, and new objects are kept as handles on the browser side. `exi_preview_batch` runs at most 8 calls sequentially and carries the handle from a create result to the next call with `{"$result":0}`; a safe own-property field of any earlier result object can be selected with `{"$result":1,"$path":"handle"}`. `stopOnError:false` continues with the following calls but provides no transaction/rollback; temporary handles must still be released. Operation names are the same as the MCP engine calls, but handles belonging to the browser API are separate from MCP process handles. This channel only uses the prototype methods/properties of the `src/index.js` export tree and the `engine`/`scene` roots; game callbacks on the instance, such as `onUpdate`/`onRender`, are not listed as callable methods in `inspect` and cannot be run with `exi_call`. The browser `inspect` result also gives the callback names registered on the page in the `callbacks` field; these names can only be used in a `{"$callback":"name"}` reference. There is no eval, `new Function`, arbitrary script or callback serialization. The runtime command payload is limited to 768 KiB, the result to 64 KiB and the wait to 10 seconds. If the RuntimeAgent is not loaded, the call fails with a bounded timeout; a static preview or synthetic telemetry does not count as GPU evidence.
 
-`observe` operation’ı scaffold/demo sayfasının önceden bağladığı `createEngineObserver(engine)` ile çalışır. Motor, swapchain canvas readback yerine düşük çözünürlüklü geçici `RenderTexture` üretir ve WebGL2 `readPixels` veya WebGPU `copyTextureToBuffer` ile gerçek GPU sonucunu okur. En fazla 64×64 örnek hücreye küçültür ve `{ type: "canvas-grid", width, height, columns, rows, grid[], hash, changed, previousHash, nonEmpty, averageLuma }` döndürür. `grid` satırları ` .:-=+*#%@` luminance paletiyle metin olarak taşınır; ham screenshot, DOM veya arbitrary page state gönderilmez. Varsayılan çözünürlük 32×18’dir. Özel canvas sayfaları için `createCanvasObserver(canvas)` fallback olarak kullanılabilir; GPU swapchain readback desteği olmayan tarayıcılarda boş/uygunsuz sonuç verebileceği için scaffold ve demo engine observer kullanır.
+The `observe` operation works with `createEngineObserver(engine)`, which the scaffold/demo page wires up in advance. Instead of a swapchain canvas readback, the engine produces a low-resolution temporary `RenderTexture` and reads the real GPU result with WebGL2 `readPixels` or WebGPU `copyTextureToBuffer`. It downsamples to at most 64×64 sample cells and returns `{ type: "canvas-grid", width, height, columns, rows, grid[], hash, changed, previousHash, nonEmpty, averageLuma }`. The `grid` rows are carried as text with the ` .:-=+*#%@` luminance palette; no raw screenshot, DOM or arbitrary page state is sent. The default resolution is 32×18. `createCanvasObserver(canvas)` can be used as a fallback for custom canvas pages; because it can give an empty/unsuitable result in browsers without GPU swapchain readback support, the scaffold and demo use the engine observer.
 
-`snapshot` operation’ı varsayılan `scene` root’unu veya açıkça verilen root handle’ı getter/callback çalıştırmadan pre-order sahne ağacı olarak döndürür. Her sayfa en fazla 64 node, toplam traversal 4.096 node ve derinlik 32 ile sınırlıdır; `args: [{ offset?, limit? }]` ile sayfalama yapılır. Sonuç `{ type: "scene-snapshot", root, offset, limit, total, nextOffset, truncated, nodes[], hash, changed, previousHash }` biçimindedir; node kayıtları handle, parent, type, name/id, transform ve görünür temel state alanlarını taşır. `hash` aynı sayfanın değişimini, `changed:false` ise tekrar eden gözlemde değişmediğini gösterir. Bu, AI’nin yalnızca piksel grid’i değil sahne yapısını da hızlı ve bounded biçimde anlamasını sağlar; raw object graph, getter, callback veya arbitrary script çalıştırılmaz.
+The `snapshot` operation returns the default `scene` root, or an explicitly given root handle, as a pre-order scene tree without running getters/callbacks. Each page is limited to 64 nodes, total traversal to 4,096 nodes and depth to 32; paging is done with `args: [{ offset?, limit? }]`. The result has the form `{ type: "scene-snapshot", root, offset, limit, total, nextOffset, truncated, nodes[], hash, changed, previousHash }`; node records carry the handle, parent, type, name/id, transform and visible basic state fields. `hash` shows changes on the same page, and `changed:false` shows that a repeated observation has not changed. This lets the AI understand not just the pixel grid but also the scene structure quickly and in bounded form; no raw object graph, getter, callback or arbitrary script is run.
 
-`scenario` operation’ı AI test/replay round-trip’ini azaltır: `args: [{ frames: [{ delta?, input?, observe?, snapshot? }], resume? }]`. RuntimeAgent yalnızca `engine` root’un public `stop()`/`step()`/`start()` yollarını ve engine’in public `Input.inject()` yöntemini kullanır; arbitrary method adı, callback veya script çalıştırmaz. En fazla 16 frame, toplam 512 input event, frame başına 128 event, gözlemde 1.024 hücre ve snapshot’ta 16 node/page kabul edilir. Varsayılan olarak senaryo öncesi çalışan engine sonunda yeniden başlatılır; `resume:false` ile durdurulmuş bırakılabilir. Sonuç `{ type: "runtime-scenario", handle, frames[], frameCount, wasRunning, resumed }` biçimindedir. Bu bir transaction değildir; bir frame hata verirse önceki frame’ler geri alınmaz.
+The `scenario` operation reduces the AI test/replay round trip: `args: [{ frames: [{ delta?, input?, observe?, snapshot? }], resume? }]`. The RuntimeAgent only uses the public `stop()`/`step()`/`start()` paths of the `engine` root and the engine's public `Input.inject()` method; it runs no arbitrary method name, callback or script. At most 16 frames, 512 input events in total, 128 events per frame, 1,024 cells in an observation and 16 nodes/page in a snapshot are accepted. By default, an engine that was running before the scenario is restarted at the end; `resume:false` leaves it stopped. The result has the form `{ type: "runtime-scenario", handle, frames[], frameCount, wasRunning, resumed }`. This is not a transaction; if a frame fails, earlier frames are not rolled back.
 
-`prompts/get` için `arguments` object olmalıdır; prompt’a tanımlanmamış alanlar `EXI_MCP_ARGUMENT_UNKNOWN`, object olmayan prompt argümanları `EXI_MCP_PROMPT_ARGS_TYPE`, yanlış `goal`/`path` tipi `EXI_MCP_ARGUMENT_TYPE` ile reddedilir. JSON-RPC prompt/resource hatalarında canonical code `error.data.code` alanında taşınır.
+For `prompts/get`, `arguments` must be an object; fields not defined for the prompt are rejected with `EXI_MCP_ARGUMENT_UNKNOWN`, non-object prompt arguments with `EXI_MCP_PROMPT_ARGS_TYPE`, and a wrong `goal`/`path` type with `EXI_MCP_ARGUMENT_TYPE`. In JSON-RPC prompt/resource errors, the canonical code is carried in the `error.data.code` field.
 
-### Callback referansları
+### Callback references
 
-Callback alan `Node.traverse`, `Node.find`, `Scene.pick`, input/physics filtreleri ve benzeri browser çağrıları için callback gövdesi MCP JSON’una konmaz. Scaffold `game.js` içinde `runtimeCallbacks` registry’sine insan/agent review’undan geçmiş fonksiyonu ekle; sonra `exi_preview_call` veya `exi_preview_batch` args içinde `{"$callback":"visit"}` kullan. Browser `inspect` sonucu kayıtlı isimleri `callbacks` alanında listeler; böylece ajan isim tahmin etmek zorunda kalmaz. RuntimeAgent yalnızca bu sayfada kayıtlı isimleri çözer; registry en fazla 256 callback ve isim başına 256 karakterdir. Bilinmeyen isim `EXI_RUNTIME_CALLBACK` ile reddedilir. Direct process-side `exi_call`/`exi_function` JSON-only kalır; callback kodu proje dosyasında yazılıp `exi_project_check` ve review’dan geçmelidir.
+For browser calls that take callbacks, such as `Node.traverse`, `Node.find`, `Scene.pick` and input/physics filters, the callback body is not put in the MCP JSON. Add a function that has been through human/agent review to the `runtimeCallbacks` registry in the scaffold's `game.js`; then use `{"$callback":"visit"}` in the `exi_preview_call` or `exi_preview_batch` args. The browser `inspect` result lists the registered names in the `callbacks` field, so the agent does not have to guess names. The RuntimeAgent only resolves names registered on this page; the registry holds at most 256 callbacks and 256 characters per name. An unknown name is rejected with `EXI_RUNTIME_CALLBACK`. Direct process-side `exi_call`/`exi_function` stays JSON-only; callback code must be written in a project file and go through `exi_project_check` and review.
 
-### Batch çağrıları
+### Batch calls
 
-Scene, dosya veya asset hazırlığında round-trip sayısını azaltmak için `exi_batch` kullanılabilir. Çağrılar aynı MCP session kuyruğunda sıralı çalışır; önceki çağrının sonucu sonraki çağrıda `{"$result": 0}` biçiminde referanslanabilir. Bir sonuç nesnesinin alanı için `{"$result": 0, "$path": "fileUploadId"}` kullanılır; path yalnızca güvenli own-property zinciridir. Handle sonucu referanslanırsa bridge bunu güvenli `{ "$handle": "hN" }` biçimine çevirir ve gerçek handle’a çözer. Varsayılan `stopOnError: true` ilk hatada durur; `false` kalan çağrıları denemeye devam eder. Batch transaction değildir: başarısızlıkta daha önce tamamlanan çağrılar geri alınmaz, bu nedenle iş sonunda `exi_release` veya `exi_session_reset` çağrılmalıdır. Nested `exi_batch` reddedilir ve toplam 128 çağrı/64 KiB sonuç sınırı geçerlidir.
+`exi_batch` can be used to reduce round trips when preparing scenes, files or assets. Calls run sequentially in the same MCP session queue; the result of an earlier call can be referenced in a later call as `{"$result": 0}`. For a field of a result object, use `{"$result": 0, "$path": "fileUploadId"}`; the path is only a safe own-property chain. If a handle result is referenced, the bridge converts it into the safe `{ "$handle": "hN" }` form and resolves it to the real handle. The default `stopOnError: true` stops at the first error; `false` keeps trying the remaining calls. A batch is not a transaction: on failure, earlier completed calls are not rolled back, so call `exi_release` or `exi_session_reset` at the end of the work. Nested `exi_batch` is rejected, and a total limit of 128 calls/64 KiB of results applies.
 
 ```json
 {"name":"exi_batch","arguments":{"calls":[
@@ -575,7 +575,7 @@ Scene, dosya veya asset hazırlığında round-trip sayısını azaltmak için `
 ]}}
 ```
 
-Chunked text upload’ı round-trip azaltarak batch içinde de yapılabilir:
+A chunked text upload can also be done inside a batch to reduce round trips:
 
 ```json
 {"name":"exi_batch","arguments":{"calls":[
@@ -585,37 +585,37 @@ Chunked text upload’ı round-trip azaltarak batch içinde de yapılabilir:
 ]}}
 ```
 
-### Handle ve async çağrı örneği
+### Handle and async call example
 
-Tool çağrısı:
+Tool call:
 
 ```json
 {"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"exi_create","arguments":{"type":"Scene"}}}
 ```
 
-Yanıt:
+Response:
 
 ```json
 {"jsonrpc":"2.0","id":10,"result":{"content":[{"type":"text","text":"{\"$handle\":\"h1\",\"type\":\"Scene\"}"}],"structuredContent":{"$handle":"h1","type":"Scene"}}}
 ```
 
-Bir handle JSON’da `{ "$handle": "h1" }` olarak argümana verilir:
+A handle is passed to an argument in JSON as `{ "$handle": "h1" }`:
 
 ```json
 {"jsonrpc":"2.0","id":11,"method":"tools/call","params":{"name":"exi_create","arguments":{"type":"Node","args":[{"x":80,"y":120}]}}}
 {"jsonrpc":"2.0","id":12,"method":"tools/call","params":{"name":"exi_call","arguments":{"handle":"h1","method":"add","args":[{"$handle":"h2"}]}}}
 ```
 
-`exi_call`, `exi_function`, `exi_export_call`, `exi_static_call` ve `exi_get` Promise döndürürse bridge sonucu bekler. Böylece asset/audio yüklemelerinde AI’ye Promise handle’ı değil gerçek sonuç gelir.
+If `exi_call`, `exi_function`, `exi_export_call`, `exi_static_call` and `exi_get` return a Promise, the bridge awaits the result. This way the AI receives the real result, not a Promise handle, for asset/audio loads.
 
-Asset yükleme akışı:
+Asset loading flow:
 
 ```json
 {"name":"exi_create","arguments":{"type":"AssetLoader","args":[{"baseURL":"http://127.0.0.1:4173/"}]}}
 {"name":"exi_call","arguments":{"handle":"h3","method":"loadJSON","args":["package.json"]}}
 ```
 
-### Declarative scene örneği
+### Declarative scene example
 
 ```json
 {
@@ -629,9 +629,9 @@ Asset yükleme akışı:
 }
 ```
 
-`exi_build_scene` yalnızca `type`, `options` ve `children` alanlarını kabul eder; `options` object, `children` array olmalıdır. Callback, function, dynamic import veya script kabul etmez. Oluşturma sırasında hata olursa daha önce yaratılmış handle’lar rollback edilir. Callback gerektiren gameplay kodu scaffold edilen `game.js` içine normal JavaScript olarak yazılır; AI CLI dosya editörüyle bunu review edebilir, MCP preview ile sonucu kontrol eder.
+`exi_build_scene` only accepts the `type`, `options` and `children` fields; `options` must be an object and `children` an array. It accepts no callbacks, functions, dynamic imports or scripts. If an error occurs during creation, the handles created so far are rolled back. Gameplay code that needs callbacks is written as normal JavaScript in the scaffolded `game.js`; the AI CLI can review it with its file editor and check the result with the MCP preview.
 
-### Starter game ve preview
+### Starter game and preview
 
 ```json
 {"name":"exi_scaffold","arguments":{"directory":"games/space-demo"}}
@@ -640,11 +640,11 @@ Asset yükleme akışı:
 {"name":"exi_preview_stop","arguments":{"previewId":"p1"}}
 ```
 
-Scaffold mevcut dosyaları varsayılan olarak ezmez, absolute/traversal path’i reddeder ve repo köküne doğrudan yazmaz. Üretilen sayfa, browser-capable AI CLI’ların okuyabileceği hidden `#exi-runtime` output’unda `data-ready`, `data-status`, `data-event`, `data-backend`, `data-fps`, `data-draws` ve `data-nodes` alanlarını bounded biçimde günceller. Aynı sayfa, `/__exi/runtime-token` üzerinden aldığı per-preview token ile en fazla 4 KiB’lik whitelist telemetry’yi `/__exi/runtime` adresine gönderir; `exi_preview_probe({ previewId, path: "/__exi/runtime" })` son raporu okur. `RuntimeAgent` aynı token ile `/__exi/runtime-command` kuyruğunu tüketir ve `/__exi/runtime-result` üzerinden `exi_preview_call`/`exi_preview_batch` sonuçlarını geri yollar; yalnızca `src/index.js` public API’sine ve `engine`/`scene` root handle’larına erişir. Backend değişiminden sonra `exi://runtime` içindeki `warmupMs` kadar beklenmelidir; profiler warmup penceresinde `data-fps="0"` döndürebilir. Preview `127.0.0.1` dışına bind olmaz; normal preview response 64 KiB, runtime telemetry body 4 KiB, runtime command 768 KiB ve result 64 KiB ile sınırlıdır. Sentetik POST veya static index yanıtı gerçek browser/GPU kanıtı değildir.
+The scaffold does not overwrite existing files by default, rejects absolute/traversal paths and does not write directly to the repo root. The generated page updates the `data-ready`, `data-status`, `data-event`, `data-backend`, `data-fps`, `data-draws` and `data-nodes` fields in bounded form in the hidden `#exi-runtime` output that browser-capable AI CLIs can read. The same page sends at most 4 KiB of whitelisted telemetry to `/__exi/runtime` with the per-preview token it gets from `/__exi/runtime-token`; `exi_preview_probe({ previewId, path: "/__exi/runtime" })` reads the latest report. The `RuntimeAgent` consumes the `/__exi/runtime-command` queue with the same token and sends `exi_preview_call`/`exi_preview_batch` results back through `/__exi/runtime-result`; it only accesses the `src/index.js` public API and the `engine`/`scene` root handles. After a backend change, wait for `warmupMs` from `exi://runtime`; the profiler can return `data-fps="0"` during the warmup window. The preview does not bind outside `127.0.0.1`; a normal preview response is limited to 64 KiB, the runtime telemetry body to 4 KiB, a runtime command to 768 KiB and a result to 64 KiB. A synthetic POST or static index response is not real browser/GPU evidence.
 
-## 11. Codex, Claude, OpenCode, Gemini kurulumu
+## 11. Codex, Claude, OpenCode, Gemini setup
 
-Detaylı config örnekleri [MCP.md](MCP.md) içindedir. Repo kökünden kullanılabilen kısa komutlar:
+Detailed config examples are in [MCP.md](MCP.md). Short commands that can be used from the repo root:
 
 ```powershell
 codex mcp add exi-engine -- node tools/exi-mcp-server.mjs
@@ -653,21 +653,21 @@ opencode mcp add
 gemini mcp add exi-engine node tools/exi-mcp-server.mjs
 ```
 
-Gemini CLI için `.gemini/settings.json` içinde `mcpServers.exi-engine` ile `command: "node"`, `args: ["tools/exi-mcp-server.mjs"]`, `cwd: "."` kullanılır; stdio config’inde `type` gerekmez. Claude Code `.mcp.json` içinde `${CLAUDE_PROJECT_DIR:-.}` placeholder’ı kullanılabilir. Cursor CLI `.cursor/mcp.json`, Cline CLI `.cline/mcp.json` içinde aynı `mcpServers` stdio şeklini kullanır. Windsurf/Cascade için kullanıcı seviyesindeki `~/.codeium/windsurf/mcp_config.json` dosyasına aynı kayıt, absolute script path ve `EXI_MCP_ROOT` ile eklenir. Güncel OpenCode CLI yönetim komutu `opencode mcp add`; config şekli ise `mcp.servers` altındaki `type: "local"` ve array `command` alanlarıdır. Windows’ta istemci çalışma dizini repo kökü olmalı; değilse absolute script path ve `EXI_MCP_ROOT` verin.
+For Gemini CLI, use `mcpServers.exi-engine` in `.gemini/settings.json` with `command: "node"`, `args: ["tools/exi-mcp-server.mjs"]` and `cwd: "."`; `type` is not needed in a stdio config. In Claude Code `.mcp.json` the `${CLAUDE_PROJECT_DIR:-.}` placeholder can be used. Cursor CLI uses the same `mcpServers` stdio shape in `.cursor/mcp.json`, and Cline CLI in `.cline/mcp.json`. For Windsurf/Cascade, the same entry is added to the user-level `~/.codeium/windsurf/mcp_config.json` file with an absolute script path and `EXI_MCP_ROOT`. The current OpenCode CLI management command is `opencode mcp add`; the config shape is `type: "local"` and an array `command` under `mcp.servers`. On Windows the client working directory must be the repo root; otherwise give an absolute script path and `EXI_MCP_ROOT`.
 
-Diğer stdio MCP istemcileri için minimum sözleşme `command: "node"`, `args: ["tools/exi-mcp-server.mjs"]`, repo kökü `cwd` ve gerekirse `EXI_MCP_ROOT` ortam değişkenidir. Modern istemci sırası `server/discover` → `_meta` taşıyan `tools/list`/`resources/list`/`prompts/list` → `exi_api`; legacy istemci sırası `initialize` → `notifications/initialized` → `tools/list`/`resources/list`/`prompts/list` → `exi_api` şeklindedir.
+For other stdio MCP clients, the minimum contract is `command: "node"`, `args: ["tools/exi-mcp-server.mjs"]`, the repo root as `cwd` and the `EXI_MCP_ROOT` environment variable if needed. The modern client order is `server/discover` → `tools/list`/`resources/list`/`prompts/list` carrying `_meta` → `exi_api`; the legacy client order is `initialize` → `notifications/initialized` → `tools/list`/`resources/list`/`prompts/list` → `exi_api`.
 
-## 12. Hata yönetimi ve güvenlik
+## 12. Error handling and security
 
-Known tool execution hataları MCP `result.isError=true` ve bounded text ile döner. Bilinmeyen method/resource için JSON-RPC error döner. AI her mutation’dan sonra `exi_get`/`exi_api` ile sonucu doğrulamalı ve iş sonunda `exi_release` veya `exi_session_reset` çağırmalıdır.
+Known tool execution errors are returned as MCP `result.isError=true` with bounded text. An unknown method/resource returns a JSON-RPC error. The AI must verify the result with `exi_get`/`exi_api` after every mutation and call `exi_release` or `exi_session_reset` at the end of the work.
 
-Result serialization, `exi_inspect`, `exi_session_status` ve browser `RuntimeAgent` nesne türünü prototype data descriptor’ından belirler; normal `constructor`/`destroy` property erişimiyle accessor çalıştırmaz. Getter içeren gerçek engine property’leri yalnızca açık `exi_get`, `exi_export_get` veya public method çağrısında okunur.
+Result serialization, `exi_inspect`, `exi_session_status` and the browser `RuntimeAgent` determine the object type from the prototype data descriptor; normal `constructor`/`destroy` property access does not run accessors. Real engine properties with getters are only read on an explicit `exi_get`, `exi_export_get` or public method call.
 
-Bridge limitleri: 1 MiB JSON-RPC mesajı, 64 KiB string, 32 JSON derinliği, 128 object key, 4096 array item, 512 KiB binary argüman, 4096 active handle, 1024 scene node, 32 scene depth, 256 KiB resource, 64 KiB tool output, 64 KiB preview response, 4 KiB runtime telemetry body ve browser batch başına 8 call. Engine `exi_check` timeout’ları `doctor=60s`, `test=180s`, `verify=300s`; örnek Codex/Gemini/OpenCode istemci timeout’u 360 saniyedir. Engine method/property çözümü engine prototype zinciri ve `src/ai/public-methods.js` sınıf-bazlı public allowlist’iyle, static çağrılar own-property allowlist’iyle sınırlıdır; renderer/cache/validation iç yardımcıları gösterilmez. `Object.prototype`, `Function.prototype`, `__proto__`, `prototype`, `constructor`, private method, eval, `new Function`, dynamic import ve arbitrary shell yoktur.
+Bridge limits: 1 MiB JSON-RPC message, 64 KiB string, JSON depth 32, 128 object keys, 4096 array items, 512 KiB binary argument, 4096 active handles, 1024 scene nodes, scene depth 32, 256 KiB resource, 64 KiB tool output, 64 KiB preview response, 4 KiB runtime telemetry body and 8 calls per browser batch. The engine `exi_check` timeouts are `doctor=60s`, `test=180s` and `verify=300s`; the example Codex/Gemini/OpenCode client timeout is 360 seconds. Engine method/property resolution is limited to the engine prototype chain and the class-based public allowlist in `src/ai/public-methods.js`, and static calls to the own-property allowlist; internal renderer/cache/validation helpers are not exposed. There is no `Object.prototype`, `Function.prototype`, `__proto__`, `prototype`, `constructor`, private method, eval, `new Function`, dynamic import or arbitrary shell.
 
-MCP local process boundary’dir; authentication veya OS sandbox değildir. Yalnızca güvenilen AI CLI’lara bağlanmalı, production’da process/container izinleri ayrıca uygulanmalıdır. Tam tehdit modeli için [SECURITY.md](SECURITY.md) okunmalıdır.
+MCP is a local process boundary; it is not authentication or an OS sandbox. Only connect it to trusted AI CLIs, and apply process/container permissions separately in production. Read [SECURITY.md](SECURITY.md) for the full threat model.
 
-## 13. Doğrulama akışı
+## 13. Verification flow
 
 ```powershell
 npm run doctor
@@ -675,15 +675,16 @@ npm test
 npm run verify
 ```
 
-`npm test`: static dependency/security, HTTP server, doctor, MCP protocol/asset/preview/scaffold ve engine smoke çalıştırır.
+`npm test`: runs static dependency/security, the HTTP server, doctor, MCP protocol/asset/preview/scaffold and the engine smoke.
 
-`npm run test:clients` Cursor/Cline dahil altı repo config şekliyle gerçek stdio bridge handshake/tool-call akışını ve host CLI keşif durumunu doğrular; Windsurf kullanıcı config’i repo dışında olduğu için `exi://clients` shape’i ve doküman örneğiyle denetlenir. Kurulu host istemcilerinin kendi MCP yönetim yolunu read-only denetlemek için `npm run test:clients:native` çalıştırılabilir; bu komut `mcp list` çıktısında `exi-engine` arar, 5 saniyede sınırlar ve kurulu olmayan istemcileri atlar. Native sonuç durumları `passed`, `skipped`, `unavailable`, `failed`, `spawn-error` ve `timeout` olarak ayrıştırılır; WindowsApps gibi host executable izin sorunları `unavailable` olur. `npm run test:mcp` ise modern/legacy MCP wire akışı ile AI oyun üretim workflow’unu doğrular. Bu testler host CLI’nin kendi executable izinleri/cancellation/UI davranışının tamamını veya fiziksel browser/GPU kanıtını sağlamaz; canlı host ve browser kanıtı ayrı kaydedilmelidir.
+`npm run test:clients` verifies the real stdio bridge handshake/tool-call flow with the shapes of the six repo configs, including Cursor/Cline, and the host CLI discovery state; because the Windsurf user config lives outside the repository, it is checked through the `exi://clients` shape and the documentation example. To check the installed host clients' own MCP management path read-only, run `npm run test:clients:native`; this command looks for `exi-engine` in the `mcp list` output, limits it to 5 seconds and skips clients that are not installed. Native result states are separated into `passed`, `skipped`, `unavailable`, `failed`, `spawn-error` and `timeout`; host executable permission issues such as WindowsApps become `unavailable`. `npm run test:mcp` verifies the modern/legacy MCP wire flow and the AI game generation workflow. These tests do not provide the host CLI's own executable permissions/cancellation/UI behavior in full or physical browser/GPU evidence; live host and browser evidence must be recorded separately.
 
-`npm run verify`: bunlara ek olarak allocation/streaming/culling/physics benchmark’larını çalıştırır. Benchmark FPS değerleri Node simülasyonudur; gerçek WebGL2/WebGPU driver veya mobil cihaz sonucu değildir.
+`npm run verify`: additionally runs the allocation/streaming/culling/physics benchmarks. Benchmark FPS values are a Node simulation; they are not real WebGL2/WebGPU driver or mobile device results.
 
-Gerçek GPU/device kaybı, WebGPU fallback, WebGL2 restore, audio ve browser lifecycle için `test/hardware-soak.html` açılmalı; fiziksel cihazlar [test/HARDWARE_MATRIX.md](test/HARDWARE_MATRIX.md) ile ayrıca raporlanmalıdır.
+For real GPU/device loss, WebGPU fallback, WebGL2 restore, audio and the browser lifecycle, open `test/hardware-soak.html`; physical devices must be reported separately with [test/HARDWARE_MATRIX.md](test/HARDWARE_MATRIX.md).
 
-AI CLI browser doğrulaması için `npm run dev` sonrası `/index.html` açılır. Önce görünür DOM’dan `BACKEND`, `FPS`, `DRAW`, `NODE` ve `ASSET LOCAL OK` alanları okunur; sonra `WebGL2` ve `WebGPU` seçimleri ayrı ayrı uygulanıp aynı alanlar tekrar okunur. Console error/warning listesi boş olmalıdır. MCP preview akışında gerçek sayfa yüklendikten ve `warmupMs` beklendikten sonra `exi_preview_probe({ previewId, path: "/__exi/runtime" })` ile token-korumalı server raporu da alınır. Bu test HTTP dosyasının geldiğini değil, canvas runtime’ının gerçekten backend kurup frame ürettiğini kanıtlar. Browser yeteneği olmayan CLI’lar için MCP `exi_preview_probe` yalnızca static HTTP veya daha önce browser tarafından gönderilmiş telemetry kanıtı verir; sentetik telemetry browser/GPU kanıtı sayılamaz.
-### Upload bütünlüğü
+For AI CLI browser verification, open `/index.html` after `npm run dev`. First read the `BACKEND`, `FPS`, `DRAW`, `NODE` and `ASSET LOCAL OK` fields from the visible DOM; then apply the `WebGL2` and `WebGPU` selections one by one and read the same fields again. The console error/warning list must be empty. In the MCP preview flow, after the real page has loaded and `warmupMs` has passed, the token-protected server report is also collected with `exi_preview_probe({ previewId, path: "/__exi/runtime" })`. This test proves that the canvas runtime really set up a backend and produced frames, not just that the HTTP file arrived. For CLIs without browser capability, MCP `exi_preview_probe` only gives static HTTP evidence or telemetry previously sent by a browser; synthetic telemetry cannot count as browser/GPU evidence.
 
-`exi_file_write`, `exi_file_begin`, `exi_asset_write` ve `exi_asset_begin` isteğe bağlı `expectedSha256` alanı kabul eder. Değer 64 hexadecimal karakterlik SHA-256 digest olmalıdır; direct write/commit sonucu `sha256` döner, mismatch durumunda hedefe rename yapılmadan `EXI_MCP_UPLOAD_INTEGRITY` döndürülür. Chunk upload’ta hash her chunk ile incremental güncellenir; bütünlük kontrolü hedef commit’inden önce yapılır.
+### Upload integrity
+
+`exi_file_write`, `exi_file_begin`, `exi_asset_write` and `exi_asset_begin` accept an optional `expectedSha256` field. The value must be a 64-hexadecimal-character SHA-256 digest; a direct write/commit result returns `sha256`, and on a mismatch `EXI_MCP_UPLOAD_INTEGRITY` is returned without renaming to the target. In a chunk upload, the hash is updated incrementally with each chunk; the integrity check happens before the target commit.

@@ -1,19 +1,19 @@
-# ExiEngine fiziksel cihaz matrisi
+# ExiEngine physical device matrix
 
-Bu liste, `hardware-soak.html` çıktısını gerçek cihazlarda karşılaştırmak için kullanılır. Her satır ayrı bir cihaz/OS/tarayıcı kombinasyonudur. `result` alanı yalnızca test süresi boyunca hata, uncaptured GPU error veya beklenmeyen fallback yoksa `passed` olur.
+This list is used to compare `hardware-soak.html` output on real devices. Each row is a separate device/OS/browser combination. The `result` field is only `passed` if there was no error, uncaptured GPU error or unexpected fallback during the test.
 
-## Test akışı
+## Test flow
 
-1. Demo ve `test/hardware-soak.html` HTTPS üzerinden veya aynı güvenilir yerel ağdaki bir test hostundan açılır.
-2. WebGL2 ve WebGPU ayrı ayrı seçilir; 500 sprite ile 30 saniye, ardından 2.000 sprite ile 30 saniye çalıştırılır.
-3. WebGPU destekliyse çalışma sırasında `Manuel loss` bir kez tetiklenir. Beklenen sonuç `passed-with-loss` ve kaynak sayaçlarının temizlenmesidir.
-4. Sonuç JSON’u, tarayıcı konsolunda hata olup olmadığıyla birlikte aşağıdaki tabloya eklenir.
+1. Open the demo and `test/hardware-soak.html` over HTTPS or from a test host on the same trusted local network.
+2. Select WebGL2 and WebGPU separately; run for 30 seconds with 500 sprites, then 30 seconds with 2,000 sprites.
+3. If WebGPU is supported, trigger `Manual loss` once during the run. The expected result is `passed-with-loss` with the resource counters cleaned up.
+4. Add the result JSON to the table below, together with whether there were errors in the browser console.
 
-JSON içindeki `environment` alanı platform/user-agent, secure context, WebGPU/WebGL2 erişimi, DPR, viewport, font availability ve Canvas `measureText("سلام")` shaping ölçümünü taşır; tabloya aktarırken bu alanı tarih/not sütununda özetleyin.
+The `environment` field in the JSON carries platform/user-agent, secure context, WebGPU/WebGL2 access, DPR, viewport, font availability and the Canvas `measureText("سلام")` shaping measurement; summarize this field in the date/note column when transferring it to the table.
 
-### Android USB hazırlığı
+### Android USB setup
 
-Sunucu varsayılan olarak yalnızca `127.0.0.1` üzerinde dinler; fiziksel cihaza LAN portu açılmaz. USB hata ayıklama açık ve yetkilendirilmiş Android cihaz bağlandıktan sonra host üzerinde:
+By default the server only listens on `127.0.0.1`; no LAN port is opened to the physical device. After connecting an Android device with USB debugging enabled and authorized, on the host:
 
 ```powershell
 node server.mjs --port 4173
@@ -21,396 +21,396 @@ C:\Users\Public\platform-tools\adb.exe reverse tcp:4173 tcp:4173
 C:\Users\Public\platform-tools\adb.exe shell am start -a android.intent.action.VIEW -d http://127.0.0.1:4173/test/hardware-soak.html
 ```
 
-`adb devices -l` cihaz göstermiyorsa Android satırı kanıtlanmış sayılmaz. Bu çalışma snapshot’ında ADB kurulu (`37.0.0-14910828`) ancak bağlı cihaz yok; bu nedenle fiziksel Android sonucu eklenmedi. iOS Safari ve uygulama içi WebView için kullanıcı sertifikalı HTTPS test hostu ve cihaz logu ayrıca gerekir.
+If `adb devices -l` shows no device, the Android row does not count as proven. In this run's snapshot ADB is installed (`37.0.0-14910828`) but no device is connected; therefore no physical Android result was added. iOS Safari and in-app WebView additionally need an HTTPS test host with a user certificate and device logs.
 
-## Güncel platform notu (15 Ağustos 2026)
+## Current platform note (August 15, 2026)
 
-Bu bölüm tarayıcı üreticilerinin yayınladığı yetenek bilgisidir; fiziksel cihaz smoke sonucu değildir.
+This section is capability information published by browser vendors; it is not a physical device smoke result.
 
-- Safari/WebKit: WebGPU, Safari 26 ile iOS/iPadOS/macOS/visionOS tarafında sevkiyata girdi. Safari 26.2 için WebKit issue kayıtlarında iOS GPU canvas flicker raporu bulunduğu için iOS satırında WebGPU varsayılan güvenilir backend kabul edilmez; fiziksel soak ve WebGL2 fallback birlikte test edilir. Kaynaklar: [WebKit Safari 26 beta](https://webkit.org/blog/16993/news-from-wwdc25-web-technology-coming-this-fall-in-safari-26-beta/), [WebKit Safari 26.2](https://webkit.org/blog/17640/webkit-features-for-safari-26-2/), [WebKit issue 301627](https://bugs.webkit.org/show_bug.cgi?id=301627).
-- Android Chrome: Chrome 121 ile Android 12+ ve Qualcomm/ARM GPU kombinasyonlarında WebGPU varsayılan açıldı; cihaz/driver kapsamı tek bir Android satırıyla kanıtlanmış sayılmaz. Kaynak: [Chrome 121 WebGPU](https://developer.chrome.com/blog/new-in-webgpu-121).
-- Android WebView: WebView Chromium tabanlı ve aylık güncellenir, ancak uygulamanın kullandığı System WebView sürümü ve cihaz GPU sürücüsü fiziksel testte kaydedilmelidir. Native `androidx.webgpu` kütüphanesi WebView JavaScript API’siyle aynı kanıt değildir. Kaynaklar: [Android WebView güncelleme modeli](https://developer.android.com/develop/ui/views/layout/webapps/jetpack-webkit-overview), [Android WebGPU](https://developer.android.com/develop/ui/views/graphics/webgpu).
+- Safari/WebKit: WebGPU shipped with Safari 26 on iOS/iPadOS/macOS/visionOS. Because WebKit issue records for Safari 26.2 contain an iOS GPU canvas flicker report, WebGPU is not accepted as the default trusted backend in the iOS row; the physical soak and the WebGL2 fallback are tested together. Sources: [WebKit Safari 26 beta](https://webkit.org/blog/16993/news-from-wwdc25-web-technology-coming-this-fall-in-safari-26-beta/), [WebKit Safari 26.2](https://webkit.org/blog/17640/webkit-features-for-safari-26-2/), [WebKit issue 301627](https://bugs.webkit.org/show_bug.cgi?id=301627).
+- Android Chrome: WebGPU was enabled by default with Chrome 121 on Android 12+ with Qualcomm/ARM GPU combinations; device/driver coverage does not count as proven by a single Android row. Source: [Chrome 121 WebGPU](https://developer.chrome.com/blog/new-in-webgpu-121).
+- Android WebView: WebView is Chromium-based and updated monthly, but the System WebView version used by the app and the device GPU driver must be recorded in the physical test. The native `androidx.webgpu` library is not the same evidence as the WebView JavaScript API. Sources: [Android WebView update model](https://developer.android.com/develop/ui/views/layout/webapps/jetpack-webkit-overview), [Android WebGPU](https://developer.android.com/develop/ui/views/graphics/webgpu).
 
-## Matris
+## Matrix
 
-| Cihaz / OS | Tarayıcı / sürüm | Backend | 500 / 30 sn | 2.000 / 30 sn | Loss fallback | max texture | peak GPU cull | peak texture | Shaping fallback | Konsol hatası | Tarih / not |
+| Device / OS | Browser / version | Backend | 500 / 30 s | 2,000 / 30 s | Loss fallback | max texture | peak GPU cull | peak texture | Shaping fallback | Console error | Date / note |
 | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- | --- |
-| Windows masaüstü | Chromium tabanlı güncel | WebGPU |  |  |  |  |  |  |  |  |  |
-| Windows masaüstü | Chromium tabanlı güncel | WebGL2 |  |  | Uygulanamaz |  | 0 |  |  |  |  |
-| iPhone / iPad | iOS Safari güncel | WebGPU |  |  |  |  |  |  |  |  |  |
-| iPhone / iPad | iOS Safari güncel | WebGL2 |  |  | Uygulanamaz |  | 0 |  |  |  |  |
-| Android telefon | Chrome güncel | WebGPU |  |  |  |  |  |  |  |  |  |
-| Android telefon | Chrome güncel | WebGL2 |  |  | Uygulanamaz |  | 0 |  |  |  |  |
-| Android WebView | Uygulama içi güncel WebView | WebGL2 |  |  | Uygulanamaz |  | 0 |  |  |  |  |
+| Windows desktop | Current Chromium-based | WebGPU |  |  |  |  |  |  |  |  |  |
+| Windows desktop | Current Chromium-based | WebGL2 |  |  | Not applicable |  | 0 |  |  |  |  |
+| iPhone / iPad | Current iOS Safari | WebGPU |  |  |  |  |  |  |  |  |  |
+| iPhone / iPad | Current iOS Safari | WebGL2 |  |  | Not applicable |  | 0 |  |  |  |  |
+| Android phone | Current Chrome | WebGPU |  |  |  |  |  |  |  |  |  |
+| Android phone | Current Chrome | WebGL2 |  |  | Not applicable |  | 0 |  |  |  |  |
+| Android WebView | Current in-app WebView | WebGL2 |  |  | Not applicable |  | 0 |  |  |  |  |
 
-## Güncel masaüstü smoke kanıtı
+## Current desktop smoke evidence
 
-15 Ağustos 2026 tarihinde yerel test hostunda, Chrome 151 / Windows / secure context / DPR 1.25 ile çalıştırıldı. ResizeObserver intrinsic-canvas düzeltmesi sonrasında kısa tekrar koşusunda canvas `1200x675`, WebGPU `device-error: 0`, WebGL2 konsol hatası `0` gözlendi. Bu sonuçlar aşağıdaki 30 saniyelik kabul sütunlarının yerine geçmez; fiziksel cihaz ve uzun süreli koşu öncesi canlı regresyon kanıtıdır.
+Run on August 15, 2026 on a local test host with Chrome 151 / Windows / secure context / DPR 1.25. In a short rerun after the ResizeObserver intrinsic-canvas fix, a canvas of `1200x675`, WebGPU `device-error: 0` and WebGL2 console errors `0` were observed. These results do not replace the 30-second acceptance columns below; they are live regression evidence before physical device and long-duration runs.
 
-| Backend | Sprite / süre | Sonuç / frame | Loss | max texture | peak GPU cull | peak texture | Shaping fallback | Not |
+| Backend | Sprites / duration | Result / frames | Loss | max texture | peak GPU cull | peak texture | Shaping fallback | Note |
 | --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- |
-| WebGL2 | 500 / 2 sn | `passed` / 121 | Uygulanmadı | 16384 | 0 B | 4 | 1 | WebGL2 yolu, text cache ve glyph fallback çalıştı |
-| WebGPU | 500 / 2 sn | `passed` / 110 | Uygulanmadı | 8192 | 81920 B / 2 buffer | 4 | 1 | WebGPU compute culling ve buffer yaşam döngüsü çalıştı; resize düzeltmesi sonrası `device-error: 0` |
-| WebGL2 | 500 / 1 sn | `passed` / 60 | Uygulanmadı | 16384 | 0 B | 4 | 1 | Kaynak yaşam döngüsü değişiklikleri sonrası `environment.shapingProbe`: width 20.569, rtl; `device-error: 0` |
-| WebGPU | 500 / 1 sn | `passed` / 44 | Uygulanmadı | 8192 | 81920 B / 2 buffer | 4 | 1 | Kaynak yaşam döngüsü değişiklikleri sonrası `environment.shapingProbe`: width 20.569, rtl; `device-error: 0` |
-| WebGPU | 513 / 2 sn | `passed` / 106 | Uygulanmadı | 8192 | 114688 B / 2 buffer | 4 | 1 | GPU culling kaynak/çıktı stride sınır regresyonu; Chrome 151 Windows |
-| WebGPU | 500 / 5 sn | `passed-with-loss` / 300 | `lossObserved: true` | 8192 | 81920 B / 2 buffer | 4 | 1 | `device-lost` → `renderer-error (manual-soak)`; tarayıcı yeniden başlatılmadan test tamamlandı |
-| WebGL2 | 500 / 2 sn | `passed` / 121 | Uygulanmadı | 16384 | 0 B | 4 | 1 | Hot-path allocation ve static buffer yaşam döngüsü değişiklikleri sonrası Chrome 151 Windows smoke; `device-error: false` |
-| WebGPU | 500 / 2 sn | `passed` / 110 | Uygulanmadı | 8192 | 81920 B / 2 buffer | 4 | 1 | Hot-path allocation ve static buffer yaşam döngüsü değişiklikleri sonrası Chrome 151 Windows smoke; `device-error: false` |
-| WebGPU | 500 / 2 sn manuel loss | `passed-with-loss` / 24 | `lossObserved: true` | 8192 | 81920 B / 2 buffer | 4 | 1 | `manual-soak` loss sonrası soak sonucu artık açıkça finalize ediliyor; `device-error: false` |
-| WebGL2 | 500 / 2 sn | `passed` / 113 | Uygulanmadı | 16384 | 0 B | 4 | 1 | Normal SpriteBatch/Text/profiler allocation iyileştirmeleri sonrası Chrome 151 Windows; `device-error: false` |
-| WebGPU | 500 / 2 sn | `passed` / 100 | Uygulanmadı | 8192 | 81920 B / 2 buffer | 4 | 1 | Normal SpriteBatch/Text/profiler allocation iyileştirmeleri sonrası Chrome 151 Windows; `device-error: false` |
-| WebGL2 | 500 / 2 sn | `passed` / 121 | Uygulanmadı | 16384 | 0 B | 4 | 1 | 15 Ağustos 2026 tekrar koşusu; clip batch scalar karşılaştırması ve asset/atlas güvenlik sınırları sonrası, konsol warning/error yok |
-| WebGPU | 500 / 2 sn | `passed` / 74 | Uygulanmadı | 8192 | 81920 B / 2 buffer | 4 | 1 | 15 Ağustos 2026 tekrar koşusu; clip batch scalar karşılaştırması ve asset/atlas güvenlik sınırları sonrası, konsol warning/error yok |
-| WebGL2 | 500 / 2 sn | `passed` / 120 | Uygulanmadı | 16384 | 0 B | 4 | 1 | 15 Ağustos 2026 güncel kaynak tekrar koşusu; instanced kamera invalidation ve nested clip scratch rect sonrası, Chrome 151 Windows secure context DPR 1.25, konsol logu boş |
-| WebGPU | 500 / 2 sn | `passed` / 95 | Uygulanmadı | 8192 | 81920 B / 2 buffer | 4 | 1 | 15 Ağustos 2026 güncel kaynak tekrar koşusu; instanced kamera invalidation ve nested clip scratch rect sonrası, Chrome 151 Windows secure context DPR 1.25, konsol logu boş |
-| WebGL2 | 500 / 2 sn | `passed` / 121 | Uygulanmadı | 16384 | 0 B | 4 | 1 | 15 Ağustos 2026 TileMap CPU görünür-range culling sonrası tekrar koşu; Chrome 151 Windows secure context DPR 1.25, `device-error: false`, konsol logu boş |
-| WebGPU | 500 / 2 sn | `passed` / 108 | Uygulanmadı | 8192 | 81920 B / 2 buffer | 4 | 1 | 15 Ağustos 2026 TileMap culling entegrasyonu sonrası tekrar koşu; Chrome 151 Windows secure context DPR 1.25, `device-error: false`, konsol logu boş |
-| WebGL2 | 500 / 2 sn | `passed` / 121 | Uygulanmadı | 16384 | 0 B | 4 | 1 | 15 Ağustos 2026 statik render key’leri sayısal cache sürümüne alındıktan sonra güncel kaynak tekrar koşusu; Chrome 151 Windows secure context DPR 1.25, `device-error: false`, konsol logu boş |
-| WebGPU | 500 / 2 sn | `passed` / 90 | Uygulanmadı | 8192 | 81920 B / 2 buffer | 4 | 1 | 15 Ağustos 2026 statik render key’leri sayısal cache sürümüne alındıktan sonra güncel kaynak tekrar koşusu; Chrome 151 Windows secure context DPR 1.25, `device-error: false`, konsol logu boş |
-| WebGL2 | 500 / 2 sn | `passed` / 121 | Uygulanmadı | 16384 | 0 B | 4 | 1 | 15 Ağustos 2026 TileMap culling closure’ı scratch belleğine taşındıktan sonra güncel kaynak tekrar koşusu; Chrome 151 Windows secure context DPR 1.25, `device-error: false`, konsol logu boş |
-| WebGPU | 500 / 2 sn | `passed` / 103 | Uygulanmadı | 8192 | 81920 B / 2 buffer | 4 | 1 | 15 Ağustos 2026 TileMap culling closure’ı scratch belleğine taşındıktan sonra güncel kaynak tekrar koşusu; Chrome 151 Windows secure context DPR 1.25, `device-error: false`, konsol logu boş |
-| WebGL2 | 500 / 2 sn | `passed` / 121 | Uygulanmadı | 16384 | 0 B | 4 | 1 | 15 Ağustos 2026 renderer scissor rect scratch değişikliği sonrası güncel kaynak tekrar koşusu; Chrome 151 Windows secure context DPR 1.25, `device-error: false`, konsol logu boş |
-| WebGPU | 500 / 2 sn | `passed` / 100 | Uygulanmadı | 8192 | 81920 B / 2 buffer | 4 | 1 | 15 Ağustos 2026 renderer scissor rect scratch değişikliği sonrası güncel kaynak tekrar koşusu; Chrome 151 Windows secure context DPR 1.25, `device-error: false`, konsol logu boş |
+| WebGL2 | 500 / 2 s | `passed` / 121 | Not applied | 16384 | 0 B | 4 | 1 | The WebGL2 path, text cache and glyph fallback worked |
+| WebGPU | 500 / 2 s | `passed` / 110 | Not applied | 8192 | 81920 B / 2 buffers | 4 | 1 | WebGPU compute culling and the buffer lifecycle worked; `device-error: 0` after the resize fix |
+| WebGL2 | 500 / 1 s | `passed` / 60 | Not applied | 16384 | 0 B | 4 | 1 | After resource lifecycle changes, `environment.shapingProbe`: width 20.569, rtl; `device-error: 0` |
+| WebGPU | 500 / 1 s | `passed` / 44 | Not applied | 8192 | 81920 B / 2 buffers | 4 | 1 | After resource lifecycle changes, `environment.shapingProbe`: width 20.569, rtl; `device-error: 0` |
+| WebGPU | 513 / 2 s | `passed` / 106 | Not applied | 8192 | 114688 B / 2 buffers | 4 | 1 | GPU culling source/output stride limit regression; Chrome 151 Windows |
+| WebGPU | 500 / 5 s | `passed-with-loss` / 300 | `lossObserved: true` | 8192 | 81920 B / 2 buffers | 4 | 1 | `device-lost` → `renderer-error (manual-soak)`; the test completed without restarting the browser |
+| WebGL2 | 500 / 2 s | `passed` / 121 | Not applied | 16384 | 0 B | 4 | 1 | Chrome 151 Windows smoke after hot-path allocation and static buffer lifecycle changes; `device-error: false` |
+| WebGPU | 500 / 2 s | `passed` / 110 | Not applied | 8192 | 81920 B / 2 buffers | 4 | 1 | Chrome 151 Windows smoke after hot-path allocation and static buffer lifecycle changes; `device-error: false` |
+| WebGPU | 500 / 2 s manual loss | `passed-with-loss` / 24 | `lossObserved: true` | 8192 | 81920 B / 2 buffers | 4 | 1 | After a `manual-soak` loss the soak result is now explicitly finalized; `device-error: false` |
+| WebGL2 | 500 / 2 s | `passed` / 113 | Not applied | 16384 | 0 B | 4 | 1 | Chrome 151 Windows after normal SpriteBatch/Text/profiler allocation improvements; `device-error: false` |
+| WebGPU | 500 / 2 s | `passed` / 100 | Not applied | 8192 | 81920 B / 2 buffers | 4 | 1 | Chrome 151 Windows after normal SpriteBatch/Text/profiler allocation improvements; `device-error: false` |
+| WebGL2 | 500 / 2 s | `passed` / 121 | Not applied | 16384 | 0 B | 4 | 1 | August 15, 2026 rerun; after the clip batch scalar comparison and asset/atlas security limits, no console warnings/errors |
+| WebGPU | 500 / 2 s | `passed` / 74 | Not applied | 8192 | 81920 B / 2 buffers | 4 | 1 | August 15, 2026 rerun; after the clip batch scalar comparison and asset/atlas security limits, no console warnings/errors |
+| WebGL2 | 500 / 2 s | `passed` / 120 | Not applied | 16384 | 0 B | 4 | 1 | August 15, 2026 current-source rerun; after instanced camera invalidation and the nested clip scratch rect, Chrome 151 Windows secure context DPR 1.25, console log empty |
+| WebGPU | 500 / 2 s | `passed` / 95 | Not applied | 8192 | 81920 B / 2 buffers | 4 | 1 | August 15, 2026 current-source rerun; after instanced camera invalidation and the nested clip scratch rect, Chrome 151 Windows secure context DPR 1.25, console log empty |
+| WebGL2 | 500 / 2 s | `passed` / 121 | Not applied | 16384 | 0 B | 4 | 1 | August 15, 2026 rerun after TileMap CPU visible-range culling; Chrome 151 Windows secure context DPR 1.25, `device-error: false`, console log empty |
+| WebGPU | 500 / 2 s | `passed` / 108 | Not applied | 8192 | 81920 B / 2 buffers | 4 | 1 | August 15, 2026 rerun after the TileMap culling integration; Chrome 151 Windows secure context DPR 1.25, `device-error: false`, console log empty |
+| WebGL2 | 500 / 2 s | `passed` / 121 | Not applied | 16384 | 0 B | 4 | 1 | August 15, 2026 current-source rerun after static render keys moved to a numeric cache version; Chrome 151 Windows secure context DPR 1.25, `device-error: false`, console log empty |
+| WebGPU | 500 / 2 s | `passed` / 90 | Not applied | 8192 | 81920 B / 2 buffers | 4 | 1 | August 15, 2026 current-source rerun after static render keys moved to a numeric cache version; Chrome 151 Windows secure context DPR 1.25, `device-error: false`, console log empty |
+| WebGL2 | 500 / 2 s | `passed` / 121 | Not applied | 16384 | 0 B | 4 | 1 | August 15, 2026 current-source rerun after the TileMap culling closure moved to scratch memory; Chrome 151 Windows secure context DPR 1.25, `device-error: false`, console log empty |
+| WebGPU | 500 / 2 s | `passed` / 103 | Not applied | 8192 | 81920 B / 2 buffers | 4 | 1 | August 15, 2026 current-source rerun after the TileMap culling closure moved to scratch memory; Chrome 151 Windows secure context DPR 1.25, `device-error: false`, console log empty |
+| WebGL2 | 500 / 2 s | `passed` / 121 | Not applied | 16384 | 0 B | 4 | 1 | August 15, 2026 current-source rerun after the renderer scissor rect scratch change; Chrome 151 Windows secure context DPR 1.25, `device-error: false`, console log empty |
+| WebGPU | 500 / 2 s | `passed` / 100 | Not applied | 8192 | 81920 B / 2 buffers | 4 | 1 | August 15, 2026 current-source rerun after the renderer scissor rect scratch change; Chrome 151 Windows secure context DPR 1.25, `device-error: false`, console log empty |
 
-Bu snapshot için konsol çıktısı ayrı dosya olarak arşivlenmedi; fiziksel matristeki her koşuda konsol hatası ayrıca doğrulanmalıdır.
+The console output for this snapshot was not archived as a separate file; console errors must be verified separately on every run in the physical matrix.
 
-Blend mode koşularında sahne aynı anda `normal`, `additive` ve `multiply` yollarını kullandı; WebGL2 state değişimi ve WebGPU pipeline varyantları bu smoke akışında render edildi.
+In the blend mode runs, the scene used the `normal`, `additive` and `multiply` paths at the same time; WebGL2 state changes and WebGPU pipeline variants were rendered in this smoke flow.
 
-## 16 Ağustos 2026 headless fallback tekrar koşusu
+## August 16, 2026 headless fallback rerun
 
-Ayrı bir yerel Chromium 151 headless oturumunda (`Windows`, secure context, DPR 1, GPU kapalı) 500 sprite / 2 saniye koşusu tekrarlandı. Explicit WebGL2 `passed` / 120 frame ve hata/kayıp gözlenmedi. Explicit WebGPU, `navigator.gpu` görünür olmasına rağmen `requestAdapter()` aşamasında `WebGPU adapter bulunamadı` ile başlamadı; bu sonuç WebGPU backend kanıtı sayılmaz. `auto` seçimi aynı ortamda bu hatayı `fallback` status’iyle raporlayıp WebGL2’ye geçti ve `passed` / 121 frame tamamlandı. Bu headless sonuç fiziksel GPU, iOS, Android veya WebView kanıtının yerine geçmez.
+In a separate local Chromium 151 headless session (`Windows`, secure context, DPR 1, GPU off), the 500-sprite / 2-second run was repeated. Explicit WebGL2 gave `passed` / 120 frames with no errors/loss observed. Explicit WebGPU did not start, failing at the `requestAdapter()` stage with `WebGPU adapter not found` even though `navigator.gpu` was visible; this result does not count as WebGPU backend evidence. In the same environment, `auto` selection reported this error with a `fallback` status, switched to WebGL2 and completed `passed` / 121 frames. This headless result does not replace physical GPU, iOS, Android or WebView evidence.
 
-## 16 Ağustos 2026 Chromium 151 loopback tekrar koşusu
+## August 16, 2026 Chromium 151 loopback rerun
 
-İzole `127.0.0.1:43173` hostunda gerçek Chromium 151 oturumunda, secure context ve DPR 1.25 ile 500 sprite / 5 saniye koşusu tekrarlandı. Her iki backend’de de `deviceErrorObserved: false`, konsol warning/error yok, `textCacheShared: true` ve `glyphComplexScriptFallbacks: 1` gözlendi. Bu masaüstü Chromium kanıtıdır; fiziksel iOS/Android/WebView sonucu değildir.
+On an isolated `127.0.0.1:43173` host, in a real Chromium 151 session with secure context and DPR 1.25, the 500-sprite / 5-second run was repeated. On both backends, `deviceErrorObserved: false`, no console warnings/errors, `textCacheShared: true` and `glyphComplexScriptFallbacks: 1` were observed. This is desktop Chromium evidence; it is not a physical iOS/Android/WebView result.
 
-| Backend | Sprite / süre | Sonuç / frame | Loss | max texture | peak GPU cull | peak texture | Shaping fallback | Not |
+| Backend | Sprites / duration | Result / frames | Loss | max texture | peak GPU cull | peak texture | Shaping fallback | Note |
 | --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- |
-| WebGL2 | 500 / 5 sn | `passed` / 300 | Uygulanmadı | 16384 | 0 B | 4 | 1 | Chrome 151 Windows secure context; izole loopback; konsol logu boş |
-| WebGPU | 500 / 5 sn | `passed` / 272 | Uygulanmadı | 8192 | 81920 B / 2 buffer | 4 | 1 | Chrome 151 Windows secure context; izole loopback; konsol logu boş |
+| WebGL2 | 500 / 5 s | `passed` / 300 | Not applied | 16384 | 0 B | 4 | 1 | Chrome 151 Windows secure context; isolated loopback; console log empty |
+| WebGPU | 500 / 5 s | `passed` / 272 | Not applied | 8192 | 81920 B / 2 buffers | 4 | 1 | Chrome 151 Windows secure context; isolated loopback; console log empty |
 
-## 16 Ağustos 2026 Chromium 151 viewport regression koşusu
+## August 16, 2026 Chromium 151 viewport regression run
 
-390×844 viewport override ve DPR 1.25 ile aynı loopback harness tekrarlandı. Bu oturumda `maxTouchPoints: 0` olduğu için sonuç dokunmatik cihaz veya fiziksel mobil GPU kanıtı değildir; yalnızca responsive canvas, yüksek DPI dünya ölçeği ve backend regression kanıtıdır.
+The same loopback harness was repeated with a 390×844 viewport override and DPR 1.25. Because `maxTouchPoints: 0` in this session, the result is not touch device or physical mobile GPU evidence; it is only evidence for the responsive canvas, high-DPI world scale and backend regressions.
 
-| Backend | Viewport / sprite / süre | Sonuç / frame | Loss | max texture | peak GPU cull | peak texture | Shaping fallback | Not |
+| Backend | Viewport / sprites / duration | Result / frames | Loss | max texture | peak GPU cull | peak texture | Shaping fallback | Note |
 | --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- |
-| WebGL2 | 390×844 / 300 / 3 sn | `passed` / 181 | Uygulanmadı | 16384 | 0 B | 4 | 1 | Chrome 151 Windows; `deviceErrorObserved: false`; konsol logu boş |
-| WebGPU | 390×844 / 300 / 3 sn | `passed` / 169 | Uygulanmadı | 8192 | 81920 B / 2 buffer | 4 | 1 | Chrome 151 Windows; `deviceErrorObserved: false`; konsol logu boş |
+| WebGL2 | 390×844 / 300 / 3 s | `passed` / 181 | Not applied | 16384 | 0 B | 4 | 1 | Chrome 151 Windows; `deviceErrorObserved: false`; console log empty |
+| WebGPU | 390×844 / 300 / 3 s | `passed` / 169 | Not applied | 8192 | 81920 B / 2 buffers | 4 | 1 | Chrome 151 Windows; `deviceErrorObserved: false`; console log empty |
 
-## 16 Ağustos 2026 RenderTexture offscreen koşusu
+## August 16, 2026 RenderTexture offscreen run
 
-İzole `127.0.0.1:43173` hostunda Chromium 151 / Windows / secure context / DPR 1.25 ile 2.000 sprite ve 1 saniyelik koşuda mini sahne ayrı RenderTexture’a çizildi, hedef texture ana sahnede Sprite olarak örneklendi ve bir kez 160×90’dan 128×72’ye resize edildi. Browser console warning/error listesi boştu.
+On an isolated `127.0.0.1:43173` host with Chromium 151 / Windows / secure context / DPR 1.25, in a 2,000-sprite, 1-second run, a mini scene was drawn into a separate RenderTexture, the target texture was sampled as a Sprite in the main scene, and it was resized once from 160×90 to 128×72. The browser console warning/error list was empty.
 
-| Backend | Sonuç / frame | max texture | peak GPU cull | peak texture | peak render target | offscreen pass | target resize | device error |
+| Backend | Result / frames | max texture | peak GPU cull | peak texture | peak render target | offscreen passes | target resizes | device error |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| WebGPU | `passed` / 39 | 8192 | 286720 B / 3 buffer | 5 | 1 | 38 | 1 | false |
+| WebGPU | `passed` / 39 | 8192 | 286720 B / 3 buffers | 5 | 1 | 38 | 1 | false |
 | WebGL2 | `passed` / 61 | 16384 | 0 B | 4 | 1 | 60 | 1 | false |
 
-Bu kısa masaüstü browser koşusu iki-pass RenderTexture entegrasyonunu kanıtlar; 30 saniyelik kabul koşusu veya fiziksel iOS/Android/WebView sonucu yerine geçmez.
+This short desktop browser run proves the two-pass RenderTexture integration; it does not replace a 30-second acceptance run or a physical iOS/Android/WebView result.
 
-Aynı Chromium 151 / Windows oturumunda 16 Ağustos 2026 validation-error ayrımı sonrası izole `127.0.0.1:43175` hostunda 2.000 sprite / 3 saniye tekrarlandı: WebGPU `passed` / 167 frame, 166 offscreen pass, 1 target resize, `deviceErrorObserved: false`; WebGL2 `passed` / 181 frame, 180 offscreen pass, 1 target resize, `deviceErrorObserved: false`. Bu kısa tekrar `EXI_RENDER_INPUT` Node regression’ının gerçek backend soak’ı bozmadığını gösterir; fiziksel cihaz kanıtı değildir.
+In the same Chromium 151 / Windows session, after the August 16, 2026 validation-error separation, 2,000 sprites / 3 seconds were repeated on an isolated `127.0.0.1:43175` host: WebGPU `passed` / 167 frames, 166 offscreen passes, 1 target resize, `deviceErrorObserved: false`; WebGL2 `passed` / 181 frames, 180 offscreen passes, 1 target resize, `deviceErrorObserved: false`. This short rerun shows that the `EXI_RENDER_INPUT` Node regression did not break the real backend soak; it is not physical device evidence.
 
-## 16 Ağustos 2026 texture-mask/filter koşusu
+## August 16, 2026 texture-mask/filter run
 
-İzole `127.0.0.1:43179` hostunda Chromium 151 / Windows / secure context / DPR 1.25 ile 2.000 sprite ve 3 saniyelik koşuda `grayscale`, `invert`, `brightness`, `maskRect` ve `maskTexture` aynı sahnede çalıştırıldı. `maskTexture` hem normal texture hem de RenderTexture preview üzerinde kullanıldı; browser console warning/error ve device error gözlenmedi.
+On an isolated `127.0.0.1:43179` host with Chromium 151 / Windows / secure context / DPR 1.25, in a 2,000-sprite, 3-second run, `grayscale`, `invert`, `brightness`, `maskRect` and `maskTexture` ran in the same scene. `maskTexture` was used on both a normal texture and a RenderTexture preview; no browser console warnings/errors or device errors were observed.
 
-| Backend | Sonuç / frame | max texture | peak GPU cull | peak texture | peak render target | offscreen pass | target resize | device error |
+| Backend | Result / frames | max texture | peak GPU cull | peak texture | peak render target | offscreen passes | target resizes | device error |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| WebGPU | `passed` / 165 | 8192 | 286720 B / 3 buffer | 6 | 1 | 164 | 1 | false |
+| WebGPU | `passed` / 165 | 8192 | 286720 B / 3 buffers | 6 | 1 | 164 | 1 | false |
 | WebGL2 | `passed` / 179 | 16384 | 0 B | 4 | 1 | 178 | 1 | false |
 
-## 16 Ağustos 2026 RenderGroup nested-pass koşusu
+## August 16, 2026 RenderGroup nested-pass run
 
-İzole `127.0.0.1:43179` hostunda Chromium 151 / Windows / secure context / DPR 1.25 ile 2.000 sprite ve 3 saniyelik koşuda bir parent `RenderGroup` içine bir nested `RenderGroup` yerleştirildi. Her frame iki grup post-order offscreen pass’inde, ayrıca mevcut mini sahne `renderToTexture()` pass’inde çizildi; grup hedefleri ana sahnede composite quad olarak örneklendi. Her iki backend’de `renderGroupPasses: 2`, `peakRenderTargetCount: 3`, `renderTargetResizes: 1`, `deviceErrorObserved: false` ve browser warning/error listesi boş kaldı. Bu masaüstü Chromium kanıtıdır; fiziksel iOS/Android/WebView sonucu değildir.
+On an isolated `127.0.0.1:43179` host with Chromium 151 / Windows / secure context / DPR 1.25, in a 2,000-sprite, 3-second run, a nested `RenderGroup` was placed inside a parent `RenderGroup`. Every frame, the two groups were drawn in post-order offscreen passes, plus the existing mini scene `renderToTexture()` pass; the group targets were sampled as composite quads in the main scene. On both backends `renderGroupPasses: 2`, `peakRenderTargetCount: 3`, `renderTargetResizes: 1`, `deviceErrorObserved: false`, and the browser warning/error list stayed empty. This is desktop Chromium evidence; it is not a physical iOS/Android/WebView result.
 
-| Backend | Sonuç / frame | max texture | peak GPU cull | peak texture | peak render target | RenderGroup pass/frame | explicit offscreen pass | target resize | device error |
+| Backend | Result / frames | max texture | peak GPU cull | peak texture | peak render target | RenderGroup passes/frame | explicit offscreen passes | target resizes | device error |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| WebGPU | `passed` / 164 | 8192 | 303104 B / 5 buffer | 8 | 3 | 2 | 163 | 1 | false |
+| WebGPU | `passed` / 164 | 8192 | 303104 B / 5 buffers | 8 | 3 | 2 | 163 | 1 | false |
 | WebGL2 | `passed` / 181 | 16384 | 0 B | 4 | 3 | 2 | 180 | 1 | false |
 
-## 16 Ağustos 2026 RenderGroup ping-pong effect koşusu
+## August 16, 2026 RenderGroup ping-pong effect run
 
-İzole `127.0.0.1:43183` hostunda Chromium 151 / Windows / secure context / DPR 1.25 ile 2.000 sprite ve 3 saniyelik koşuda parent grup iki efekt (`sepia` + `contrast`), nested grup bir efekt (`saturate`) çalıştırdı. Zincir toplam üç post-process pass/frame kullandı; iki ara hedef sınırı ve grup başına 16 MiB ara pixel bütçesi korundu. `peakRenderTargetCount: 6`, `renderTargetResizes: 1`, `deviceErrorObserved: false` ve browser warning/error listesi boş kaldı. Bu masaüstü Chromium kanıtıdır; fiziksel iOS/Android/WebView sonucu değildir.
+On an isolated `127.0.0.1:43183` host with Chromium 151 / Windows / secure context / DPR 1.25, in a 2,000-sprite, 3-second run, the parent group ran two effects (`sepia` + `contrast`) and the nested group one effect (`saturate`). The chain used three post-process passes per frame in total; the two-intermediate-target limit and the 16 MiB intermediate pixel budget per group were kept. `peakRenderTargetCount: 6`, `renderTargetResizes: 1`, `deviceErrorObserved: false`, and the browser warning/error list stayed empty. This is desktop Chromium evidence; it is not a physical iOS/Android/WebView result.
 
-| Backend | Sonuç / frame | max texture | peak GPU cull | peak texture | peak render target | RenderGroup pass/frame | post-process pass/frame | explicit offscreen pass | target resize | device error |
+| Backend | Result / frames | max texture | peak GPU cull | peak texture | peak render target | RenderGroup passes/frame | post-process passes/frame | explicit offscreen passes | target resizes | device error |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| WebGPU | `passed` / 161 | 8192 | 303104 B / 5 buffer | 11 | 6 | 2 | 3 | 160 | 1 | false |
+| WebGPU | `passed` / 161 | 8192 | 303104 B / 5 buffers | 11 | 6 | 2 | 3 | 160 | 1 | false |
 | WebGL2 | `passed` / 178 | 16384 | 0 B | 4 | 6 | 2 | 3 | 177 | 1 | false |
 
-## 16 Ağustos 2026 RenderGroup ping-pong 30 saniye soak
+## August 16, 2026 RenderGroup ping-pong 30-second soak
 
-Aynı izole loopback/Chromium 151 / Windows / secure context / DPR 1.25 koşusu yeni `sepia`, `contrast` ve `saturate` shader’larıyla 2.000 sprite üzerinden 30 saniyeye uzatıldı. Parent/nested RenderGroup ve toplam üç post-process pass/frame boyunca iki backend’de de kaynak sayaçları sabit kaldı; loss, device error ve browser warning/error oluşmadı. Bu fiziksel cihaz veya mobil WebView kanıtı değildir.
+The same isolated loopback/Chromium 151 / Windows / secure context / DPR 1.25 run was extended to 30 seconds over 2,000 sprites with the new `sepia`, `contrast` and `saturate` shaders. Throughout the parent/nested RenderGroup and the three post-process passes per frame, the resource counters stayed constant on both backends; no loss, device errors or browser warnings/errors occurred. This is not physical device or mobile WebView evidence.
 
-| Backend | Sonuç / frame | max texture | peak GPU cull | peak texture | peak render target | RenderGroup pass/frame | post-process pass/frame | explicit offscreen pass | target resize | device error |
+| Backend | Result / frames | max texture | peak GPU cull | peak texture | peak render target | RenderGroup passes/frame | post-process passes/frame | explicit offscreen passes | target resizes | device error |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| WebGPU | `passed` / 1781 | 8192 | 303104 B / 5 buffer | 11 | 6 | 2 | 3 | 1780 | 1 | false |
+| WebGPU | `passed` / 1781 | 8192 | 303104 B / 5 buffers | 11 | 6 | 2 | 3 | 1780 | 1 | false |
 | WebGL2 | `passed` / 1771 | 16384 | 0 B | 4 | 6 | 2 | 3 | 1770 | 1 | false |
 
-## 16 Ağustos 2026 SpriteBatch GPU animation koşusu
+## August 16, 2026 SpriteBatch GPU animation run
 
-İzole `127.0.0.1:43187` hostunda Chromium 151 / Windows / secure context / DPR 1.25 ile 2.000 sprite aynı atlasın iki frame’iyle `addAnimatedSprite()` üzerinden 3 saniye çalıştırıldı. Animasyon frame state’i aynı SpriteBatch içinde ilerledi; WebGPU compute culling/indirect draw ve WebGL2 instanced fallback ile render edildi. WebGPU’da 34, WebGL2’de 36 frame değişimi gözlendi; `deviceErrorObserved: false`, RenderGroup/post-process ve offscreen sayaçları mevcut soak ile birlikte sağlıklı kaldı. Bu masaüstü Chromium kanıtıdır; fiziksel iOS/Android/WebView sonucu değildir.
+On an isolated `127.0.0.1:43187` host with Chromium 151 / Windows / secure context / DPR 1.25, 2,000 sprites ran for 3 seconds through `addAnimatedSprite()` with two frames of the same atlas. The animation frame state advanced inside the same SpriteBatch; it was rendered with WebGPU compute culling/indirect draw and the WebGL2 instanced fallback. 34 frame changes were observed on WebGPU and 36 on WebGL2; `deviceErrorObserved: false`, and the RenderGroup/post-process and offscreen counters stayed healthy alongside the existing soak. This is desktop Chromium evidence; it is not a physical iOS/Android/WebView result.
 
-| Backend | Sonuç / frame | max texture | peak GPU cull | peak texture | peak render target | animation frame changes | RenderGroup pass/frame | post-process pass/frame | explicit offscreen pass | target resize | device error |
+| Backend | Result / frames | max texture | peak GPU cull | peak texture | peak render target | animation frame changes | RenderGroup passes/frame | post-process passes/frame | explicit offscreen passes | target resizes | device error |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| WebGPU | `passed` / 165 | 8192 | 303104 B / 5 buffer | 11 | 6 | 34 | 2 | 3 | 164 | 1 | false |
+| WebGPU | `passed` / 165 | 8192 | 303104 B / 5 buffers | 11 | 6 | 34 | 2 | 3 | 164 | 1 | false |
 | WebGL2 | `passed` / 181 | 16384 | 0 B | 4 | 6 | 36 | 2 | 3 | 180 | 1 | false |
 
-## 16 Ağustos 2026 GPU texture residency/bütçe koşusu
+## August 16, 2026 GPU texture residency/budget run
 
-İzole `127.0.0.1:43189` hostunda aynı 2.000 sprite / 3 saniye RenderGroup, atlas animasyonu ve RenderTexture sahnesi yeni `baseTexture` residency ve toplam GPU texture bütçesi telemetrisiyle tekrarlandı. Varsayılan toplam bütçe 128 MiB / 4096 kaynak olarak raporlandı; atlas frame’leri ayrı GPU texture oluşturmadı. Her iki backend `passed`, device error ve kayıp gözlenmedi. Bu masaüstü Chromium kanıtıdır; fiziksel iOS/Android/WebView sonucu değildir.
+On an isolated `127.0.0.1:43189` host, the same 2,000-sprite / 3-second RenderGroup, atlas animation and RenderTexture scene was repeated with the new `baseTexture` residency and total GPU texture budget telemetry. The default total budget was reported as 128 MiB / 4096 resources; atlas frames created no separate GPU textures. Both backends `passed`, with no device errors or loss observed. This is desktop Chromium evidence; it is not a physical iOS/Android/WebView result.
 
-| Backend | Sonuç / frame | peak texture count | peak texture bytes | max texture bytes | max texture count | peak render target | animation changes | device error |
+| Backend | Result / frames | peak texture count | peak texture bytes | max texture bytes | max texture count | peak render target | animation changes | device error |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
 | WebGPU | `passed` / 164 | 11 | 269440 B | 134217728 B | 4096 | 6 | 34 | false |
 | WebGL2 | `passed` / 181 | 4 | 269436 B | 134217728 B | 4096 | 6 | 36 | false |
 
-## 16 Ağustos 2026 Texture lifecycle validation koşusu
+## August 16, 2026 texture lifecycle validation run
 
-İzole `127.0.0.1:43191` hostunda lifecycle guard değişikliği sonrası aynı 2.000 sprite / 3 saniye atlas animasyonu, RenderGroup ve RenderTexture senaryosu yeniden çalıştırıldı. Chromium 151 / Windows / secure context / DPR 1.25 koşusunda destroy edilmiş texture girişleri için `EXI_TEXTURE_INPUT` smoke assertion’ları da Node engine smoke içinde geçti. Bu masaüstü Chromium kanıtıdır; fiziksel iOS/Android/WebView sonucu değildir.
+On an isolated `127.0.0.1:43191` host, after the lifecycle guard change, the same 2,000-sprite / 3-second atlas animation, RenderGroup and RenderTexture scenario was run again. In the Chromium 151 / Windows / secure context / DPR 1.25 run, the `EXI_TEXTURE_INPUT` smoke assertions for destroyed texture inputs also passed in the Node engine smoke. This is desktop Chromium evidence; it is not a physical iOS/Android/WebView result.
 
-| Backend | Sonuç / frame | peak texture count | peak texture bytes | max texture bytes | peak render target | animation changes | device error | loss |
+| Backend | Result / frames | peak texture count | peak texture bytes | max texture bytes | peak render target | animation changes | device error | loss |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | WebGPU | `passed` / 165 | 11 | 269440 B | 134217728 B | 6 | 34 | false | false |
 | WebGL2 | `passed` / 180 | 4 | 269436 B | 134217728 B | 6 | 36 | false | false |
 
-## 16 Ağustos 2026 Graphics polygon koşusu
+## August 16, 2026 Graphics polygon run
 
-İzole `127.0.0.1:43192` hostunda yeni `Graphics.polygon()` ear-clipping yolu, 2.000 sprite / 3 saniye atlas animasyonu, RenderGroup ve RenderTexture senaryosuyla birlikte Chromium 151 / Windows / secure context / DPR 1.25 üzerinde çalıştırıldı. `graphicsPolygonTested: true`, browser backend’lerinde device error/loss yok ve offscreen pass akışı tamamlandı. Bu masaüstü Chromium kanıtıdır; fiziksel iOS/Android/WebView sonucu değildir.
+On an isolated `127.0.0.1:43192` host, the new `Graphics.polygon()` ear-clipping path ran together with the 2,000-sprite / 3-second atlas animation, RenderGroup and RenderTexture scenario on Chromium 151 / Windows / secure context / DPR 1.25. `graphicsPolygonTested: true`, no device errors/loss on the browser backends, and the offscreen pass flow completed. This is desktop Chromium evidence; it is not a physical iOS/Android/WebView result.
 
-| Backend | Sonuç / frame | graphics polygon | peak texture count | peak texture bytes | peak render target | animation changes | explicit offscreen pass | device error | loss |
+| Backend | Result / frames | graphics polygon | peak texture count | peak texture bytes | peak render target | animation changes | explicit offscreen passes | device error | loss |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | WebGPU | `passed` / 165 | true | 11 | 269440 B | 6 | 34 | 164 | false | false |
 | WebGL2 | `passed` / 181 | true | 5 | 269440 B | 6 | 36 | 180 | false | false |
 
-## 16 Ağustos 2026 Gerçek Web Audio voice + pan koşusu
+## August 16, 2026 real Web Audio voice + pan run
 
-İzole `127.0.0.1:43194` hostunda hardware soak başlatma etkileşimi içinden gerçek `AudioContext` oluşturuldu; 10 ms sessiz `AudioBuffer`, aktif voice volume güncellemesi, merkez dışı `StereoPannerNode` graph’ının lazy oluşturulması, tekrar merkez pan’a dönüş, voice sayımı, `stopAll()` ve context teardown çalıştırıldı. Aynı koşuda Graphics polygon, atlas animasyonu, RenderGroup ve RenderTexture akışı da korundu. Chromium 151 / Windows / secure context / DPR 1.25 sonucu aşağıdadır; fiziksel iOS/Android/WebView sonucu değildir.
+On an isolated `127.0.0.1:43194` host, a real `AudioContext` was created from within the hardware soak start interaction; a 10 ms silent `AudioBuffer`, an active voice volume update, lazy creation of an off-center `StereoPannerNode` graph, a return to center pan, voice counting, `stopAll()` and context teardown were run. The Graphics polygon, atlas animation, RenderGroup and RenderTexture flow was also kept in the same run. The Chromium 151 / Windows / secure context / DPR 1.25 result is below; it is not a physical iOS/Android/WebView result.
 
-| Backend | Sonuç / frame | audio voice tested | audio pan tested | audio peak voices | audio error | graphics polygon | animation changes | explicit offscreen pass | device error | loss |
+| Backend | Result / frames | audio voice tested | audio pan tested | audio peak voices | audio error | graphics polygon | animation changes | explicit offscreen passes | device error | loss |
 | --- | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: |
 | WebGPU | `passed` / 150 | true | true | 1 | null | true | 31 | 149 | false | false |
 | WebGL2 | `passed` / 179 | true | true | 1 | null | true | 36 | 178 | false | false |
 
-## 16 Ağustos 2026 Güvenli scene switch koşusu
+## August 16, 2026 safe scene switch run
 
-İzole `127.0.0.1:43195` hostunda engine hazırlandıktan sonra boş bir probe scene’e, ardından ana stress scene’e `ExiEngine.setScene()` ile geçildi. Geçişten sonra atlas animasyonu, Graphics polygon, RenderGroup, RenderTexture ve audio probe akışı sürdü. Chromium 151 / Windows / secure context / DPR 1.25 sonucu aşağıdadır; fiziksel iOS/Android/WebView sonucu değildir.
+On an isolated `127.0.0.1:43195` host, after the engine was prepared, it switched to an empty probe scene and then to the main stress scene with `ExiEngine.setScene()`. After the switch, the atlas animation, Graphics polygon, RenderGroup, RenderTexture and audio probe flow continued. The Chromium 151 / Windows / secure context / DPR 1.25 result is below; it is not a physical iOS/Android/WebView result.
 
-| Backend | Sonuç / frame | scene switch tested | graphics polygon | audio pan tested | explicit offscreen pass | device error | loss |
+| Backend | Result / frames | scene switch tested | graphics polygon | audio pan tested | explicit offscreen passes | device error | loss |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | WebGPU | `passed` / 141 | true | true | true | 140 | false | false |
 | WebGL2 | `passed` / 179 | true | true | true | 178 | false | false |
 
-## 16 Ağustos 2026 Input axis browser koşusu
+## August 16, 2026 input axis browser run
 
-İzole `127.0.0.1:43196` hostunda çalışan engine listener’larına gerçek `KeyboardEvent` gönderilerek `key-axis` binding’i pozitif ve nötr değerlerde test edildi. Aynı koşuda `setScene()` geçişi, AudioContext voice/pan, Graphics polygon, RenderGroup ve RenderTexture akışı korundu. Chromium 151 / Windows / secure context / DPR 1.25 sonucu aşağıdadır; fiziksel gamepad veya iOS/Android/WebView sonucu değildir.
+On an isolated `127.0.0.1:43196` host, real `KeyboardEvent`s were sent to the running engine's listeners to test a `key-axis` binding at positive and neutral values. The `setScene()` switch, AudioContext voice/pan, Graphics polygon, RenderGroup and RenderTexture flow was kept in the same run. The Chromium 151 / Windows / secure context / DPR 1.25 result is below; it is not a physical gamepad or iOS/Android/WebView result.
 
-| Backend | Sonuç / frame | input axis tested | scene switch tested | audio pan tested | explicit offscreen pass | device error | loss |
+| Backend | Result / frames | input axis tested | scene switch tested | audio pan tested | explicit offscreen passes | device error | loss |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | WebGPU | `passed` / 150 | true | true | true | 149 | false | false |
 | WebGL2 | `passed` / 180 | true | true | true | 179 | false | false |
 
-## 16 Ağustos 2026 Bounded keyboard state koşusu
+## August 16, 2026 bounded keyboard state run
 
-İzole `127.0.0.1:43197` hostunda input listener zinciri ve bounded keyboard state hardening’i, `inputAxisTested: true` ile birlikte gerçek WebGPU/WebGL2 render koşusunda tekrarlandı. 3 saniyelik koşuda scene switch, audio voice/pan, polygon, RenderGroup ve offscreen pass akışı korunmuştur. Chromium 151 / Windows / secure context / DPR 1.25 sonucudur; fiziksel mobil cihaz sonucu değildir.
+On an isolated `127.0.0.1:43197` host, the input listener chain and the bounded keyboard state hardening were repeated in a real WebGPU/WebGL2 render run together with `inputAxisTested: true`. In the 3-second run, the scene switch, audio voice/pan, polygon, RenderGroup and offscreen pass flow was kept. This is a Chromium 151 / Windows / secure context / DPR 1.25 result; it is not a physical mobile device result.
 
-| Backend | Sonuç / frame | input axis tested | scene switch tested | audio pan tested | explicit offscreen pass | device error | loss |
+| Backend | Result / frames | input axis tested | scene switch tested | audio pan tested | explicit offscreen passes | device error | loss |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | WebGPU | `passed` / 149 | true | true | true | 148 | false | false |
 | WebGL2 | `passed` / 179 | true | true | true | 178 | false | false |
 
-## 16 Ağustos 2026 Camera shake koşusu
+## August 16, 2026 camera shake run
 
-İzole `127.0.0.1:43198` hostunda bounded `Camera.shake()` başlatıldı, bir frame ilerletildi ve `clearShake()` ile kamera merkezi geri doğrulandı. Aynı gerçek render koşusunda scene switch, input axis, AudioContext voice/pan, Graphics polygon ve offscreen pass akışı korundu. Chromium 151 / Windows / secure context / DPR 1.25 sonucudur; fiziksel mobil cihaz sonucu değildir.
+On an isolated `127.0.0.1:43198` host, a bounded `Camera.shake()` was started, one frame was advanced, and the camera center was verified again with `clearShake()`. In the same real render run, the scene switch, input axis, AudioContext voice/pan, Graphics polygon and offscreen pass flow was kept. This is a Chromium 151 / Windows / secure context / DPR 1.25 result; it is not a physical mobile device result.
 
-| Backend | Sonuç / frame | camera shake tested | input axis tested | scene switch tested | audio pan tested | explicit offscreen pass | device error | loss |
+| Backend | Result / frames | camera shake tested | input axis tested | scene switch tested | audio pan tested | explicit offscreen passes | device error | loss |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | WebGPU | `passed` / 150 | true | true | true | true | 149 | false | false |
 | WebGL2 | `passed` / 177 | true | true | true | true | 176 | false | false |
 
-## 16 Ağustos 2026 Lifecycle pause/resume koşusu
+## August 16, 2026 lifecycle pause/resume run
 
-İzole `127.0.0.1:43199` hostunda gerçek Chromium render akışı başlatıldı; `engine.start()` sonrası `pause()` ile RAF durduruldu, `resume()` ile yeniden başlatıldı ve fixed-step state’in devam ettiği doğrulandı. Soak harness ayrıca `pauseOnHidden` sözleşmesini gerçek engine instance üzerinde kontrol etti. Chromium 151 / Windows / secure context / DPR 1.25 sonucudur; document görünürlük geçişi tarayıcı otomasyonu tarafından zorlanmadığı için bu satır manuel lifecycle API ve gerçek backend kanıtıdır; fiziksel mobil cihaz sonucu değildir.
+On an isolated `127.0.0.1:43199` host, a real Chromium render flow was started; after `engine.start()`, RAF was stopped with `pause()`, restarted with `resume()`, and it was verified that the fixed-step state continued. The soak harness also checked the `pauseOnHidden` contract on a real engine instance. This is a Chromium 151 / Windows / secure context / DPR 1.25 result; because the document visibility transition was not forced by the browser automation, this row is evidence for the manual lifecycle API and a real backend; it is not a physical mobile device result.
 
-| Backend | Sonuç / frame | lifecycle tested | camera shake tested | input axis tested | scene switch tested | audio pan tested | explicit offscreen pass | device error | loss |
+| Backend | Result / frames | lifecycle tested | camera shake tested | input axis tested | scene switch tested | audio pan tested | explicit offscreen passes | device error | loss |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | WebGPU | `passed` / 89 | true | true | true | true | true | 88 | false | false |
 | WebGL2 | `passed` / 118 | true | true | true | true | true | 117 | false | false |
 
-## 16 Ağustos 2026 Time scale koşusu
+## August 16, 2026 time scale run
 
-İzole `127.0.0.1:43200` hostunda gerçek engine instance’ında `setTimeScale(0.5)` ve tekrar `setTimeScale(1)` çağrıları yapıldı; `getInfo().timeScale` değerleri doğrulandı. Aynı koşuda pause/resume, scene switch, camera shake, input axis, audio pan, RenderGroup ve RenderTexture akışları korundu. Chromium 151 / Windows / secure context / DPR 1.25 sonucudur; fiziksel mobil cihaz sonucu değildir.
+On an isolated `127.0.0.1:43200` host, `setTimeScale(0.5)` and then `setTimeScale(1)` were called on a real engine instance; the `getInfo().timeScale` values were verified. The pause/resume, scene switch, camera shake, input axis, audio pan, RenderGroup and RenderTexture flows were kept in the same run. This is a Chromium 151 / Windows / secure context / DPR 1.25 result; it is not a physical mobile device result.
 
-| Backend | Sonuç / frame | time scale tested | lifecycle tested | camera shake tested | input axis tested | scene switch tested | audio pan tested | explicit offscreen pass | device error | loss |
+| Backend | Result / frames | time scale tested | lifecycle tested | camera shake tested | input axis tested | scene switch tested | audio pan tested | explicit offscreen passes | device error | loss |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | WebGPU | `passed` / 89 | true | true | true | true | true | true | 88 | false | false |
 | WebGL2 | `passed` / 120 | true | true | true | true | true | true | 119 | false | false |
 
-## 16 Ağustos 2026 Transform interpolation koşusu
+## August 16, 2026 transform interpolation run
 
-İzole `127.0.0.1:43201` hostunda engine `interpolate: true` ile çalıştırıldı. Fixed-step transform snapshot/restore yolu gerçek WebGPU/WebGL2 render akışında test edilirken timeScale, pause/resume, scene switch, camera shake, input axis, audio pan ve offscreen pass kontrolleri korundu. Chromium 151 / Windows / secure context / DPR 1.25 sonucudur; fiziksel mobil cihaz sonucu değildir.
+On an isolated `127.0.0.1:43201` host, the engine was run with `interpolate: true`. While the fixed-step transform snapshot/restore path was tested in a real WebGPU/WebGL2 render flow, the timeScale, pause/resume, scene switch, camera shake, input axis, audio pan and offscreen pass checks were kept. This is a Chromium 151 / Windows / secure context / DPR 1.25 result; it is not a physical mobile device result.
 
-| Backend | Sonuç / frame | interpolation tested | time scale tested | lifecycle tested | camera shake tested | input axis tested | scene switch tested | audio pan tested | explicit offscreen pass | device error | loss |
+| Backend | Result / frames | interpolation tested | time scale tested | lifecycle tested | camera shake tested | input axis tested | scene switch tested | audio pan tested | explicit offscreen passes | device error | loss |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | WebGPU | `passed` / 89 | true | true | true | true | true | true | true | 88 | false | false |
 | WebGL2 | `passed` / 119 | true | true | true | true | true | true | true | 118 | false | false |
 
-## 16 Ağustos 2026 Interpolation world-matrix restore retest
+## August 16, 2026 interpolation world-matrix restore retest
 
-İzole `127.0.0.1:43202` hostunda interpolation restore sonrasında güncel world matrix’in yeniden hesaplanması gereken cache invalidation değişikliği tekrar çalıştırıldı. WebGPU ve WebGL2 gerçek render akışında `interpolateTested: true`, device error/loss yok ve offscreen pass tamamlandı. Chromium 151 / Windows / secure context / DPR 1.25 sonucudur; fiziksel mobil cihaz sonucu değildir.
+On an isolated `127.0.0.1:43202` host, the cache invalidation change that requires the current world matrix to be recomputed after an interpolation restore was run again. In the real WebGPU and WebGL2 render flows, `interpolateTested: true`, no device errors/loss, and the offscreen passes completed. This is a Chromium 151 / Windows / secure context / DPR 1.25 result; it is not a physical mobile device result.
 
-| Backend | Sonuç / frame | interpolation tested | time scale tested | lifecycle tested | explicit offscreen pass | device error | loss |
+| Backend | Result / frames | interpolation tested | time scale tested | lifecycle tested | explicit offscreen passes | device error | loss |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | WebGPU | `passed` / 81 | true | true | true | 80 | false | false |
 | WebGL2 | `passed` / 119 | true | true | true | 118 | false | false |
 
-## 16 Ağustos 2026 Page Lifecycle bfcache koşusu
+## August 16, 2026 Page Lifecycle bfcache run
 
-İzole `127.0.0.1:43203` hostunda güncel engine instance’ına synthetic `pagehide` ve `pageshow` olayları gönderildi. `pagehide` sonrası RAF/fixed-step/audio lifecycle pause, `pageshow` sonrası yalnızca engine kaynaklı pause’un geri açılması gerçek WebGPU/WebGL2 render akışında doğrulandı. Chromium 151 / Windows / secure context / DPR 1.25 sonucudur; gerçek bfcache navigasyonu ve fiziksel mobil cihaz sonucu değildir.
+On an isolated `127.0.0.1:43203` host, synthetic `pagehide` and `pageshow` events were sent to the current engine instance. The RAF/fixed-step/audio lifecycle pause after `pagehide`, and reopening only the engine-originated pause after `pageshow`, were verified in a real WebGPU/WebGL2 render flow. This is a Chromium 151 / Windows / secure context / DPR 1.25 result; it is not a real bfcache navigation or physical mobile device result.
 
-| Backend | Sonuç / frame | lifecycle tested | page lifecycle tested | responsive resize | logical size | device error | loss |
+| Backend | Result / frames | lifecycle tested | page lifecycle tested | responsive resize | logical size | device error | loss |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | WebGPU | `passed` / 127 | true | true | true | true | false | false |
 | WebGL2 | `passed` / 133 | true | true | true | true | false | false |
 
-## 16 Ağustos 2026 TileMap hücre flip koşusu
+## August 16, 2026 TileMap cell flip run
 
-İzole `127.0.0.1:43006` hostunda 500 sprite / 2 saniye gerçek Chromium 151 / Windows / secure context / DPR 1.25 koşusu yapıldı. `TileMap.setTile(..., { flipX: true, flipY: true })` aynı atlas üzerinde WebGL2 CPU instance yolu ve WebGPU GPU-source yolu ile doğrulandı; `tileFlipTested`, Sprite flip ve `roundPixels` kontrolleri iki backend’de de `true` kaldı. Browser tanı logu boş, `deviceErrorObserved: false`, kayıp yoktur. Bu masaüstü Chromium kanıtıdır; fiziksel iOS/Android/WebView sonucu değildir.
+On an isolated `127.0.0.1:43006` host, a 500-sprite / 2-second run was done on real Chromium 151 / Windows / secure context / DPR 1.25. `TileMap.setTile(..., { flipX: true, flipY: true })` was verified on the same atlas with the WebGL2 CPU instance path and the WebGPU GPU-source path; the `tileFlipTested`, Sprite flip and `roundPixels` checks stayed `true` on both backends. The browser diagnostic log is empty, `deviceErrorObserved: false`, and there is no loss. This is desktop Chromium evidence; it is not a physical iOS/Android/WebView result.
 
-| Backend | Sonuç / frame | tile flip tested | sprite flip tested | round pixels | peak texture bytes | peak render target | explicit offscreen pass | device error | loss |
+| Backend | Result / frames | tile flip tested | sprite flip tested | round pixels | peak texture bytes | peak render target | explicit offscreen passes | device error | loss |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | WebGPU | `passed` / 58 | true | true | true | 266440 B | 6 | 57 | false | false |
 | WebGL2 | `passed` / 55 | true | true | true | 266440 B | 6 | 54 | false | false |
 
-## 16 Ağustos 2026 AnimatedSprite/SpriteBatch ping-pong koşusu
+## August 16, 2026 AnimatedSprite/SpriteBatch ping-pong run
 
-İzole `127.0.0.1:43007` hostunda 500 sprite / 2 saniye gerçek Chromium 151 / Windows / secure context / DPR 1.25 koşusu yapıldı. İlk `SpriteBatch` animasyonuna `pingPong: true` verilerek frame yönünün uçta `-1` yönüne geçtiği gerçek engine update döngüsünde ölçüldü; WebGL2 ve WebGPU sonuçlarında `pingPongTested: true`, browser tanı logu boş, device error/loss yoktur. Bu masaüstü Chromium kanıtıdır; fiziksel iOS/Android/WebView sonucu değildir.
+On an isolated `127.0.0.1:43007` host, a 500-sprite / 2-second run was done on real Chromium 151 / Windows / secure context / DPR 1.25. `pingPong: true` was given to the first `SpriteBatch` animation, and the frame direction switching to `-1` at the end was measured in the real engine update loop; in the WebGL2 and WebGPU results `pingPongTested: true`, the browser diagnostic log is empty, and there are no device errors/loss. This is desktop Chromium evidence; it is not a physical iOS/Android/WebView result.
 
-| Backend | Sonuç / frame | ping-pong tested | animation frame changes | peak texture bytes | peak render target | explicit offscreen pass | device error | loss |
+| Backend | Result / frames | ping-pong tested | animation frame changes | peak texture bytes | peak render target | explicit offscreen passes | device error | loss |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | WebGPU | `passed` / 42 | true | 20 | 266440 B | 6 | 41 | false | false |
 | WebGL2 | `passed` / 55 | true | 21 | 266440 B | 6 | 54 | false | false |
 
-## 16 Ağustos 2026 Animasyon loop/frame callback koşusu
+## August 16, 2026 animation loop/frame callback run
 
-İzole `127.0.0.1:43009` hostunda 500 sprite / 2 saniye gerçek Chromium 151 / Windows / secure context / DPR 1.25 koşusu yapıldı. İlk `SpriteBatch` animasyonuna döngü sınırını bildiren `onLoop` ve yalnızca gerçek frame geçişlerinde çağrılan `onFrameChange` callback’leri bağlandı; WebGL2 ve WebGPU sonuçlarında `loopTested: true`, `frameChangeTested: true`, `pingPongTested: true` ve browser tanı logu boştur. Harness başlangıç zamanını engine başlatıldıktan sonra alıyor; böylece kısa koşular hazırlık süresine göre hatalı biçimde tek frame’de sonlanmıyor. Offscreen render, texture yaşam döngüsü ve device error/loss kontrolleri de aynı koşuda geçti. Bu masaüstü Chromium kanıtıdır; fiziksel iOS/Android/WebView sonucu değildir.
+On an isolated `127.0.0.1:43009` host, a 500-sprite / 2-second run was done on real Chromium 151 / Windows / secure context / DPR 1.25. An `onLoop` callback reporting the loop boundary and an `onFrameChange` callback called only on real frame transitions were attached to the first `SpriteBatch` animation; in the WebGL2 and WebGPU results `loopTested: true`, `frameChangeTested: true`, `pingPongTested: true`, and the browser diagnostic log is empty. The harness takes its start time after the engine has started, so short runs do not wrongly end after a single frame because of setup time. Offscreen rendering, the texture lifecycle and the device error/loss checks also passed in the same run. This is desktop Chromium evidence; it is not a physical iOS/Android/WebView result.
 
-| Backend | Sonuç / frame | loop tested | frame-change tested | ping-pong tested | animation frame changes | explicit offscreen pass | peak GPU cull bytes | device error | loss |
+| Backend | Result / frames | loop tested | frame-change tested | ping-pong tested | animation frame changes | explicit offscreen passes | peak GPU cull bytes | device error | loss |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | WebGPU | `passed` / 83 | true | true | true | 25 | 82 | 106496 B | false | false |
 | WebGL2 | `passed` / 82 | true | true | true | 24 | 81 | 0 B | false | false |
 
-## 16 Ağustos 2026 TextureAtlas getClip koşusu
+## August 16, 2026 TextureAtlas getClip run
 
-İzole `127.0.0.1:43010` hostunda hardware soak animasyon frame’leri doğrudan `TextureAtlas.fromGrid()` ve `getClip()` ile üretildi; aynı clip hem WebGL2 hem WebGPU `SpriteBatch.addAnimatedSprite()` yoluna verildi. 500 sprite / 2 saniye koşusunda atlas frame cache’i, loop/ping-pong, frame-change callback, GPU kaynak akışı ve offscreen pass birlikte doğrulandı. Browser tanı logu boş, device error/loss yoktur. Bu masaüstü Chromium kanıtıdır; fiziksel iOS/Android/WebView sonucu değildir.
+On an isolated `127.0.0.1:43010` host, the hardware soak animation frames were produced directly with `TextureAtlas.fromGrid()` and `getClip()`; the same clip was given to both the WebGL2 and WebGPU `SpriteBatch.addAnimatedSprite()` paths. In the 500-sprite / 2-second run, the atlas frame cache, loop/ping-pong, the frame-change callback, the GPU resource flow and the offscreen pass were verified together. The browser diagnostic log is empty, and there are no device errors/loss. This is desktop Chromium evidence; it is not a physical iOS/Android/WebView result.
 
-| Backend | Sonuç / frame | loop tested | frame-change tested | ping-pong tested | animation frame changes | explicit offscreen pass | peak GPU cull bytes | device error | loss |
+| Backend | Result / frames | loop tested | frame-change tested | ping-pong tested | animation frame changes | explicit offscreen passes | peak GPU cull bytes | device error | loss |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | WebGPU | `passed` / 61 | true | true | true | 25 | 60 | 106496 B | false | false |
 | WebGL2 | `passed` / 85 | true | true | true | 24 | 84 | 0 B | false | false |
 
-## 16 Ağustos 2026 TextureAtlas JSON array importer koşusu
+## August 16, 2026 TextureAtlas JSON array importer run
 
-İzole `127.0.0.1:43012` hostunda hardware soak animasyon atlası TexturePacker tarzı `frames` array metadata’sından (`filename`, `frame`, `rotated: false`, `trimmed: false`) oluşturuldu. Aynı `getClip()` çıktısı WebGL2 ve WebGPU `SpriteBatch` yollarında 500 sprite / 2 saniye çalıştı; loop/ping-pong, frame-change callback, GPU kaynak akışı ve offscreen pass geçti. Browser tanı logu boş, device error/loss yoktur. Bu masaüstü Chromium kanıtıdır; fiziksel iOS/Android/WebView sonucu değildir.
+On an isolated `127.0.0.1:43012` host, the hardware soak animation atlas was built from TexturePacker-style `frames` array metadata (`filename`, `frame`, `rotated: false`, `trimmed: false`). The same `getClip()` output ran on the WebGL2 and WebGPU `SpriteBatch` paths with 500 sprites / 2 seconds; loop/ping-pong, the frame-change callback, the GPU resource flow and the offscreen pass passed. The browser diagnostic log is empty, and there are no device errors/loss. This is desktop Chromium evidence; it is not a physical iOS/Android/WebView result.
 
-| Backend | Sonuç / frame | loop tested | frame-change tested | ping-pong tested | animation frame changes | explicit offscreen pass | peak GPU cull bytes | device error | loss |
+| Backend | Result / frames | loop tested | frame-change tested | ping-pong tested | animation frame changes | explicit offscreen passes | peak GPU cull bytes | device error | loss |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | WebGPU | `passed` / 86 | true | true | true | 24 | 85 | 106496 B | false | false |
 | WebGL2 | `passed` / 69 | true | true | true | 24 | 68 | 0 B | false | false |
 
-## 16 Ağustos 2026 mevcut kaynak + manuel loss tekrar koşusu
+## August 16, 2026 current source + manual loss rerun
 
-Bu çalışma turunda Codex in-app Chromium 151 / Windows / secure context / DPR 1.25 üzerinde `127.0.0.1:4173` loopback hostunda 500 sprite ile 3 saniyelik normal koşu ve ayrı 5 saniyelik manuel loss koşusu çalıştırıldı. Normal koşuda iki backend `deviceErrorObserved: false` ile tamamlandı; manuel loss koşusunda WebGPU `device-lost`, WebGL2 `context-lost` status’ü aldı ve her iki koşu da beklenen `passed-with-loss` sonucu verdi. Browser warning/error listesi tüm koşularda boştur. Bu masaüstü Chromium kanıtıdır; fiziksel iOS/Android/WebView sonucu değildir.
+In this round of work, on Codex in-app Chromium 151 / Windows / secure context / DPR 1.25, on the `127.0.0.1:4173` loopback host, a 3-second normal run and a separate 5-second manual loss run were done with 500 sprites. In the normal run both backends completed with `deviceErrorObserved: false`; in the manual loss run WebGPU received a `device-lost` status and WebGL2 a `context-lost` status, and both runs gave the expected `passed-with-loss` result. The browser warning/error list is empty in all runs. This is desktop Chromium evidence; it is not a physical iOS/Android/WebView result.
 
-| Backend | Normal sonuç / frame | Peak GPU cull | Peak texture | Peak render target | Offscreen pass | Target resize | Manuel loss sonucu / frame | Device error | Console warning/error |
+| Backend | Normal result / frames | Peak GPU cull | Peak texture | Peak render target | Offscreen passes | Target resizes | Manual loss result / frames | Device error | Console warning/error |
 | --- | --- | ---: | ---: | ---: | ---: | --- | --- | --- |
-| WebGPU | `passed` / 124 | 106496 B / 5 buffer | 266440 B | 6 | 123 | 1 | `passed-with-loss` / 32 | false | 0 |
+| WebGPU | `passed` / 124 | 106496 B / 5 buffers | 266440 B | 6 | 123 | 1 | `passed-with-loss` / 32 | false | 0 |
 | WebGL2 | `passed` / 120 | 0 B | 266440 B | 6 | 119 | 1 | `passed-with-loss` / 39 | false | 0 |
 
-## 16 Ağustos 2026 RenderGroup steady-state sync koşusu
+## August 16, 2026 RenderGroup steady-state sync run
 
-`RenderGroup` effect target cache değişikliği sonrası aynı `127.0.0.1:4173` loopback hostunda Chromium 151 / Windows / secure context / DPR 1.25 ile 500 sprite ve 3 saniyelik WebGPU/WebGL2 koşusu tekrarlandı. Her iki backend’de iki RenderGroup pass’i ve üç post-process pass’i korundu; target sayısı 6’da sabit kaldı, yalnızca ilk resize gerçekleşti. Node engine smoke ayrıca sabit target count/boyut/filter durumunda `setFilter` çağrısının tekrarlanmadığını doğrudan doğruladı. Browser warning/error listesi boştur. Bu masaüstü Chromium kanıtıdır; fiziksel iOS/Android/WebView sonucu değildir.
+After the `RenderGroup` effect target cache change, a 500-sprite, 3-second WebGPU/WebGL2 run was repeated on the same `127.0.0.1:4173` loopback host with Chromium 151 / Windows / secure context / DPR 1.25. Two RenderGroup passes and three post-process passes were kept on both backends; the target count stayed fixed at 6, and only the first resize happened. The Node engine smoke also directly verified that the `setFilter` call is not repeated when the target count/size/filter state is unchanged. The browser warning/error list is empty. This is desktop Chromium evidence; it is not a physical iOS/Android/WebView result.
 
-| Backend | Sonuç / frame | RenderGroup pass/frame | post-process pass/frame | peak render target | explicit offscreen pass | target resize | device error | Console warning/error |
+| Backend | Result / frames | RenderGroup passes/frame | post-process passes/frame | peak render target | explicit offscreen passes | target resizes | device error | Console warning/error |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | WebGPU | `passed` / 123 | 2 | 3 | 6 | 122 | 1 | false | 0 |
 | WebGL2 | `passed` / 126 | 2 | 3 | 6 | 125 | 1 | false | 0 |
 
-## 16 Ağustos 2026 Node inherited-state fast-path regression koşusu
+## August 16, 2026 Node inherited-state fast-path regression run
 
-Node alpha/filter/mask ve inherited-state fast-path’leri sonrası izole `127.0.0.1:43124` hostunda Chromium 151 / Windows / secure context / DPR 1.25 ile her backend’de 500 sprite ve 3 saniyelik koşu tekrarlandı. WebGPU ve WebGL2’de sahne geçişi, input axis, lifecycle, overlay, RenderGroup/nested RenderGroup, üç post-process pass’i, RenderTexture resize ve audio pan probe’ları geçti. Browser warning/error listesi ve device error yoktur. Bu masaüstü Chromium kanıtıdır; fiziksel iOS/Android/WebView sonucu değildir.
+After the Node alpha/filter/mask and inherited-state fast paths, a 500-sprite, 3-second run on each backend was repeated on an isolated `127.0.0.1:43124` host with Chromium 151 / Windows / secure context / DPR 1.25. On WebGPU and WebGL2, the scene switch, input axis, lifecycle, overlay, RenderGroup/nested RenderGroup, three post-process passes, RenderTexture resize and audio pan probes passed. There are no browser warnings/errors and no device errors. This is desktop Chromium evidence; it is not a physical iOS/Android/WebView result.
 
-| Backend | Sonuç / frame | RenderGroup pass/frame | post-process pass/frame | peak GPU cull | peak texture | peak render target | explicit offscreen pass | device error | Console warning/error |
+| Backend | Result / frames | RenderGroup passes/frame | post-process passes/frame | peak GPU cull | peak texture | peak render target | explicit offscreen passes | device error | Console warning/error |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| WebGPU | `passed` / 105 | 2 | 3 | 106496 B / 5 buffer | 266440 B | 6 | 104 | false | 0 |
+| WebGPU | `passed` / 105 | 2 | 3 | 106496 B / 5 buffers | 266440 B | 6 | 104 | false | 0 |
 | WebGL2 | `passed` / 127 | 2 | 3 | 0 B | 266440 B | 6 | 126 | false | 0 |
 
-## 16 Ağustos 2026 Asset integrity değişikliği sonrası renderer soak koşusu
+## August 16, 2026 renderer soak run after the asset integrity change
 
-İsteğe bağlı Web Crypto `sha256` asset integrity yolu ve doğrulanmış texture cache bypass’ı eklendikten sonra izole `127.0.0.1:43125` hostunda Chromium 151 / Windows / secure context / DPR 1.25 ile 500 sprite ve 3 saniyelik normal koşu tekrarlandı. Integrity verilmemiş varsayılan render akışında WebGPU/WebGL2 sonuçları, RenderGroup/nested RenderGroup, üç post-process pass’i, lifecycle, responsive resize, texture ve offscreen kaynak sayaçlarıyla birlikte geçti. Browser warning/error listesi boştur; bu masaüstü Chromium kanıtıdır, fiziksel iOS/Android/WebView sonucu değildir.
+After the optional Web Crypto `sha256` asset integrity path and the verified texture cache bypass were added, a 500-sprite, 3-second normal run was repeated on an isolated `127.0.0.1:43125` host with Chromium 151 / Windows / secure context / DPR 1.25. In the default render flow without integrity, the WebGPU/WebGL2 results passed together with RenderGroup/nested RenderGroup, three post-process passes, the lifecycle, responsive resize, and the texture and offscreen resource counters. The browser warning/error list is empty; this is desktop Chromium evidence, not a physical iOS/Android/WebView result.
 
-| Backend | Sonuç / frame | RenderGroup pass/frame | post-process pass/frame | peak GPU cull | peak texture | peak render target | explicit offscreen pass | device error | Console warning/error |
+| Backend | Result / frames | RenderGroup passes/frame | post-process passes/frame | peak GPU cull | peak texture | peak render target | explicit offscreen passes | device error | Console warning/error |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| WebGPU | `passed` / 88 | 2 | 3 | 106496 B / 5 buffer | 266440 B | 6 | 87 | false | 0 |
+| WebGPU | `passed` / 88 | 2 | 3 | 106496 B / 5 buffers | 266440 B | 6 | 87 | false | 0 |
 | WebGL2 | `passed` / 134 | 2 | 3 | 0 B | 266440 B | 6 | 133 | false | 0 |
 
-## 17 Ağustos 2026 gerçek browser MCP RuntimeAgent koşusu
+## August 17, 2026 real browser MCP RuntimeAgent run
 
-Codex in-app Chromium oturumunda MCP bridge’in başlattığı loopback preview gerçek tarayıcıda açıldı. Root demo artık token varsa `/src/ai/runtime-agent.js` yükleyip `engine` ve `scene` köklerini sunuyor; token yoksa normal demo yolu değişmiyor. `exi_preview_probe({ path: "/__exi/runtime" })` ile `ready: true`, `status: "running"`, `fps: 60`, `draws: 6`, `nodes: 37` okundu. Aynı MCP stdio oturumunda `exi_preview_call` ile `clamp`, `Node` create/inspect/call/release ve `engine.running` çağrıları geçti; root `engine` release denemesi `EXI_RUNTIME_ROOT_HANDLE` ile reddedildi. `exi_preview_batch` gerçek browser üzerinde create → call → inspect → release zincirini tek round-trip’te `completed: 4`, `failed: 0` ile tamamladı. Browser console warning/error listesi boştur. WebGPU ve WebGL2 ayrı ayrı seçildi; iki backend’de de DOM runtime `Çalışıyor`, `60 FPS`, `6 DRAW`, `37 NODE` gösterdi ve telemetry backend değeri sırasıyla `webgpu`/`webgl2` oldu. Bu gerçek masaüstü browser + MCP transport kanıtıdır; uzun süreli soak veya fiziksel iOS/Android/WebView sonucu değildir.
+In a Codex in-app Chromium session, the loopback preview started by the MCP bridge was opened in a real browser. The root demo now loads `/src/ai/runtime-agent.js` when there is a token and exposes the `engine` and `scene` roots; without a token the normal demo path does not change. With `exi_preview_probe({ path: "/__exi/runtime" })`, `ready: true`, `status: "running"`, `fps: 60`, `draws: 6` and `nodes: 37` were read. In the same MCP stdio session, `exi_preview_call` passed `clamp`, `Node` create/inspect/call/release and `engine.running` calls; an attempt to release the root `engine` was rejected with `EXI_RUNTIME_ROOT_HANDLE`. `exi_preview_batch` completed a create → call → inspect → release chain on the real browser in a single round trip with `completed: 4`, `failed: 0`. The browser console warning/error list is empty. WebGPU and WebGL2 were selected separately; on both backends the DOM runtime showed `Running`, `60 FPS`, `6 DRAW` and `37 NODE`, and the telemetry backend value was `webgpu`/`webgl2` respectively. This is real desktop browser + MCP transport evidence; it is not a long-duration soak or a physical iOS/Android/WebView result.
 
 | Backend | Browser runtime | MCP function call | Handle lifecycle | Protected root | Telemetry | Console warning/error |
 | --- | --- | --- | --- | --- | --- | --- |
-| WebGPU | `passed` / 60 FPS | `clamp(2,0,1) -> 1` | create → inspect → call → release; batch `4/0` | `engine` release reddedildi | `ready=true`, `6 draw`, `37 node` | 0 |
-| WebGL2 | `passed` / 60 FPS | `clamp(0,0,1) -> 0` | RuntimeAgent yeniden başlatıldı | `engine` root koruması mevcut | `ready=true`, `6 draw`, `37 node` | 0 |
+| WebGPU | `passed` / 60 FPS | `clamp(2,0,1) -> 1` | create → inspect → call → release; batch `4/0` | `engine` release rejected | `ready=true`, `6 draw`, `37 node` | 0 |
+| WebGL2 | `passed` / 60 FPS | `clamp(0,0,1) -> 0` | RuntimeAgent restarted | `engine` root protection present | `ready=true`, `6 draw`, `37 node` | 0 |
 
-## 17 Ağustos 2026 gerçek browser MCP asset → texture → atlas → sprite koşusu
+## August 17, 2026 real browser MCP asset → texture → atlas → sprite run
 
-MCP stdio bridge üzerinden başlatılan `127.0.0.1:64603` loopback preview, Codex in-app Browser gerçek Chromium oturumunda açıldı. Aynı MCP oturumunda browser RuntimeAgent ile `AssetLoader` oluşturuldu, `/assets/demo.svg` yüklendi ve gerçek browser `Texture` sonucu 64×64 olarak doğrulandı. `TextureAtlas.fromGrid()` 2×2 atlas oluşturdu; bir frame `Sprite` constructor’ına handle olarak verildi ve `scene.add()` ile canlı sahneye eklendi. `exi_preview_batch` ile frame alma → Sprite oluşturma zinciri `completed: 2`, `failed: 0` döndürdü. WebGPU koşusunda telemetry `ready=true`, `running`, `60 FPS`, `7 draw`, `38 node`; WebGL2 koşusunda aynı asset zinciri yeniden çalıştırıldı ve `ready=true`, `running`, `60 FPS`, `8 draw`, `39 node` okundu. Her iki backend’de browser console warning/error listesi boştur. Bu gerçek masaüstü browser + MCP transport + asset lifecycle kanıtıdır; uzun süreli soak veya fiziksel iOS/Android/WebView sonucu değildir.
+The `127.0.0.1:64603` loopback preview started through the MCP stdio bridge was opened in a real Chromium session in the Codex in-app Browser. In the same MCP session, an `AssetLoader` was created with the browser RuntimeAgent, `/assets/demo.svg` was loaded, and the real browser `Texture` result was verified as 64×64. `TextureAtlas.fromGrid()` created a 2×2 atlas; a frame was passed as a handle to the `Sprite` constructor and added to the live scene with `scene.add()`. With `exi_preview_batch`, the get-frame → create-Sprite chain returned `completed: 2`, `failed: 0`. In the WebGPU run the telemetry was `ready=true`, `running`, `60 FPS`, `7 draw`, `38 node`; in the WebGL2 run the same asset chain was run again and `ready=true`, `running`, `60 FPS`, `8 draw`, `39 node` were read. The browser console warning/error list is empty on both backends. This is real desktop browser + MCP transport + asset lifecycle evidence; it is not a long-duration soak or a physical iOS/Android/WebView result.
 
 | Backend | Asset load | Atlas/Sprite | MCP batch | Telemetry | Console warning/error |
 | --- | --- | --- | --- | --- | ---: |
 | WebGPU | `/assets/demo.svg` → `Texture 64×64` | `fromGrid 2×2` → frame → `Sprite` → `Scene.add` | `2/0` | `60 FPS / 7 draw / 38 node` | 0 |
 | WebGL2 | `/assets/demo.svg` → `Texture 64×64` | `fromGrid 2×2` → frame → `Sprite` → `Scene.add` | `2/0` | `60 FPS / 8 draw / 39 node` | 0 |
 
-## 18 Ağustos 2026 snapshot + deterministic input MCP koşusu
+## August 18, 2026 snapshot + deterministic input MCP run
 
-Codex in-app Browser gerçek Chromium oturumunda `127.0.0.1:4173` loopback preview üzerinde yeni `snapshot` ve `Input.inject` sözleşmesi çalıştırıldı. Her backend warmup sonrasında DOM ve GPU runtime `ready=true`, `status=running`, `60 FPS`, `6 DRAW`, `37 NODE` verdi; scene snapshot root handle üzerinden `total=38` ve WebGPU’da 64/64, WebGL2’da ilk 2/64 page doğrulandı. WebGPU koşusunda `engine.stop()` → `Input.inject(keydown)` → `engine.step(1/60)` → `isKeyDown=true` → `inject(keyup)` zinciri geçti. WebGL2 koşusunda `captureFrame(2×2)` sonucu 16 raw byte olarak döndü. Browser console warning/error listesi boştur. Bu gerçek masaüstü browser + MCP transport kanıtıdır; fiziksel iOS/Android/WebView veya uzun süreli soak sonucu değildir.
+In a real Chromium session in the Codex in-app Browser, the new `snapshot` and `Input.inject` contract was run on the `127.0.0.1:4173` loopback preview. After warmup on each backend, the DOM and GPU runtime gave `ready=true`, `status=running`, `60 FPS`, `6 DRAW` and `37 NODE`; the scene snapshot verified `total=38` through the root handle, with page 64/64 on WebGPU and the first 2/64 on WebGL2. In the WebGPU run, the `engine.stop()` → `Input.inject(keydown)` → `engine.step(1/60)` → `isKeyDown=true` → `inject(keyup)` chain passed. In the WebGL2 run, the `captureFrame(2×2)` result came back as 16 raw bytes. The browser console warning/error list is empty. This is real desktop browser + MCP transport evidence; it is not a physical iOS/Android/WebView or long-duration soak result.
 
 | Backend | DOM runtime | Snapshot | Input tape / step | Capture | Console warning/error |
 | --- | --- | --- | --- | --- | ---: |
 | WebGPU | `ready=true / running / 60 FPS / 6 draw / 37 node` | `scene total=38`, `38/64`, `truncated=false` | `stop → keydown → step(1/60) → isKeyDown=true → keyup` | offscreen observer active | 0 |
 | WebGL2 | `ready=true / running / 60 FPS / 6 draw / 37 node` | `scene total=38`, `2/64`, `truncated=false` | runtime input controls available | `2×2`, `16 bytes` | 0 |
 
-## 18 Ağustos 2026 bounded scenario round-trip koşusu
+## August 18, 2026 bounded scenario round-trip run
 
-Aynı gerçek Codex in-app Browser oturumunda yeni `scenario` operasyonu iki backend’de çalıştırıldı: input event → fixed-step `engine.step()` → bounded canvas grid → bounded scene snapshot. WebGPU’da iki frame, WebGL2’da bir frame koşusu `resumed=true` ile tamamlandı; iki backend’de de gözlem `4×2` grid, snapshot `4 node` ve console warning/error `0` verdi. WebGPU örneğinde DOM telemetry `ready=true / running / 60 FPS / 6 draw / 37 node`; WebGL2 örneğinde senaryo anındaki örnek `ready=true / running / 60 FPS / 5 draw / 37 node` idi. Draw sayısı senaryo sırasında ölçülen anlık değerdir; bu satır uzun süreli performans veya fiziksel cihaz kanıtı değildir.
+In the same real Codex in-app Browser session, the new `scenario` operation was run on both backends: input event → fixed-step `engine.step()` → bounded canvas grid → bounded scene snapshot. A two-frame run on WebGPU and a one-frame run on WebGL2 completed with `resumed=true`; on both backends the observation gave a `4×2` grid, the snapshot `4 node` and console warnings/errors `0`. In the WebGPU example the DOM telemetry was `ready=true / running / 60 FPS / 6 draw / 37 node`; in the WebGL2 example the sample at the moment of the scenario was `ready=true / running / 60 FPS / 5 draw / 37 node`. The draw count is the instantaneous value measured during the scenario; this row is not long-duration performance or physical device evidence.
 
 | Backend | Scenario | Observe / snapshot | Resume | Console warning/error |
 | --- | --- | --- | --- | ---: |
 | WebGPU | `2 frame`, keydown → step → keyup | `4×2 grid`, `4 node` | `true` | 0 |
 | WebGL2 | `1 frame`, pointer/input → step | `4×2 grid`, `4 node` | `true` | 0 |
 
-## 18 Ağustos 2026 scaffold → asset → gerçek browser E2E koşusu
+## August 18, 2026 scaffold → asset → real browser E2E run
 
-Fresh `ai-e2e-runtime-20260818b` scaffold klasörü aynı MCP stdio oturumunda oluşturuldu; 68 byte PNG asset `exi_asset_write` ile yüklendi ve `exi_project_preview({ path, port: 4187 })` `ok=true`, `checked=2`, `previewId=p1`, hedef HTTP 200 verdi. Gerçek Codex in-app Browser sayfayı açtı; DOM telemetry `ready=true`, `status=running`, `backend=webgpu`, `fps=60`, `draws=1`, `nodes=1`, browser warning/error `0` okundu. Aynı uzun MCP/browser oturumunda `AssetLoader.loadTexture()` 1×1 `Texture` (`h2`), `TextureAtlas.fromGrid()` (`h3`), `get("0")` frame (`h4`), `Sprite` (`h5`) ve `scene.add()` çağrıları tamamlandı. Son bounded snapshot `total=3`, `Scene + Graphics + Sprite`, `truncated=false` verdi; ardından `exi_preview_probe` `ready=true`, `status=running`, `backend=webgpu` telemetry’sini döndürdü. Preview stop, browser tab reset, test klasörü ve port cleanup da tamamlandı. Bu, gerçek browser + MCP transport + asset lifecycle zincirinin kanıtıdır; native host CLI’nin kendi UI/cancellation davranışı ve fiziksel cihaz sonucu değildir.
+A fresh `ai-e2e-runtime-20260818b` scaffold folder was created in the same MCP stdio session; a 68-byte PNG asset was uploaded with `exi_asset_write`, and `exi_project_preview({ path, port: 4187 })` gave `ok=true`, `checked=2`, `previewId=p1` and target HTTP 200. The real Codex in-app Browser opened the page; DOM telemetry `ready=true`, `status=running`, `backend=webgpu`, `fps=60`, `draws=1`, `nodes=1` and browser warnings/errors `0` were read. In the same long MCP/browser session, the `AssetLoader.loadTexture()` 1×1 `Texture` (`h2`), `TextureAtlas.fromGrid()` (`h3`), `get("0")` frame (`h4`), `Sprite` (`h5`) and `scene.add()` calls completed. The final bounded snapshot gave `total=3`, `Scene + Graphics + Sprite`, `truncated=false`; then `exi_preview_probe` returned `ready=true`, `status=running`, `backend=webgpu` telemetry. Preview stop, browser tab reset, test folder and port cleanup were also completed. This is evidence of the real browser + MCP transport + asset lifecycle chain; it is not the native host CLI's own UI/cancellation behavior or a physical device result.
 
-## Kabul kriterleri
+## Acceptance criteria
 
-- `result` değeri normal koşuda `passed`, manuel kayıpta `passed-with-loss` olmalı.
-- `device-error`, shader derleme hatası, context/device kaybından sonra sürekli render hatası veya artan kaynak sayaçları başarısızlık sayılır.
-- `textCacheShared` tekrar eden iki label için `true` kalmalı; `peakTextureCount` testin sabit texture setiyle açıklanabilir olmalı.
-- `glyphComplexScriptFallbacks` sıfırdan büyük olmalı; bu, Arapça örneğinin GlyphAtlas yerine Canvas shaping yoluna kontrollü geçtiğini kanıtlar.
-- WebGPU’da `peakGpuCullBytes` cihaz limitinin altında kalmalı; WebGL2’da GPU culling sayacı `0` olmalı.
-- Fiziksel cihaz satırları doldurulmadan performans veya güvenilirlik iddiası masaüstü browser sonucu ile sınırlı tutulmalı.
+- The `result` value must be `passed` in a normal run and `passed-with-loss` on a manual loss.
+- A `device-error`, a shader compile error, continuous render errors after a context/device loss, or growing resource counters count as a failure.
+- `textCacheShared` must stay `true` for two repeated labels; `peakTextureCount` must be explainable by the test's fixed texture set.
+- `glyphComplexScriptFallbacks` must be greater than zero; this proves that the Arabic sample switched to the Canvas shaping path instead of GlyphAtlas in a controlled way.
+- On WebGPU, `peakGpuCullBytes` must stay below the device limit; on WebGL2 the GPU culling counter must be `0`.
+- Until the physical device rows are filled in, performance or reliability claims must be limited to the desktop browser result.
 
-## 14 Eylül 2026 browser E2E runner + WebGPU/WebGL2 kısa soak
+## September 14, 2026 browser E2E runner + WebGPU/WebGL2 short soak
 
-Council’ın kanıt/iddia ayrımı doğrultusunda browser E2E koşusu gerçek sistem Chrome’unda tekrarlandı. E2E runner’ın Playwright paket çözümlemesi ve `shell:true` çağrısı düzeltildi; mevcut server `.mjs` public-module yolu için regresyon testi kondu. `EXI_PLAYWRIGHT_CHANNEL=chrome EXI_PLAYWRIGHT_SECONDS=30 EXI_PLAYWRIGHT_SPRITES=200 npm run test:e2e:browser` sonucu Windows üzerinde Chrome 153.0.8010.36 ile `1 passed`, demo WebGPU `60 FPS`, RuntimeAgent `scenario` ile gerçek ok tuşu hareketi ve her iki seçili backend’de 30 saniye / 200 sprite hardware-soak geçti; browser console warning/error `0` kaldı.
+In line with the Council's separation of evidence from claims, the browser E2E run was repeated in the real system Chrome. The E2E runner's Playwright package resolution and `shell:true` call were fixed; a regression test was added for the existing server `.mjs` public-module path. `EXI_PLAYWRIGHT_CHANNEL=chrome EXI_PLAYWRIGHT_SECONDS=30 EXI_PLAYWRIGHT_SPRITES=200 npm run test:e2e:browser` gave `1 passed` on Windows with Chrome 153.0.8010.36; the demo ran WebGPU at `60 FPS`, real arrow-key movement passed with the RuntimeAgent `scenario`, and a 30-second / 200-sprite hardware soak passed on both selected backends; browser console warnings/errors stayed `0`.
 
-| Backend | Demo FPS | Hardware-soak | Frames | Device error | Console warning/error |
+| Backend | Demo FPS | Hardware soak | Frames | Device error | Console warning/error |
 | --- | ---: | --- | ---: | --- | ---: |
 | WebGPU | 60 | `passed` | 1788 | false | 0 |
 | WebGL2 | — | `passed` | 1798 | false | 0 |
 
-Bu gerçek masaüstü Chrome + GPU üzerinde 30 saniyelik bounded koşudur; 30 saniye üstü ve farklı sprite yükleri için `EXI_PLAYWRIGHT_SECONDS` / `EXI_PLAYWRIGHT_SPRITES` değiştirilebilir. Aynı koşuda root demo `RuntimeAgent scenario` hareketi `x=0→25.999999999999996`, MCP ile oluşturulan scaffold oyunu `x=432→447` olarak gözlendi. Manuel device/context-loss, fiziksel mobil cihaz ve native AI CLI davranışı bu koşudan kanıtlanmaz.
+This is a bounded 30-second run on real desktop Chrome + GPU; for runs longer than 30 seconds and different sprite loads, `EXI_PLAYWRIGHT_SECONDS` / `EXI_PLAYWRIGHT_SPRITES` can be changed. In the same run, the root demo `RuntimeAgent scenario` movement was observed as `x=0→25.999999999999996`, and the scaffold game created over MCP as `x=432→447`. Manual device/context loss, physical mobile devices and native AI CLI behavior are not proven by this run.

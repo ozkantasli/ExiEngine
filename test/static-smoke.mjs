@@ -107,7 +107,7 @@ assert.match(mcpGuide, /npm run mcp.*stdout/s);
 assert.match(mcpGuide, /\$callback/);
 assert.match(await readFile(path.join(root, "API.md"), "utf8"), /AssetLoader/);
 assert.match(await readFile(path.join(root, "API.md"), "utf8"), /exi_preview_start/);
-assert.match(await readFile(path.join(root, "API.md"), "utf8"), /tools\/call.*tek kuyrukta/s);
+assert.match(await readFile(path.join(root, "API.md"), "utf8"), /tools\/call.*single queue/s);
 assert.match(await readFile(path.join(root, "API.md"), "utf8"), /annotations/);
 assert.match(await readFile(path.join(root, "API.md"), "utf8"), /exi:\/\/runtime/);
 assert.match(await readFile(path.join(root, "API.md"), "utf8"), /exi:\/\/clients/);

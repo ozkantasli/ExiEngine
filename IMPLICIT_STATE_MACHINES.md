@@ -400,7 +400,7 @@ begin/stay/end callback receives its own record; all six callback call sites wer
 `contactInfo` field plus its `clear()` reset block were deleted. Public callback shape unchanged. The
 zero-alloc alternative and the transient-scratch documentation requirement became moot. The §9.4-era
 re-entrancy note stands (callbacks must not call `step()`). Test hook: `test/unit/physics.test.mjs`
-("contact kayıtları retained kabul edilebilir (paylaşılmaz)") — retained record survives later events;
+("contact kayıtları retained kabul edilebilir (paylaşılmaz)" — "contact records may be retained (not shared)") — retained record survives later events;
 also pins that a zero-overlap "touching" pair produces no `begin` (strict AABB).
 **Evidence (verified):** single record at `collision.js:632`
 (`this.contactInfo = { body, other, phase, normal: {x, y}, penetration }`), overwritten per event
