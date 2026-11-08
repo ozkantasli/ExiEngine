@@ -1,90 +1,90 @@
-# ExiEngine — rakip motor boşluk analizi
+# ExiEngine — competitor engine gap analysis
 
-Bu doküman, `ENGINE_FEATURE_MATRIX.md` içindeki 27 motorun alt-sistem tablosu ile
-topluluk issue/discussion kayıtlarının kesişiminden çıkarılan, **önceliklendirilmiş**
-boşluk listesidir. "Boşluk", ya birden fazla motorda ortak eksik, ya zayıf/yarım
-uygulanmış, ya da sık talep edilen ama olgunlaşmamış bir yetenek anlamına gelir.
+This document is a **prioritized** list of gaps derived from the intersection of the
+subsystem table of the 27 engines in `ENGINE_FEATURE_MATRIX.md` and community
+issue/discussion records. A "gap" means a capability that is either missing in several
+engines, weakly/half implemented, or frequently requested but immature.
 
-Öncelik ölçeği: **P0** kritik (geniş kullanıcı acısı, birkaç motorda birden eksik),
-**P1** yüksek (zayıf veya sık talep), **P2** orta (niş/stratejik). Her satırda hangi
-motorları etkilediği ve ExiEngine için fırsat belirtilir.
+Priority scale: **P0** critical (broad user pain, missing in several engines at once),
+**P1** high (weak or frequently requested), **P2** medium (niche/strategic). Each row lists
+the engines it affects and the opportunity for ExiEngine.
 
-## P0 — Kritik boşluklar
+## P0 — Critical gaps
 
-1. **Hafif/2D motorlarda tam görsel editör yok.**
-   PixiJS, Ebiten, ggez, macroquad, FXGL, Piston, melonJS hiçbirinde editör yok;
-   Godot/Flax/Stride/Cocos/Defold/s&box kümesine özgü. Editör, kod-dışı kullanıcı
-   kitlesi için en büyük giriş engeli ve en sık talep edilen özelliktir.
-   *Fırsat:* tarayıcıda çalışan, bağımlılıksız bir editör (runtime ile aynı dil) düşük maliyetle niş açar.
+1. **Lightweight/2D engines lack a full visual editor.**
+   None of PixiJS, Ebiten, ggez, macroquad, FXGL, Piston or melonJS has an editor;
+   editors are specific to the Godot/Flax/Stride/Cocos/Defold/s&box cluster. An editor is
+   the biggest barrier to entry for non-coders and the most frequently requested feature.
+   *Opportunity:* a dependency-free editor that runs in the browser (same language as the runtime) opens a niche at low cost.
 
-2. **Rust ekosisteminde yerleşik fizik yok.**
-   Bevy, Piston, ggez, macroquad'da fizik "dış" (bevy_rapier/xpbd, rapier, nphysics).
-   Eklenti parçalanması ve sürüm çakışması (rapier vs xpbd) yeni kullanıcılar için
-   kalıcı bir sürtünme. Yalnızca Fyrox yerleşik fizik sunar.
-   *Fırsat:* belirleyici (deterministic) bir 2D fizik çekirdeğini runtime'a gömmek Rust motorlarının boşluğunu doldurur.
+2. **The Rust ecosystem has no built-in physics.**
+   In Bevy, Piston, ggez and macroquad physics is "external" (bevy_rapier/xpbd, rapier, nphysics).
+   Plugin fragmentation and version conflicts (rapier vs xpbd) are a lasting source of
+   friction for new users. Only Fyrox offers built-in physics.
+   *Opportunity:* embedding a deterministic 2D physics core in the runtime fills the Rust engines' gap.
 
-3. **Tek motorda birleşik 2D+3D nadir.**
-   Çoğu motor ya 2D (PixiJS, Ebiten, ggez, melonJS, Flame, FXGL) ya 3D (Babylon,
-   Panda3D, Flax, s&box). İkisini iyi yapan sadece Godot, Stride, Fyrox, Urho3D.
-   *Fırsat:* aynı çekirdek üzerinde 2D/3D geçişi, oyun türü değiştikçe motor değiştirme maliyetini kaldırır.
+3. **Unified 2D+3D in one engine is rare.**
+   Most engines are either 2D (PixiJS, Ebiten, ggez, melonJS, Flame, FXGL) or 3D (Babylon,
+   Panda3D, Flax, s&box). Only Godot, Stride, Fyrox and Urho3D do both well.
+   *Opportunity:* switching between 2D/3D on the same core removes the cost of changing engines as the game genre changes.
 
-4. **Web/WebAssembly birinci sınıf hedef değil.**
-   Birçok masaüstü motoru web'i sonradan eklenmiş/deneysel tutar (Bevy WebGPU web yolu
-   tamamlanmamış, Stride/Flax/Fyrox web deneysel). Web'de olgun olanlar (PixiJS, Babylon,
-   melonJS, GDevelop) ise editör/tam özellik yönünden eksik.
-   *Fırsat:* web'i doğuştan birinci hedef almak (ExiEngine zaten bunu yapıyor) iki ucu da yakalar.
+4. **Web/WebAssembly is not a first-class target.**
+   Many desktop engines treat the web as an afterthought/experimental (Bevy's WebGPU web path
+   is unfinished; Stride/Flax/Fyrox web is experimental). The engines that are mature on the web
+   (PixiJS, Babylon, melonJS, GDevelop) lack an editor or full features.
+   *Opportunity:* treating the web as the native first target (which ExiEngine already does) captures both ends.
 
-## P1 — Yüksek öncelikli boşluklar
+## P1 — High-priority gaps
 
-5. **Hot-reload / canlı düzenleme az ve yarım.**
-   Defold (Lua) ve Bevy (asset) kısmen sunar; Godot sınırlı. Genel olarak sahne/kod
-   değişikliğini yeniden başlatmadan görmek sık istenen ama seyrek teslim edilen bir özellik.
+5. **Hot reload / live editing is rare and incomplete.**
+   Defold (Lua) and Bevy (assets) partly offer it; Godot's is limited. Seeing scene/code
+   changes without a restart is frequently requested but rarely delivered.
 
-6. **Varlık pipeline'ı ve import formatı tutarsız.**
-   glTF yaygınlaştı ama FBX/GLB/atlas desteği motorlar arası düzensiz; hafif motorlarda
-   yükleyici basit ve sahne-formatı yok. Asset import'un deterministik ve genişletilebilir
-   olması toplulukta tekrar eden talep.
+6. **Asset pipelines and import formats are inconsistent.**
+   glTF has become common, but FBX/GLB/atlas support is uneven across engines; lightweight
+   engines have simple loaders and no scene format. Deterministic and extensible asset import
+   is a recurring community request.
 
-7. **Editör UX'i ve dokümantasyon yetersiz.**
-   Fyrox ve Bevy editörleri olgunlaşmamış; doküman/onboarding boşluğu Rust motorlarında ve
-   yeni C++ motorlarında (Piccolo) belirgin. "Çalışan örnek + net API rehberi" eksikliği
-   benimsemeyi düşürür.
+7. **Editor UX and documentation are lacking.**
+   The Fyrox and Bevy editors are immature; the documentation/onboarding gap is visible in Rust
+   engines and new C++ engines (Piccolo). The lack of "a working example + a clear API guide"
+   lowers adoption.
 
-8. **Hata ayıklama/profiling araçları zayıf.**
-   Hafif motorlarda frame-graf, GPU zamanlama, bellek izleme çoğunlukla yok. Performans
-   darboğazı teşhisi için kullanıcı kendi aracını kurar.
+8. **Debugging/profiling tools are weak.**
+   Lightweight engines mostly lack a frame graph, GPU timing and memory tracking. Users build
+   their own tools to diagnose performance bottlenecks.
 
-9. **Unity'den geçiş yapanlar için C# script olgunluğu düzensiz.**
-   Godot C# ikinci sınıf konumda (GDScript öncelikli), Stride/Flax C# iyi ama kullanıcı
-   tabanı küçük. Unity göçmenleri tutarlı bir C# + editör deneyimi arıyor.
+9. **C# scripting maturity is uneven for people moving from Unity.**
+   Godot C# is second-class (GDScript comes first); Stride/Flax C# is good but their user
+   bases are small. Unity migrants look for a consistent C# + editor experience.
 
-## P2 — Orta / stratejik boşluklar
+## P2 — Medium / strategic gaps
 
-10. **Konsol dağıtımı çoğunlukla üçüncü taraf veya lisans kapılı.**
-    Godot/Defold third-party, s&box/Flax kapalı. Bağımsız motorlar için konsol yolu pahalı.
+10. **Console distribution is mostly third-party or license-gated.**
+    Godot/Defold use third parties, s&box/Flax are closed. The console path is expensive for independent engines.
 
-11. **Platformlar arası determinizm eksik.**
-    Fizik/animasyon sonucunun farklı platformlarda birebir aynı olması (multiplayer/kayıt
-    tekrarı için) çoğu motorda garanti edilmez; sık dile getirilir ama nadiren çözülür.
+11. **Cross-platform determinism is missing.**
+    Getting identical physics/animation results across platforms (for multiplayer/replays)
+    is not guaranteed in most engines; it is often raised but rarely solved.
 
-12. **Ajan/LLM öncelikli API yüzeyi hiçbir motorda yok.**
-    Hiçbir rakip, motoru bir AI agent'ın doğrudan keşfedip sürebileceği yansımalı/limitli
-    bir API + MCP köprüsüyle sunmuyor. Bu ExiEngine'in mevcut farklılaştırıcısıdır; matriste
-    rakipsizdir. Stratejik önceliği yüksek, kısa vadede kullanıcı tabanı düşüktür.
+12. **No engine has an agent/LLM-first API surface.**
+    No competitor offers the engine through a reflective/bounded API + MCP bridge that an AI
+    agent can discover and drive directly. This is ExiEngine's current differentiator and is
+    unmatched in the matrix. Its strategic priority is high; its short-term user base is small.
 
-## Özet tablo
+## Summary table
 
-| # | Boşluk | Öncelik | Etkilenen motorlar | ExiEngine fırsatı |
+| # | Gap | Priority | Affected engines | ExiEngine opportunity |
 | --- | --- | --- | --- | --- |
-| 1 | Tam görsel editör eksikliği | P0 | PixiJS, Ebiten, ggez, macroquad, FXGL, Piston, melonJS | Tarayıcıda aynı-dil editör |
-| 2 | Rust'ta yerleşik fizik yok | P0 | Bevy, Piston, ggez, macroquad | Gömülü deterministik 2D fizik |
-| 3 | Birleşik 2D+3D nadir | P0 | Çoğu tek-odak motor | Tek çekirdekte 2D/3D |
-| 4 | Web birinci sınıf değil | P0 | Bevy, Stride, Flax, Fyrox | Web-doğuştan runtime |
-| 5 | Hot-reload az/yarım | P1 | Genel | Canlı düzenleme |
-| 6 | Varlık pipeline tutarsız | P1 | Hafif motorlar | Deterministik import |
-| 7 | Editör UX + doküman zayıf | P1 | Fyrox, Bevy, Piccolo | Çalışan örnek + API rehberi |
-| 8 | Debug/profiling zayıf | P1 | Hafif motorlar | Frame-graf + GPU zamanlama |
-| 9 | C# script olgunluğu düzensiz | P1 | Godot (C#), Stride, Flax | Tutarlı C#/editör |
-| 10 | Konsol dağıtımı kapılı | P2 | Godot, Defold, s&box, Flax | — |
-| 11 | Platformlar arası determinizm | P2 | Genel | Deterministik çekirdek |
-| 12 | Ajan/LLM API yüzeyi yok | P2 | Hiçbiri | ExiEngine farklılaştırıcısı |
+| 1 | No full visual editor | P0 | PixiJS, Ebiten, ggez, macroquad, FXGL, Piston, melonJS | Same-language editor in the browser |
+| 2 | No built-in physics in Rust | P0 | Bevy, Piston, ggez, macroquad | Embedded deterministic 2D physics |
+| 3 | Unified 2D+3D is rare | P0 | Most single-focus engines | 2D/3D on one core |
+| 4 | Web is not first-class | P0 | Bevy, Stride, Flax, Fyrox | Web-native runtime |
+| 5 | Hot reload rare/incomplete | P1 | General | Live editing |
+| 6 | Inconsistent asset pipeline | P1 | Lightweight engines | Deterministic import |
+| 7 | Weak editor UX + docs | P1 | Fyrox, Bevy, Piccolo | Working example + API guide |
+| 8 | Weak debug/profiling | P1 | Lightweight engines | Frame graph + GPU timing |
+| 9 | Uneven C# scripting maturity | P1 | Godot (C#), Stride, Flax | Consistent C#/editor |
+| 10 | Console distribution gated | P2 | Godot, Defold, s&box, Flax | — |
+| 11 | Cross-platform determinism | P2 | General | Deterministic core |
+| 12 | No agent/LLM API surface | P2 | None | ExiEngine differentiator |

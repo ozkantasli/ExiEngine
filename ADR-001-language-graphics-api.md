@@ -1,52 +1,54 @@
-# ADR-001 — Programlama dili ve grafik API'si seçimi
+# ADR-001 — Choice of programming language and graphics API
 
-Durum: **Kabul edildi (kodda uygulanmış)** · Tarih: 2026-08-17 · Aşama: Architecture & Tech Stack Selection
+Status: **Accepted (implemented in code)** · Date: 2026-08-17 · Phase: Architecture & Tech Stack Selection
 
-## Karar
+## Decision
 
-1. **Dil:** TypeScript/JavaScript. Runtime, bağımlılıksız ES modülleri (`src/index.js`) olarak
-   dağıtılır; public API'nin tip yüzeyi elle yazılan `index.d.ts` ile taşınır. Node.js yalnızca
-   dev/test/MCP sunucusu içindir; tarayıcı runtime'ında gerekmez.
-2. **Grafik API'si:** **WebGPU (birincil) + WebGL2 (fallback)**. İki backend de kendi dosyasında
-   (`src/render/webgpu-renderer.js`, `src/render/webgl2-renderer.js`); ortak boru hattı modülleri
-   (`batch.js`, `instanced.js`, `clear.js`, `scissor.js`, `post-process.js`) ikisini de besler.
+1. **Language:** TypeScript/JavaScript. The runtime ships as dependency-free ES modules
+   (`src/index.js`); the type surface of the public API is carried by the hand-written
+   `index.d.ts`. Node.js is only used for the dev/test/MCP server; it is not needed in the
+   browser runtime.
+2. **Graphics API:** **WebGPU (primary) + WebGL2 (fallback)**. Each backend lives in its own file
+   (`src/render/webgpu-renderer.js`, `src/render/webgl2-renderer.js`); shared pipeline modules
+   (`batch.js`, `instanced.js`, `clear.js`, `scissor.js`, `post-process.js`) feed both.
 
-## Değerlendirilen ve elenen alternatifler
+## Alternatives considered and rejected
 
-| Aday | Neden elendi |
+| Candidate | Why it was rejected |
 | --- | --- |
-| C++ + Vulkan/OpenGL/Direct3D | Tarayıcıda çalışamaz. PRD hedefi web-öncelikli (canvas); native API tarayıcı canvas'ına erişemez. Ayrıca dependency-free + ajan-öncelikli MCP döngüsünü kırar. |
-| Rust + Vulkan/OpenGL/wgpu (native) | Aynı native erişim engeli; Rust→wasm yolu (bevy_macroquad gibi) build toolchain'i ve WASM runtime bağımlılığı getirir. |
-| Rust→wasm (Bevy tarzı) | Build adımı + wasm toolchain'i ekler; reflection-manifest (`exi_api`) JS own-property descriptor okuması üzerine kurulu, native/wasm'a taşımak maliyetli. |
-| WebGL2 tek başına | WebGPU compute/indirect culling avantajından (bknz. gap: GPU culling) vazgeçirir; yeni cihazlarda geride kalır. |
-| WebGPU tek başına | Safari/eski cihaz desteği eksik; WebGL2 fallback olmadan hedef kitle daralır. |
-| Three.js / PixiJS gibi harici grafik kütüphanesi | "Sıfır runtime bağımlılık" sözleşmesini ihlal eder; çekirdek backend'i kendisi yönetme kararıyla çelişir. |
+| C++ + Vulkan/OpenGL/Direct3D | Cannot run in the browser. The PRD target is web-first (canvas); native APIs cannot reach the browser canvas. It also breaks the dependency-free, agent-first MCP loop. |
+| Rust + Vulkan/OpenGL/wgpu (native) | Same native-access barrier; the Rust→wasm path (like bevy_macroquad) adds a build toolchain and a WASM runtime dependency. |
+| Rust→wasm (Bevy style) | Adds a build step and a wasm toolchain; the reflection manifest (`exi_api`) is built on reading JS own-property descriptors, and porting it to native/wasm is costly. |
+| WebGL2 alone | Gives up the WebGPU compute/indirect culling advantage (see gap: GPU culling); falls behind on newer devices. |
+| WebGPU alone | Safari/older device support is incomplete; without a WebGL2 fallback the audience shrinks. |
+| An external graphics library such as Three.js / PixiJS | Violates the "zero runtime dependencies" contract; conflicts with the decision that the core manages its own backends. |
 
-## Gerekçe (PRD hedeflerine göre)
+## Rationale (against the PRD goals)
 
-1. **Hedef platform tarayıcı.** PRD §2: modern tarayıcılar + WebGPU/WebGL2. Tarayıcıda yalnızca
-   JS (doğrudan) ve WASM (dolaylı) çalışır. Native API'ler (Vulkan/OpenGL/Direct3D) kategorik
-   olarak uygulanamaz — bu bir "tradeoff" değil, platform kısıtı.
-2. **Sıfır runtime bağımlılık** (PRD §4). JS, tarayıcının global `WebGPU`/`WebGL2` API'lerine
-   npm bağımlılığı olmadan konuşabilir; harici kütüphane gerekmez.
-3. **Ajan-öncelikli API** (PRD §4, farklılaştırıcı #1). `exi_api` reflection manifest'i JS
-   own-property/descriptor'larını getter çalıştırmadan okur — bu JS'de doğrudan, native/wasm'da
-   zor. Ajan döngüsü (scaffold → preview → verify) aynı dili paylaşınca araç zinciri tekdüze kalır.
-4. **Deterministik bounded çekirdek** (PRD §4). Fixed-step sıralama ve bounded buffer'lar JS'te
-   gerçeklenebilir; ağır yük GPU'ya (WebGPU compute culling) taşınır.
+1. **The target platform is the browser.** PRD §2: modern browsers + WebGPU/WebGL2. Only JS
+   (directly) and WASM (indirectly) run in the browser. Native APIs (Vulkan/OpenGL/Direct3D)
+   are categorically not applicable — this is a platform constraint, not a tradeoff.
+2. **Zero runtime dependencies** (PRD §4). JS can talk to the browser's global `WebGPU`/`WebGL2`
+   APIs without any npm dependency; no external library is needed.
+3. **Agent-first API** (PRD §4, differentiator #1). The `exi_api` reflection manifest reads JS
+   own properties/descriptors without running getters — direct in JS, hard in native/wasm. When the
+   agent loop (scaffold → preview → verify) shares one language, the toolchain stays uniform.
+4. **Deterministic, bounded core** (PRD §4). Fixed-step ordering and bounded buffers can be
+   implemented in JS; heavy work is moved to the GPU (WebGPU compute culling).
 
-## Tradeoff'lar ve sonuçları
+## Tradeoffs and consequences
 
-- **Performans:** JS, native C++/Rust'tan yavaş; ancak 2D scope + GPU-ayak işi (WebGPU compute,
-  indirect draw) ile denge kabul edildi. `bench:*` kapıları sıcak yolları korur.
-- **Native dağıtım yok:** konsol/masaüstü binary imkânsız (gap #10). Web-öncelikli PRD'de kabul.
-- **WebGPU destek boşluğu:** eski tarayıcılar için WebGL2 fallback ile azaltılır (çift backend).
-- **Tip güvenliği:** elle yazılan `index.d.ts`; drift `npm run test:static` ile kilitlenir.
+- **Performance:** JS is slower than native C++/Rust; the balance is accepted given the 2D scope
+  and GPU-side work (WebGPU compute, indirect draw). The `bench:*` gates protect hot paths.
+- **No native distribution:** console/desktop binaries are not possible (gap #10). Accepted for a
+  web-first PRD.
+- **WebGPU support gap:** mitigated for older browsers with the WebGL2 fallback (dual backend).
+- **Type safety:** hand-written `index.d.ts`; drift is locked by `npm run test:static`.
 
-## Kanıt
+## Evidence
 
 - `src/render/webgl2-renderer.js`, `src/render/webgpu-renderer.js`
-- `src/index.js` (public export yüzeyi), `index.d.ts` (tip bildirimi)
+- `src/index.js` (public export surface), `index.d.ts` (type declarations)
 - `package.json`: `"description": "A dependency-free 2D WebGL2/WebGPU renderer core."`
-- `AI_ENGINE_GUIDE.md`: "Motor başka bir oyun motoruna import edilmez; çekirdek WebGL2/WebGPU
-  backend'lerini kendisi yönetir."
+- `AI_ENGINE_GUIDE.md`: "The engine is not imported into another game engine; the core manages
+  its own WebGL2/WebGPU backends."

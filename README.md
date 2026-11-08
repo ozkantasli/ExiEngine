@@ -2,9 +2,9 @@
 
 [![CI](https://github.com/ozkantasli/ExiEngine/actions/workflows/ci.yml/badge.svg)](https://github.com/ozkantasli/ExiEngine/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.2.0-ff6f9f.svg)](package.json)
-[![Node](https://img.shields.io/badge/node-22%20%7C%2024-6fffc0.svg)](.github/workflows/ci.yml)
-[![Renderer](https://img.shields.io/badge/renderer-WebGPU%20%2B%20WebGL2-ffd36f.svg)](ADR-001-language-graphics-api.md)
+[![Version](https://img.shields.io/badge/version-0.2.0-f87171.svg)](package.json)
+[![Node](https://img.shields.io/badge/node-22%20%7C%2024-22d3ee.svg)](.github/workflows/ci.yml)
+[![Renderer](https://img.shields.io/badge/renderer-WebGPU%20%2B%20WebGL2-22d3ee.svg)](ADR-001-language-graphics-api.md)
 [![Dependencies](https://img.shields.io/badge/runtime%20deps-0-brightgreen.svg)](package.json)
 [![Unit tests](https://img.shields.io/badge/unit%20tests-201-blue.svg)](test/unit)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-blue.svg)](CONTRIBUTING.md)

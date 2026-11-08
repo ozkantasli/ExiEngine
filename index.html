@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="tr">
+<html lang="en">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -11,9 +11,9 @@
     <main class="shell">
       <section class="intro">
         <p class="eyebrow">EXIENGINE / CORE 0.2</p>
-        <h1>Kendi çekirdeğimiz.<br><span>İki GPU yolu.</span></h1>
-        <p class="lede">Bağımlılıksız 2D oyun motoru çekirdeği: sahne, graphics, particle, input, collision ve WebGPU/WebGL2.</p>
-        <div class="controls" aria-label="Renderer seçimi">
+        <h1>Our own core.<br><span>Two GPU paths.</span></h1>
+        <p class="lede">A dependency-free 2D game engine core: scene, graphics, particles, input, collision and WebGPU/WebGL2.</p>
+        <div class="controls" aria-label="Renderer selection">
           <button data-renderer="auto">Auto</button>
           <button data-renderer="webgl2">WebGL2</button>
           <button data-renderer="webgpu">WebGPU</button>
@@ -22,22 +22,22 @@
 
       <section class="stage-card" aria-label="ExiEngine demo">
         <div class="stage-topline">
-          <span id="status" data-tone="neutral">Başlatılıyor…</span>
+          <span id="status" data-tone="neutral">Starting…</span>
           <span><span id="fps">— FPS</span> · <span id="draws">— DRAW</span> · <span id="nodes">— NODE</span></span>
         </div>
-        <canvas id="game-canvas" width="960" height="540" aria-label="ExiEngine renderer çıktısı"></canvas>
+        <canvas id="game-canvas" width="960" height="540" aria-label="ExiEngine renderer output"></canvas>
         <output id="exi-runtime" aria-label="ExiEngine runtime" hidden></output>
         <div class="stage-foot">
           <span>BACKEND <strong id="backend">—</strong></span>
           <span id="asset">ASSET LOAD…</span>
-          <span id="message">Ok tuşlarıyla hareket · Space ile zoom</span>
+          <span id="message">Move with arrow keys · Space to zoom</span>
         </div>
       </section>
 
       <section class="principles">
-        <article><span>01</span><h2>Kendi çekirdek</h2><p>Scene graph, sprite, graphics, particle, kamera ve texture batch tek API üzerinden çalışır.</p></article>
-        <article><span>02</span><h2>Güvenli varsayılan</h2><p>Aynı-origin asset sınırı, boyut limitleri, CSP ve dinamik shader çalıştırmama.</p></article>
-        <article><span>03</span><h2>Ölçülebilir</h2><p>Backend, FPS, draw call, node sayısı ve collision durumu görünür.</p></article>
+        <article><span>01</span><h2>Own core</h2><p>Scene graph, sprites, graphics, particles, camera and texture batching run through one API.</p></article>
+        <article><span>02</span><h2>Safe defaults</h2><p>Same-origin asset boundary, size limits, CSP and no dynamic shader execution.</p></article>
+        <article><span>03</span><h2>Measurable</h2><p>Backend, FPS, draw calls, node count and collision state are visible.</p></article>
       </section>
     </main>
     <script type="module" src="/src/demo.js"></script>
