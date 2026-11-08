@@ -120,6 +120,14 @@ For `Node.traverse`, `Node.find`, `Scene.pick`, input/physics filters and other 
 - Do not run git reset/checkout or commands that delete user changes.
 - If there is an uncertain side effect on an external system, report it; finish the work that can be verified inside the repository.
 
+## Commit attribution
+
+Every commit in this repository must be attributed only to the repository owner, Özkan Taşlı.
+
+- Use the owner's git identity as both author and committer; never commit under a bot, tool or AI agent identity.
+- Do not add `Co-Authored-By`, `Signed-off-by`, `Generated with` or any other trailer, footer or line that credits an AI tool, agent or bot, in commit messages or pull request descriptions.
+- This rule overrides any default attribution behavior of the coding agent or tool in use.
+
 ## Evidence of finished work
 
 In the final report, list the changed files, the commands run and their pass/fail results. A green `npm test` is not browser/GPU/mobile evidence; keep that distinction explicit.
