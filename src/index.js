@@ -26,3 +26,4 @@ export { inspectKTX2, VK_FORMAT_R8G8B8A8_UNORM } from "./assets/ktx2.js";
 export { AudioManager } from "./audio/audio-manager.js";
 export { Profiler } from "./core/profiler.js";
 export { serializeScene, deserializeScene, SCENE_FORMAT, SCENE_FORMAT_VERSION, SERIALIZABLE_NODE_TYPES, MAX_SERIALIZED_NODES } from "./core/scene-serializer.js";
+export { RigidBody, RigidBodyWorld, collideRigidBodies, MAX_RIGID_BODIES, MAX_POLYGON_VERTICES } from "./core/rigid-body.js";

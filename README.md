@@ -36,6 +36,7 @@ browser.
 🚀 Instanced `SpriteBatch` with WebGPU compute culling, up to 100,000 sprites per batch</br>
 🗺️ Instanced TileMap, Tiled (.tmj) import, collision-rect generation and A* pathfinding</br>
 🧱 Lightweight physics: gravity, one-way and moving platforms, layers/masks, contact events</br>
+🎱 Rigid bodies: rotating circles, boxes and convex polygons with friction, restitution and stable stacking</br>
 🎮 One action/axis input layer for keyboard, pointer, touch and gamepad</br>
 🔊 Web Audio `AudioManager`: buses, fades, panning, voice budget</br>
 🎨 Pixel-art friendly: nearest sampling, `roundPixels`, flipX/flipY, atlas animations</br>
@@ -78,6 +79,7 @@ only and sends CSP/`nosniff` headers.
 |---|---|
 | [`examples/platformer`](examples/platformer/main.js) | `TileMap.fromTiled` level, tile-property collision bodies, gravity, coyote time / jump buffering, camera follow + bounds, HUD overlay |
 | [`examples/top-down`](examples/top-down/main.js) | Code-built TileMap walls, zero-gravity physics, trigger pickups, A* (`findGridPath`) chasers, particles, camera shake |
+| [`examples/physics`](examples/physics/main.js) | `RigidBodyWorld`: boxes, circles, convex polygons, rotation, friction, restitution, a standing pyramid, click to drop shapes |
 | [`examples/ui-menu`](examples/ui-menu/main.js) | Overlay UI, pointer + keyboard focus (Tab/Enter), tweened buttons, `StateMachine` screens |
 
 `npm test` checks the examples statically; `npm run test:e2e:examples` runs them in a real

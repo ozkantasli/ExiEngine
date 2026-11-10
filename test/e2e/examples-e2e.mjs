@@ -30,6 +30,7 @@ const inputs = {
   platformer: [["ArrowRight", 700], ["Space", 150], ["ArrowRight", 400]],
   "top-down": [["ArrowDown", 500], ["ArrowRight", 500]],
   "ui-menu": [["Tab", 80], ["Enter", 80]],
+  physics: [["Space", 80], ["Space", 80]],
 };
 const launchOptions = { args: ["--no-sandbox", "--ignore-gpu-blocklist", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"] };
 if (process.env.EXI_PLAYWRIGHT_EXECUTABLE) launchOptions.executablePath = process.env.EXI_PLAYWRIGHT_EXECUTABLE;

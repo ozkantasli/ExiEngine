@@ -384,6 +384,22 @@ const engine = await ExiEngine.create({ canvas, scene, physics });
 
 `Collider` is a generic AABB, `CollisionWorld` provides broadphase/query/raycast/overlapCircle; `PhysicsBody` sets velocity/static/kinematic; `PhysicsWorld` provides add/remove/sync/overlaps/overlapCircle/step/clear and begin/stay/end contact callbacks. Layers/masks, one-way, triggers, local bounds, finite velocity and body/cell capacity are enforced.
 
+### `RigidBodyWorld` and `RigidBody` (rotating rigid bodies)
+
+```js
+const world = new RigidBodyWorld({ gravityY: 980, iterations: 10, onContact: (a, b, manifold) => {} });
+world.add(new RigidBody({ shape: { type: "box", width: 800, height: 40 }, x: 400, y: 520, static: true }));
+const crate = world.add(new RigidBody({
+  shape: { type: "box", width: 32, height: 32 },        // or { type: "circle", radius } / { type: "polygon", points: [x, y, ...] }
+  x: 300, y: 100, angle: 0.4, friction: 0.6, restitution: 0.1, density: 1,
+  node: crateGraphics,                                  // optional: position/rotation are copied to this Node every step
+}));
+crate.applyImpulse(0, -400, crate.position.x + 10, crate.position.y); // off-center impulses spin the body
+const engine = await ExiEngine.create({ canvas, scene, physics: world }); // stepped on the fixed timestep
+```
+
+An optional second physics module next to the axis-aligned `PhysicsWorld`: circles, boxes and convex polygons (up to `MAX_POLYGON_VERTICES`, either winding; concave input is rejected) with rotation, mass/inertia from `density`, Coulomb friction, restitution, damping, `gravityScale`, `fixedRotation`, static bodies, sensors (`isSensor`, reported through `onContact` but never blocking) and 32-bit `layer`/`mask` filtering. Collision uses SAT with up to two contact points, sequential impulses with warm starting, a two-point block solver and direct position correction, so stacks and pyramids settle and stay upright; the same inputs and fixed step give the same results. `onContact(a, b, manifold)` fires when a pair starts touching. Polygon bodies are centered on their centroid: draw them with `body.shape.vertices`. Use `PhysicsWorld` for tile platformers (cheaper, one-way platforms, tile bodies); use `RigidBodyWorld` when objects must tumble, roll or stack. Limits: `MAX_RIGID_BODIES` (2 048) bodies, speeds and coordinates are clamped, and there are no joints or continuous collision yet, so very thin, very fast bodies can tunnel.
+
 ## 9. Save, audio and profiler
 
 ### `SaveStore`

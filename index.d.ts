@@ -771,3 +771,41 @@ export interface DeserializeSceneOptions {
 }
 export function serializeScene(root: Node, options?: SerializeSceneOptions): SceneDocument;
 export function deserializeScene(document: SceneDocument, options?: DeserializeSceneOptions): Node;
+
+export type RigidShape = { type: "circle"; radius: number } | { type: "box"; width: number; height: number } | { type: "polygon"; points: ArrayLike<number> };
+export interface RigidBodyOptions {
+  shape: RigidShape; x?: number; y?: number; angle?: number; velocityX?: number; velocityY?: number; angularVelocity?: number;
+  static?: boolean; density?: number; restitution?: number; friction?: number; linearDamping?: number; angularDamping?: number;
+  gravityScale?: number; fixedRotation?: boolean; isSensor?: boolean; layer?: number; mask?: number; node?: Node | null; tag?: string;
+}
+export interface RigidContactManifold { normalX: number; normalY: number; depth: number; count: number; points: Point[]; separations: number[]; }
+export const MAX_RIGID_BODIES: number;
+export const MAX_POLYGON_VERTICES: number;
+export class RigidBody {
+  readonly shape: { type: "circle"; radius: number } | { type: "polygon"; vertices: Point[]; normals: Point[]; area: number; offsetX: number; offsetY: number };
+  node: Node | null; position: Point; angle: number; velocity: Point; angularVelocity: number;
+  mass: number; inertia: number; invMass: number; invInertia: number; isStatic: boolean; isSensor: boolean; fixedRotation: boolean;
+  restitution: number; friction: number; linearDamping: number; angularDamping: number; gravityScale: number;
+  layer: number; mask: number; tag: string; world: RigidBodyWorld | null;
+  readonly bounds: { left: number; top: number; right: number; bottom: number };
+  constructor(options: RigidBodyOptions);
+  setVelocity(x: number, y?: number): this;
+  setPosition(x: number, y: number): this;
+  setAngle(angle: number): this;
+  applyForce(x: number, y: number, pointX?: number, pointY?: number): this;
+  applyImpulse(x: number, y: number, pointX?: number, pointY?: number): this;
+  containsPoint(x: number, y: number): boolean;
+  updateGeometry(): void;
+  syncNode(): void;
+}
+export type RigidContactHandler = (a: RigidBody, b: RigidBody, manifold: RigidContactManifold) => void;
+export class RigidBodyWorld {
+  gravity: Point; iterations: number; maxBodies: number; bodies: RigidBody[]; onContact: RigidContactHandler | null; scene: Scene | null;
+  constructor(options?: { gravityX?: number; gravityY?: number; iterations?: number; scene?: Scene | null; onContact?: RigidContactHandler | null; maxBodies?: number });
+  add(body: RigidBody): RigidBody;
+  remove(body: RigidBody): boolean;
+  clear(): void;
+  queryPoint(x: number, y: number, out?: RigidBody[]): RigidBody[];
+  step(delta: number): this;
+}
+export function collideRigidBodies(a: RigidBody, b: RigidBody, manifold?: RigidContactManifold): RigidContactManifold | null;
