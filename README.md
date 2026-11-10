@@ -34,7 +34,7 @@ browser.
 📦 Zero runtime dependencies, one `import`</br>
 🧩 Scene graph: Sprite, Text, Graphics, TileMap, ParticleEmitter, NineSlice, RenderGroup</br>
 🚀 Instanced `SpriteBatch` with WebGPU compute culling, up to 100,000 sprites per batch</br>
-🗺️ Instanced TileMap, collision-rect generation and A* pathfinding</br>
+🗺️ Instanced TileMap, Tiled (.tmj) import, collision-rect generation and A* pathfinding</br>
 🧱 Lightweight physics: gravity, one-way and moving platforms, layers/masks, contact events</br>
 🎮 One action/axis input layer for keyboard, pointer, touch and gamepad</br>
 🔊 Web Audio `AudioManager`: buses, fades, panning, voice budget</br>

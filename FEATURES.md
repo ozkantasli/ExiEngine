@@ -56,6 +56,7 @@
 - Safe, atomic chunk/region updates with `TileMap.setRegion()`; typed-array bulk/region paths make no temporary copy after validation, and atomicity is kept for normal arrays
 - TileMap is drawn instanced by default; on WebGPU, tile transform/culling moves to the GPU with `gpuCulling`, and on the WebGL2 CPU fallback `cullTiles` packs the visible row/column range
 - Mirroring sprite atlas UVs per cell with `TileMap.setTile(x, y, index, { flipX, flipY })` without growing the geometry/instance stride
+- Importing a tile layer of a [Tiled](https://www.mapeditor.org) JSON (`.tmj`) map with `TileMap.fromTiled(map, { texture, layer, tileset })`; CSV-array or uncompressed base64 data, flip bits become `flipX`/`flipY`, layer offset/opacity/visibility/name are applied, and unsupported data (infinite/compressed/non-orthogonal maps, rotated tiles, tileset margin/spacing, mixed tilesets) is rejected explicitly; `TileMap.tiledTileIdsWithProperty()` turns custom tile properties into a `solidTiles` set
 - Lightweight, nestable scissor clip rects in screen coordinates
 - Fast rectangular masks with `maskRect`, using the same allocation-free scissor intersection path, and screen-space alpha masks with `maskTexture`; a `RenderTexture` can be used as a mask
 - WebGPU-first selection, WebGL2 fallback and context/device loss reporting

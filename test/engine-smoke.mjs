@@ -644,6 +644,13 @@ const invalidTileMap = new TileMap({ texture: new Texture({ sourceWidth: 16, sou
 assert.equal(invalidTileMap.getTile(0.5, 0), -1);
 assert.throws(() => invalidTileMap.setTile(0, 0, NaN), /index/);
 assert.throws(() => invalidTileMap.setTile(0, 0, 2 ** 32), /index/);
+const tiledLevel = { width: 2, height: 2, tilewidth: 8, tileheight: 8, layers: [{ type: "tilelayer", name: "ground", data: [1, 0, (0x80000000 | 4) >>> 0, 2] }], tilesets: [{ firstgid: 1, tiles: [{ id: 1, properties: [{ name: "solid", value: true }] }] }] };
+const tiledTileMap = TileMap.fromTiled(tiledLevel, { texture: new Texture({ sourceWidth: 16, sourceHeight: 16 }) });
+assert.deepEqual(Array.from(tiledTileMap.tiles), [0, -1, 3, 1]);
+assert.equal(tiledTileMap.tileFlags[2], 1);
+assert.deepEqual([...TileMap.tiledTileIdsWithProperty(tiledLevel, "solid")], [1]);
+assert.throws(() => TileMap.fromTiled({ ...tiledLevel, infinite: true }, { texture: new Texture({ sourceWidth: 16, sourceHeight: 16 }) }), /infinite/);
+tiledTileMap.destroy();
 const unevenTileMap = new TileMap({ texture: new Texture({ sourceWidth: 10, sourceHeight: 8 }), tileWidth: 4, tileHeight: 4, columns: 2, rows: 1 });
 unevenTileMap.setTile(0, 0, 0).setTile(1, 0, 1);
 assert.equal(unevenTileMap.getFrame(1).u0, 0.4);

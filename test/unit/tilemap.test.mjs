@@ -124,3 +124,109 @@ test("tilemap: render batch ve getLocalBounds cache", () => {
   assert.equal(queue.batches[0].vertexCount, 12);
   assert.equal(queue.batches[0].instanced, true);
 });
+
+// --- Tiled (.tmj) import ---------------------------------------------------
+function tiledMap(overrides = {}, layerOverrides = {}) {
+  return {
+    width: 3, height: 2, tilewidth: 16, tileheight: 16, orientation: "orthogonal", infinite: false,
+    layers: [
+      { type: "objectgroup", name: "spawns", objects: [] },
+      { type: "tilelayer", name: "ground", width: 3, height: 2, data: [1, 2, 0, 0, 4, 1], offsetx: 4, offsety: -2, opacity: 0.5, ...layerOverrides },
+      { type: "tilelayer", name: "decor", width: 3, height: 2, data: [0, 0, 3, 0, 0, 0] },
+    ],
+    tilesets: [{ firstgid: 1, name: "tiles", tilewidth: 16, tileheight: 16, tilecount: 8, columns: 4, margin: 0, spacing: 0,
+      tiles: [{ id: 1, properties: [{ name: "solid", type: "bool", value: true }] }, { id: 3, properties: [{ name: "solid", type: "bool", value: false }, { name: "kind", type: "string", value: "spike" }] }] }],
+    ...overrides,
+  };
+}
+const tiledTexture = () => new Texture({ sourceWidth: 64, sourceHeight: 32 });
+
+test("tilemap: fromTiled imports the first tile layer with offset/opacity/name", () => {
+  const map = TileMap.fromTiled(tiledMap(), { texture: tiledTexture(), x: 10, alpha: 0.5 });
+  assert.equal(map.columns, 3);
+  assert.equal(map.rows, 2);
+  assert.equal(map.tileWidth, 16);
+  assert.deepEqual(Array.from(map.tiles), [0, 1, -1, -1, 3, 0]);
+  assert.equal(map.name, "ground");
+  assert.equal(map.position.x, 14);
+  assert.equal(map.position.y, -2);
+  assert.equal(map.alpha, 0.25);
+  assert.equal(map.visible, true);
+  map.destroy();
+});
+
+test("tilemap: fromTiled selects layer by name or index and honors hidden layers", () => {
+  const byName = TileMap.fromTiled(tiledMap(), { texture: tiledTexture(), layer: "decor", name: "custom" });
+  assert.deepEqual(Array.from(byName.tiles), [-1, -1, 2, -1, -1, -1]);
+  assert.equal(byName.name, "custom");
+  const byIndex = TileMap.fromTiled(tiledMap({}, { visible: false }), { texture: tiledTexture(), layer: 1 });
+  assert.equal(byIndex.visible, false);
+  assert.throws(() => TileMap.fromTiled(tiledMap(), { texture: tiledTexture(), layer: 0 }), /not supported/);
+  assert.throws(() => TileMap.fromTiled(tiledMap(), { texture: tiledTexture(), layer: "missing" }), /not found/);
+  assert.throws(() => TileMap.fromTiled(tiledMap(), { texture: tiledTexture(), layer: 9 }), /out of range/);
+});
+
+test("tilemap: fromTiled maps flip bits to tile flags and rejects diagonal flips", () => {
+  const data = [(0x80000000 | 1) >>> 0, (0x40000000 | 2) >>> 0, 0, 0, 0, (0xC0000000 | 1) >>> 0];
+  const map = TileMap.fromTiled(tiledMap({}, { data }), { texture: tiledTexture() });
+  assert.deepEqual(Array.from(map.tiles), [0, 1, -1, -1, -1, 0]);
+  assert.deepEqual(Array.from(map.tileFlags), [1, 2, 0, 0, 0, 3]);
+  assert.throws(() => TileMap.fromTiled(tiledMap({}, { data: [(0x20000000 | 1) >>> 0, 0, 0, 0, 0, 0] }), { texture: tiledTexture() }), /rotated/);
+});
+
+test("tilemap: fromTiled decodes uncompressed base64 layer data", () => {
+  const bytes = new Uint8Array(new Uint32Array([1, 2, 0, 0, 4, (0x80000000 | 1) >>> 0]).buffer);
+  const data = Buffer.from(bytes).toString("base64");
+  const map = TileMap.fromTiled(tiledMap({}, { data, encoding: "base64" }), { texture: tiledTexture() });
+  assert.deepEqual(Array.from(map.tiles), [0, 1, -1, -1, 3, 0]);
+  assert.equal(map.tileFlags[5], 1);
+  assert.throws(() => TileMap.fromTiled(tiledMap({}, { data, encoding: "base64", compression: "zlib" }), { texture: tiledTexture() }), /compressed/);
+  assert.throws(() => TileMap.fromTiled(tiledMap({}, { data: "AAAA", encoding: "base64" }), { texture: tiledTexture() }), /size/);
+  assert.throws(() => TileMap.fromTiled(tiledMap({}, { data: "!!!!", encoding: "base64" }), { texture: tiledTexture() }), /base64|size/);
+  assert.throws(() => TileMap.fromTiled(tiledMap({}, { data: "x", encoding: "csv" }), { texture: tiledTexture() }), /base64/);
+});
+
+test("tilemap: fromTiled honors multiple tilesets by firstgid", () => {
+  const map = tiledMap({ tilesets: [{ firstgid: 1, tilecount: 8 }, { firstgid: 9, name: "props", tilecount: 8 }] }, { data: [9, 10, 0, 0, 0, 16] });
+  const props = TileMap.fromTiled(map, { texture: tiledTexture(), tileset: "props" });
+  assert.deepEqual(Array.from(props.tiles), [0, 1, -1, -1, -1, 7]);
+  assert.throws(() => TileMap.fromTiled(map, { texture: tiledTexture() }), /different tileset/);
+});
+
+test("tilemap: fromTiled rejects unsupported or invalid maps with explicit errors", () => {
+  const texture = tiledTexture();
+  assert.throws(() => TileMap.fromTiled(null, { texture }), /object/);
+  assert.throws(() => TileMap.fromTiled(tiledMap(), {}), /texture/);
+  assert.throws(() => TileMap.fromTiled(tiledMap({ orientation: "isometric" }), { texture }), /orthogonal/);
+  assert.throws(() => TileMap.fromTiled(tiledMap({ infinite: true }), { texture }), /infinite/);
+  assert.throws(() => TileMap.fromTiled(tiledMap({}, { chunks: [] }), { texture }), /chunked/);
+  assert.throws(() => TileMap.fromTiled(tiledMap({ width: 0 }), { texture }), /width/);
+  assert.throws(() => TileMap.fromTiled(tiledMap({ width: 1000, height: 1000 }), { texture }), /limit/);
+  assert.throws(() => TileMap.fromTiled(tiledMap({}, { width: 2 }), { texture }), /size/);
+  assert.throws(() => TileMap.fromTiled(tiledMap({}, { data: [1, 2] }), { texture }), /size/);
+  assert.throws(() => TileMap.fromTiled(tiledMap({}, { data: [1, 2, 0, 0, 0, -1] }), { texture }), /gid/);
+  assert.throws(() => TileMap.fromTiled(tiledMap({}, { opacity: 2 }), { texture }), /opacity/);
+  assert.throws(() => TileMap.fromTiled(tiledMap({}, { offsetx: Infinity }), { texture }), /offsetx/);
+  assert.throws(() => TileMap.fromTiled(tiledMap({ tilesets: [{ firstgid: 1, margin: 1 }] }), { texture }), /margin/);
+  assert.throws(() => TileMap.fromTiled(tiledMap({ tilesets: [{ firstgid: 1, tilewidth: 8 }] }), { texture }), /tilewidth/);
+  assert.throws(() => TileMap.fromTiled(tiledMap({ tilesets: [] }), { texture }), /no tileset/);
+  assert.throws(() => TileMap.fromTiled(tiledMap({ layers: [] }), { texture }), /no tile layer/);
+  // Tile ids beyond the texture grid are still rejected by the existing TileMap validation.
+  assert.throws(() => TileMap.fromTiled(tiledMap({}, { data: [8, 0, 0, 0, 0, 0] }), { texture: new Texture({ sourceWidth: 32, sourceHeight: 16 }) }), /TileMap/);
+});
+
+test("tilemap: tiledTileIdsWithProperty feeds solidTiles/createStaticBodies", () => {
+  const level = tiledMap();
+  const solid = TileMap.tiledTileIdsWithProperty(level, "solid");
+  assert.deepEqual([...solid], [1]);
+  assert.deepEqual([...TileMap.tiledTileIdsWithProperty(level, "kind", { value: "spike" })], [3]);
+  assert.equal(TileMap.tiledTileIdsWithProperty(tiledMap({ tilesets: [{ firstgid: 1 }] }), "solid").size, 0);
+  assert.throws(() => TileMap.tiledTileIdsWithProperty(level, ""), /property name/);
+  const map = TileMap.fromTiled(level, { texture: tiledTexture() });
+  const rects = map.getCollisionRects(solid);
+  assert.deepEqual(rects.map(({ x, y, width, height }) => [x, y, width, height]), [[16, 0, 16, 16]]);
+  const world = new PhysicsWorld();
+  const bodies = map.createStaticBodies(world, { solidTiles: solid });
+  assert.equal(bodies.bodies.length, 1);
+  map.destroy();
+});

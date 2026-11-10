@@ -54,6 +54,107 @@ function normalizeTileFlags(options) {
   return (options.flipX ? TILE_FLIP_X : 0) | (options.flipY ? TILE_FLIP_Y : 0);
 }
 
+// Tiled (https://www.mapeditor.org) JSON map import. Only the subset that maps
+// losslessly onto a single-texture TileMap is accepted; everything else is
+// rejected explicitly instead of being rendered wrong.
+const TILED_FLIP_H = 0x80000000;
+const TILED_FLIP_V = 0x40000000;
+const TILED_FLIP_D = 0x20000000;
+const TILED_ROTATE_HEX = 0x10000000;
+const TILED_GID_MASK = 0x0fffffff;
+const MAX_TILED_LAYERS = 1024;
+const MAX_TILED_TILESETS = 256;
+const MAX_TILED_TILE_RECORDS = 65_536;
+const MAX_TILED_PROPERTIES = 256;
+const MAX_TILED_NAME_LENGTH = 256;
+
+function isTiledRecord(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function tiledPositiveInteger(value, label) {
+  if (!Number.isSafeInteger(value) || value <= 0) throw new RangeError(`Tiled ${label} must be a positive integer.`);
+  return value;
+}
+
+function tiledFiniteNumber(value, fallback, label) {
+  if (value === undefined) return fallback;
+  if (typeof value !== "number" || !Number.isFinite(value)) throw new RangeError(`Tiled ${label} must be a finite number.`);
+  return value;
+}
+
+function tiledArray(value, limit, label) {
+  if (!Array.isArray(value)) throw new TypeError(`Tiled ${label} must be an array.`);
+  if (value.length > limit) throw new RangeError(`Tiled ${label} limit exceeded.`);
+  return value;
+}
+
+function findTiledEntry(entries, selector, label, predicate = () => true) {
+  if (selector === undefined) {
+    for (const entry of entries) if (isTiledRecord(entry) && predicate(entry)) return entry;
+    throw new RangeError(`Tiled map has no ${label}.`);
+  }
+  if (typeof selector === "number") {
+    if (!Number.isSafeInteger(selector) || selector < 0 || selector >= entries.length) throw new RangeError(`Tiled ${label} index is out of range.`);
+    const entry = entries[selector];
+    if (!isTiledRecord(entry) || !predicate(entry)) throw new RangeError(`Tiled ${label} at index ${selector} is not supported.`);
+    return entry;
+  }
+  if (typeof selector === "string" && selector.length <= MAX_TILED_NAME_LENGTH) {
+    for (const entry of entries) if (isTiledRecord(entry) && entry.name === selector && predicate(entry)) return entry;
+    throw new RangeError(`Tiled ${label} not found.`);
+  }
+  throw new TypeError(`Tiled ${label} selector must be an index or a name.`);
+}
+
+function resolveTiledTileset(map, selector) {
+  const tilesets = tiledArray(map.tilesets, MAX_TILED_TILESETS, "tilesets");
+  if (tilesets.length === 0) throw new RangeError("Tiled map has no tileset.");
+  const tileset = findTiledEntry(tilesets, selector ?? 0, "tileset");
+  const firstGid = tiledPositiveInteger(tileset.firstgid, "tileset firstgid");
+  let endGid = TILED_GID_MASK + 1;
+  for (const other of tilesets) {
+    if (!isTiledRecord(other) || other === tileset) continue;
+    const otherFirst = tiledPositiveInteger(other.firstgid, "tileset firstgid");
+    if (otherFirst > firstGid && otherFirst < endGid) endGid = otherFirst;
+  }
+  if (tileset.tilecount !== undefined) endGid = Math.min(endGid, firstGid + tiledPositiveInteger(tileset.tilecount, "tileset tilecount"));
+  if ((tileset.margin ?? 0) !== 0 || (tileset.spacing ?? 0) !== 0) throw new RangeError("Tiled tileset margin/spacing is not supported; export the tileset without margin and spacing.");
+  if (tileset.tilewidth !== undefined && tileset.tilewidth !== map.tilewidth) throw new RangeError("Tiled tileset tilewidth must match the map tilewidth.");
+  if (tileset.tileheight !== undefined && tileset.tileheight !== map.tileheight) throw new RangeError("Tiled tileset tileheight must match the map tileheight.");
+  return { tileset, firstGid, endGid };
+}
+
+function decodeTiledGids(layer, count) {
+  if (layer.chunks !== undefined) throw new RangeError("Tiled infinite (chunked) layers are not supported.");
+  const data = layer.data;
+  if (Array.isArray(data)) {
+    if (data.length !== count) throw new RangeError("Tiled layer data size does not match the layer size.");
+    const gids = new Uint32Array(count);
+    for (let index = 0; index < count; index += 1) {
+      const value = data[index];
+      if (!Number.isSafeInteger(value) || value < 0 || value > 0xffffffff) throw new RangeError("Tiled layer gid is invalid.");
+      gids[index] = value;
+    }
+    return gids;
+  }
+  if (typeof data === "string") {
+    if (layer.encoding !== "base64") throw new RangeError("Tiled string layer data must use base64 encoding.");
+    if (layer.compression !== undefined && layer.compression !== "") throw new RangeError("Tiled compressed layer data is not supported; export with uncompressed base64 or CSV.");
+    if (data.length > 4 * Math.ceil((count * 4) / 3) + 16) throw new RangeError("Tiled layer data size does not match the layer size.");
+    let binary;
+    try { binary = atob(data.trim()); } catch { throw new RangeError("Tiled layer base64 data is invalid."); }
+    if (binary.length !== count * 4) throw new RangeError("Tiled layer data size does not match the layer size.");
+    const gids = new Uint32Array(count);
+    for (let index = 0; index < count; index += 1) {
+      const offset = index * 4;
+      gids[index] = (binary.charCodeAt(offset) | (binary.charCodeAt(offset + 1) << 8) | (binary.charCodeAt(offset + 2) << 16) | (binary.charCodeAt(offset + 3) << 24)) >>> 0;
+    }
+    return gids;
+  }
+  throw new TypeError("Tiled layer data must be an array or a base64 string.");
+}
+
 function resetRenderItem(items, index) {
   let item = items[index];
   if (!item) {
@@ -128,12 +229,84 @@ export class TileMap extends Node {
     this.isRenderable = true;
   }
 
+  static fromTiled(map, { texture, layer, tileset, ...options } = {}) {
+    if (!isTiledRecord(map)) throw new TypeError("Tiled map must be an object.");
+    if (!(texture instanceof Texture)) throw new TypeError("TileMap.fromTiled texture is required.");
+    if (map.orientation !== undefined && map.orientation !== "orthogonal") throw new RangeError("Only orthogonal Tiled maps are supported.");
+    if (map.infinite === true) throw new RangeError("Tiled infinite maps are not supported.");
+    const columns = tiledPositiveInteger(map.width, "map width");
+    const rows = tiledPositiveInteger(map.height, "map height");
+    const tileWidth = tiledPositiveInteger(map.tilewidth, "map tilewidth");
+    const tileHeight = tiledPositiveInteger(map.tileheight, "map tileheight");
+    if (columns * rows > MAX_TILE_COUNT) throw new RangeError("TileMap tile count limit exceeded.");
+    const layers = tiledArray(map.layers, MAX_TILED_LAYERS, "layers");
+    const source = findTiledEntry(layers, layer, "tile layer", (entry) => entry.type === "tilelayer");
+    if ((source.width !== undefined && source.width !== columns) || (source.height !== undefined && source.height !== rows)) throw new RangeError("Tiled layer size must match the map size.");
+    const { firstGid, endGid } = resolveTiledTileset(map, tileset);
+    const count = columns * rows;
+    const gids = decodeTiledGids(source, count);
+    const tiles = new Int32Array(count);
+    let flagged = null;
+    for (let index = 0; index < count; index += 1) {
+      const gid = gids[index];
+      if (gid === 0) { tiles[index] = -1; continue; }
+      if (gid & (TILED_FLIP_D | TILED_ROTATE_HEX)) throw new RangeError("Tiled rotated (diagonal-flip) tiles are not supported.");
+      const id = gid & TILED_GID_MASK;
+      if (id < firstGid || id >= endGid) throw new RangeError("Tiled layer uses a tile from a different tileset.");
+      tiles[index] = id - firstGid;
+      if (gid & (TILED_FLIP_H | TILED_FLIP_V)) (flagged ??= []).push(index);
+    }
+    const offsetX = tiledFiniteNumber(source.offsetx, 0, "layer offsetx");
+    const offsetY = tiledFiniteNumber(source.offsety, 0, "layer offsety");
+    const opacity = tiledFiniteNumber(source.opacity, 1, "layer opacity");
+    if (opacity < 0 || opacity > 1) throw new RangeError("Tiled layer opacity must be within 0..1.");
+    const nodeOptions = {
+      ...options,
+      texture, tileWidth, tileHeight, columns, rows,
+      x: tiledFiniteNumber(options.x, 0, "x option") + offsetX,
+      y: tiledFiniteNumber(options.y, 0, "y option") + offsetY,
+      alpha: tiledFiniteNumber(options.alpha, 1, "alpha option") * opacity,
+      visible: options.visible !== false && source.visible !== false,
+    };
+    if (options.name === undefined && typeof source.name === "string" && source.name.length <= MAX_TILED_NAME_LENGTH) nodeOptions.name = source.name;
+    const tileMap = new TileMap(nodeOptions);
+    try {
+      tileMap.setTiles(tiles);
+      if (flagged) {
+        for (const index of flagged) {
+          const gid = gids[index];
+          tileMap.setTile(index % columns, Math.floor(index / columns), tiles[index], { flipX: (gid & TILED_FLIP_H) !== 0, flipY: (gid & TILED_FLIP_V) !== 0 });
+        }
+      }
+    } catch (error) {
+      tileMap.destroy();
+      throw error;
+    }
+    return tileMap;
+  }
+
+  static tiledTileIdsWithProperty(map, propertyName, { tileset, value = true } = {}) {
+    if (!isTiledRecord(map)) throw new TypeError("Tiled map must be an object.");
+    if (typeof propertyName !== "string" || propertyName.length === 0 || propertyName.length > MAX_TILED_NAME_LENGTH) throw new TypeError("Tiled property name is invalid.");
+    const { tileset: record, firstGid, endGid } = resolveTiledTileset(map, tileset);
+    const result = new Set();
+    if (record.tiles === undefined) return result;
+    for (const tile of tiledArray(record.tiles, MAX_TILED_TILE_RECORDS, "tileset tiles")) {
+      if (!isTiledRecord(tile) || !Number.isSafeInteger(tile.id) || tile.id < 0 || firstGid + tile.id >= endGid) continue;
+      if (tile.properties === undefined) continue;
+      for (const property of tiledArray(tile.properties, MAX_TILED_PROPERTIES, "tile properties")) {
+        if (isTiledRecord(property) && property.name === propertyName && property.value === value) { result.add(tile.id); break; }
+      }
+    }
+    return result;
+  }
+
   index(x, y) { return y * this.columns + x; }
   inBounds(x, y) { return Number.isSafeInteger(x) && Number.isSafeInteger(y) && x >= 0 && y >= 0 && x < this.columns && y < this.rows; }
 
   validateTileIndex(tileIndex) {
     const value = Number(tileIndex);
-    if (!Number.isSafeInteger(value)) throw new RangeError("TileMap tile index geÃ§ersiz.");
+    if (!Number.isSafeInteger(value)) throw new RangeError("TileMap tile index geçersiz.");
     if (value < 0) return value;
     const gridColumns = Math.floor(this.texture.sourceWidth / this.tileWidth);
     const gridRows = Math.floor(this.texture.sourceHeight / this.tileHeight);

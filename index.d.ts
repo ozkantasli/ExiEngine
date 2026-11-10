@@ -435,7 +435,14 @@ export interface TileMapStaticBodies {
 export interface TileMapOptions extends NodeOptions {
   texture?: Texture; tileWidth: number; tileHeight: number; columns: number; rows: number; staticCache?: boolean; instanced?: boolean; gpuCulling?: boolean; cullTiles?: boolean;
 }
+export interface TiledMapLayer { type?: string; name?: string; width?: number; height?: number; data?: readonly number[] | string; encoding?: string; compression?: string; chunks?: unknown; offsetx?: number; offsety?: number; opacity?: number; visible?: boolean; [key: string]: unknown; }
+export interface TiledTileProperty { name: string; type?: string; value: unknown; }
+export interface TiledTilesetRef { firstgid: number; name?: string; source?: string; tilewidth?: number; tileheight?: number; tilecount?: number; margin?: number; spacing?: number; tiles?: readonly { id: number; properties?: readonly TiledTileProperty[] }[]; [key: string]: unknown; }
+export interface TiledMap { width: number; height: number; tilewidth: number; tileheight: number; orientation?: string; infinite?: boolean; layers: readonly TiledMapLayer[]; tilesets: readonly TiledTilesetRef[]; [key: string]: unknown; }
+export interface TileMapFromTiledOptions extends Omit<TileMapOptions, "texture" | "tileWidth" | "tileHeight" | "columns" | "rows"> { texture: Texture; layer?: number | string; tileset?: number | string; }
 export class TileMap extends Node {
+  static fromTiled(map: TiledMap, options: TileMapFromTiledOptions): TileMap;
+  static tiledTileIdsWithProperty(map: TiledMap, propertyName: string, options?: { tileset?: number | string; value?: unknown }): Set<number>;
   texture: Texture; tileWidth: number; tileHeight: number; columns: number; rows: number;
   staticCache: boolean; instanced: boolean; gpuCulling: boolean; cullTiles: boolean;
   tiles: Int32Array;

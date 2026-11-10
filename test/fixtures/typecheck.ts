@@ -42,7 +42,7 @@ import type {
   CaptureFrameResult,
 } from "../../index.d.ts";
 
-import { Scene, Sprite, Camera, clamp, Vec2 } from "../../src/index.js";
+import { Scene, Sprite, Camera, clamp, Vec2, Texture, TileMap } from "../../src/index.js";
 
 // Tip düzeyinde sözleşme: bu sembollerin TS'te mevcut olduğunu kanıtlar.
 export type {
@@ -106,6 +106,14 @@ export function useFilter(kind: FilterKind): FilterKind {
   return kind;
 }
 
+export function useTiled(texture: Texture): TileMap {
+  const map = { width: 2, height: 1, tilewidth: 8, tileheight: 8, layers: [{ type: "tilelayer", name: "ground", data: [1, 0] }], tilesets: [{ firstgid: 1, tiles: [{ id: 0, properties: [{ name: "solid", type: "bool", value: true }] }] }] };
+  const solid: Set<number> = TileMap.tiledTileIdsWithProperty(map, "solid");
+  const tileMap = TileMap.fromTiled(map, { texture, layer: "ground", zIndex: 1 });
+  if (!solid.has(0) || tileMap.getTile(0, 0) !== 0) throw new Error("typecheck fixture: Tiled import failed");
+  return tileMap;
+}
+
 // Modül yüklendiğinde çalıştır: doğrulama
 if (import.meta.url) {
   const scene = makeScene();
@@ -116,5 +124,6 @@ if (import.meta.url) {
   if (clamp(5, 0, 1) !== 1) throw new Error("typecheck fixture: clamp failed");
   const vec = new Vec2(3, 4);
   if (vec.length() !== 5) throw new Error("typecheck fixture: Vec2 failed");
+  useTiled(new Texture({ sourceWidth: 16, sourceHeight: 8 })).destroy();
   console.log("typecheck fixture: passed");
 }

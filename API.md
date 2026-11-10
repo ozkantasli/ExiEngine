@@ -247,13 +247,25 @@ Uses a bounded object pool with `emit(count, options?)`, `burst(count, options?)
 ### `TileMap`
 
 ```js
-const map = new TileMap({ width: 100, height: 60, tileWidth: 16, tileHeight: 16, texture: atlasTexture });
+const map = new TileMap({ columns: 100, rows: 60, tileWidth: 16, tileHeight: 16, texture: atlasTexture });
 map.setTile(4, 8, 2, { flipX: true });
 map.setRegion(0, 0, 10, 10, values);
 const staticBodies = map.createStaticBodies(physics, { solidTiles: new Set([1, 2]) });
 ```
 
 Provides `index`, `inBounds`, `setTile`, `getTile`, `setTiles`, `setRegion`, `rebuild`, `getCollisionRects` and `createStaticBodies`. It does not create a Sprite per tile; typed-array and region inputs are validated atomically.
+
+#### Tiled import
+
+```js
+const level = await loader.loadJSON("/maps/level1.tmj");
+const tileset = await loader.loadTexture("/maps/tiles.png");
+const ground = TileMap.fromTiled(level, { texture: tileset, layer: "Ground" });
+const solid = TileMap.tiledTileIdsWithProperty(level, "solid");
+ground.createStaticBodies(physics, { solidTiles: solid });
+```
+
+`TileMap.fromTiled(map, { texture, layer?, tileset?, ...nodeOptions })` builds one TileMap from one tile layer of a [Tiled](https://www.mapeditor.org) JSON (`.tmj`) map. `layer` and `tileset` select by index or name (defaults: first tile layer, first tileset). Layer `offsetx`/`offsety`, `opacity`, `visible` and `name` are applied on top of the node options, and horizontal/vertical flip bits become `flipX`/`flipY`. Supported: finite orthogonal maps, CSV-array or uncompressed base64 data, embedded or external tilesets (external tilesets are only range-checked against the texture grid). Rejected with an explicit error instead of rendering wrong: infinite/chunked maps, compressed data, non-orthogonal orientation, diagonal-flip (rotated) tiles, tileset margin/spacing, a tile size that differs from the map, and layers that mix tiles from several tilesets (create one TileMap per tileset/layer). `TileMap.tiledTileIdsWithProperty(map, name, { tileset?, value = true })` returns the local tile ids whose custom property equals `value`, ready for `solidTiles`.
 
 ### `RenderGroup`
 
