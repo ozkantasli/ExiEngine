@@ -271,6 +271,21 @@ ground.createStaticBodies(physics, { solidTiles: solid });
 
 Collects its children in a RenderTexture pass. Provides `resize`, `setEffects`, `clearEffects`, `getEffects` and `getRenderCamera`. The effect list consists of allowlisted filters and uses a bounded ping-pong target.
 
+### Scene serialization
+
+```js
+const document = serializeScene(scene);                       // plain JSON-safe object
+localStorage.setItem("level", JSON.stringify(document));
+const report = {};
+const restored = deserializeScene(JSON.parse(localStorage.getItem("level")), {
+  textures: { tiles: tilesetTexture, hero: heroTexture },     // Map, record or resolveTexture(id)
+  report,                                                     // { nodes, missingTextures }
+});
+engine.setScene(restored);
+```
+
+Documents are `{ format: "exi-scene", version: 1, root }`, where every node is the same `{ type, options, children }` shape that MCP `exi_build_scene` accepts. Supported types are `SERIALIZABLE_NODE_TYPES` (`Scene`, `Node`, `Sprite`, `NineSliceSprite`, `Text`, `Graphics`, `TileMap`); common transform/visual/interaction fields, Sprite/Text style, Graphics commands (polygons keep their source points) and TileMap tiles/flip flags are stored. Callbacks and caches are never stored and loading never evaluates code: unknown types or option keys, non-finite numbers, over-long strings and documents past `MAX_SERIALIZED_NODES` (10 000) nodes or depth 64 are rejected. Textures are stored by id (`"white"` for `Texture.white`); an unresolved id falls back to a white placeholder and is listed in `report.missingTextures`, or throws with `strict: true`. Unsupported nodes (particles, batches, render groups) throw on save unless `unsupported: "skip"` is passed, which lists them in `document.skipped`.
+
 ## 7. Atlases and asset loading
 
 ### `TextureAtlas`

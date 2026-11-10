@@ -755,3 +755,19 @@ export const NONE: unique symbol;
 export const CONSUMED: unique symbol;
 export function isSentinel(value: unknown): boolean;
 
+
+export const SCENE_FORMAT: "exi-scene";
+export const SCENE_FORMAT_VERSION: 1;
+export const MAX_SERIALIZED_NODES: number;
+export const SERIALIZABLE_NODE_TYPES: readonly ("Scene" | "Text" | "NineSliceSprite" | "Sprite" | "TileMap" | "Graphics" | "Node")[];
+export interface SerializedNode { type: "Scene" | "Node" | "Sprite" | "NineSliceSprite" | "Text" | "Graphics" | "TileMap"; options?: Record<string, unknown>; children?: SerializedNode[]; }
+export interface SceneDocument { format: "exi-scene"; version: 1; root: SerializedNode; skipped?: string[]; }
+export interface SerializeSceneOptions { maxNodes?: number; unsupported?: "throw" | "skip"; }
+export interface DeserializeSceneReport { nodes?: number; missingTextures?: string[]; }
+export interface DeserializeSceneOptions {
+  textures?: ReadonlyMap<string, Texture> | Record<string, Texture> | null;
+  resolveTexture?: ((id: string) => Texture | null | undefined) | null;
+  strict?: boolean; maxNodes?: number; report?: DeserializeSceneReport | null;
+}
+export function serializeScene(root: Node, options?: SerializeSceneOptions): SceneDocument;
+export function deserializeScene(document: SceneDocument, options?: DeserializeSceneOptions): Node;

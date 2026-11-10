@@ -122,6 +122,7 @@
 - Static `Graphics`, regular `SpriteBatch` and CPU `TileMap` cache/culling keys also reuse the same numeric version state; no long key string is built in a stable frame
 - The CPU instance path is recomputed when the camera changes even with `cullable: false`; nested scissor clip intersections reuse a per-node scratch rect
 - Engine interpolation roots and WebGL2/WebGPU RenderGroup traversal lists are reused as persistent scratch across frames; the scene reference is cleared on transitions (`npm run bench -- frame-scratch`)
+- JSON scene documents with `serializeScene()`/`deserializeScene()` in the same `{ type, options, children }` shape as MCP `exi_build_scene`; textures are referenced by id, callbacks are never stored, and loading validates types, option keys, numbers and node/depth limits without evaluating code
 - A dependency-free TypeScript API contract with the root `index.d.ts`
 - Vertex/instance buffers whose capacity is kept in WebGL2, and narrowed in WebGPU according to a 64 MB global limit and the device limit
 

@@ -206,7 +206,7 @@ export class Graphics extends Node {
     if (this.commands.length >= MAX_GRAPHICS_COMMANDS) throw new RangeError(`Graphics command limit is ${MAX_GRAPHICS_COMMANDS}.`);
     const normalized = new Array(length);
     for (let index = 0; index < length; index += 1) normalized[index] = finite(points[index]);
-    this.commands.push({ type: "polygon", positions: triangulatePolygon(normalized), bounds: polygonBounds(normalized), tint: fill, alpha: alphaValue(alpha) });
+    this.commands.push({ type: "polygon", points: normalized, positions: triangulatePolygon(normalized), bounds: polygonBounds(normalized), tint: fill, alpha: alphaValue(alpha) });
     this._invalidate();
     return this;
   }

@@ -40,9 +40,10 @@ import type {
   GridPathResult,
   KTX2Info,
   CaptureFrameResult,
+  SceneDocument,
 } from "../../index.d.ts";
 
-import { Scene, Sprite, Camera, clamp, Vec2, Texture, TileMap } from "../../src/index.js";
+import { Scene, Sprite, Camera, clamp, Vec2, Texture, TileMap, serializeScene, deserializeScene } from "../../src/index.js";
 
 // Tip düzeyinde sözleşme: bu sembollerin TS'te mevcut olduğunu kanıtlar.
 export type {
@@ -125,5 +126,7 @@ if (import.meta.url) {
   const vec = new Vec2(3, 4);
   if (vec.length() !== 5) throw new Error("typecheck fixture: Vec2 failed");
   useTiled(new Texture({ sourceWidth: 16, sourceHeight: 8 })).destroy();
+  const document: SceneDocument = serializeScene(scene);
+  if (!(deserializeScene(document) instanceof Scene)) throw new Error("typecheck fixture: scene serialization failed");
   console.log("typecheck fixture: passed");
 }
