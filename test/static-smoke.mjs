@@ -139,7 +139,7 @@ assert.match(mcpServer, /prompts\/get/);
 assert.match(mcpServer, /exi_create_game/);
 assert.match(mcpServer, /exi_verify_runtime/);
 assert.match(mcpServer, /exi_batch/);
-assert.match(mcpServer, /calls 1 ile 128/);
+assert.match(mcpServer, /calls must be between 1 and 128/);
 assert.match(mcpServer, /resolveBatchReferences/);
 assert.match(mcpServer, /function resolveBatchResultPath/);
 assert.match(mcpServer, /function isClass/);

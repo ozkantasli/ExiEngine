@@ -92,7 +92,7 @@ function fail(message, code = "EXI_MCP_INPUT") {
 }
 
 function cancellationError() {
-  const error = new Error("MCP isteği iptal edildi.");
+  const error = new Error("MCP request was cancelled.");
   error.code = "EXI_MCP_CANCELLED";
   return error;
 }
@@ -111,22 +111,22 @@ function sendProgress(progressToken, progress, total, message) {
 }
 
 function assertPublicName(value, label) {
-  if (typeof value !== "string" || !value || value.length > 256 || value.startsWith("_") || forbiddenKeys.has(value)) fail(`${label} geçersiz.`);
+  if (typeof value !== "string" || !value || value.length > 256 || value.startsWith("_") || forbiddenKeys.has(value)) fail(`${label} is invalid.`);
   return value;
 }
 
 function assertSafeData(value, depth = 0) {
-  if (depth > MAX_VALUE_DEPTH) fail("İstek veri derinliği limiti aşıldı.");
+  if (depth > MAX_VALUE_DEPTH) fail("Request data depth limit exceeded.");
   if (typeof value === "string") {
-    if (value.length > MAX_STRING_LENGTH) fail("İstek metin limiti aşıldı.");
+    if (value.length > MAX_STRING_LENGTH) fail("Request text limit exceeded.");
     return value;
   }
   if (value === null || typeof value === "boolean" || typeof value === "number") {
-    if (typeof value === "number" && !Number.isFinite(value)) fail("İstek sayısı sonlu olmalı.");
+    if (typeof value === "number" && !Number.isFinite(value)) fail("Request number must be finite.");
     return value;
   }
   if (Array.isArray(value)) {
-    if (value.length > MAX_VALUE_ITEMS) fail("İstek dizi limiti aşıldı.");
+    if (value.length > MAX_VALUE_ITEMS) fail("Request array limit exceeded.");
     for (const item of value) assertSafeData(item, depth + 1);
     return value;
   }
@@ -134,31 +134,31 @@ function assertSafeData(value, depth = 0) {
     const keys = Object.keys(value);
     if (keys.length === 1 && Object.hasOwn(value, "$bytes")) {
       if (Array.isArray(value.$bytes)) {
-        if (value.$bytes.length > MAX_BINARY_BYTES) fail("Byte array limiti aşıldı.");
+        if (value.$bytes.length > MAX_BINARY_BYTES) fail("Byte array limit exceeded.");
         for (const byte of value.$bytes) {
-          if (!Number.isInteger(byte) || byte < 0 || byte > 255) fail("Byte array yalnızca 0..255 tamsayıları içermeli.");
+          if (!Number.isInteger(byte) || byte < 0 || byte > 255) fail("Byte array must only contain integers 0..255.");
         }
       } else if (typeof value.$bytes === "string") {
-        if (value.$bytes.length > MAX_BASE64_STRING_LENGTH) fail("Base64 byte metni limiti aşıldı.");
-      } else fail("$bytes base64 metni veya byte array olmalı.");
+        if (value.$bytes.length > MAX_BASE64_STRING_LENGTH) fail("Base64 byte text limit exceeded.");
+      } else fail("$bytes must be base64 text or a byte array.");
       return value;
     }
-    if (keys.length > MAX_VALUE_KEYS) fail("İstek nesne alanı limiti aşıldı.");
+    if (keys.length > MAX_VALUE_KEYS) fail("Request object field limit exceeded.");
     for (const key of keys) {
-      if (forbiddenKeys.has(key)) fail(`Güvenli olmayan alan adı: ${key}`);
+      if (forbiddenKeys.has(key)) fail(`Unsafe field name: ${key}`);
       assertSafeData(value[key], depth + 1);
     }
     return value;
   }
-  fail("İstek yalnızca JSON verisi içerebilir.");
+  fail("Request may only contain JSON data.");
 }
 
 function resolvePath(relativePath) {
-  if (typeof relativePath !== "string" || !relativePath.trim() || relativePath.length > 240 || path.isAbsolute(relativePath)) fail("Yol repo köküne göre göreli olmalı.");
+  if (typeof relativePath !== "string" || !relativePath.trim() || relativePath.length > 240 || path.isAbsolute(relativePath)) fail("Path must be relative to the repository root.");
   const normalized = relativePath.replaceAll("\\", "/");
-  if (normalized.split("/").some((part) => part === "..")) fail("Repo dışına çıkan yol reddedildi.");
+  if (normalized.split("/").some((part) => part === "..")) fail("Path escaping the repository was rejected.");
   const resolved = path.resolve(ROOT, normalized);
-  if (resolved !== ROOT && !resolved.startsWith(`${ROOT}${path.sep}`)) fail("Yol repo sınırları dışında.");
+  if (resolved !== ROOT && !resolved.startsWith(`${ROOT}${path.sep}`)) fail("Path is outside the repository bounds.");
   return { resolved, relative: path.relative(ROOT, resolved).replaceAll("\\", "/") };
 }
 
@@ -168,8 +168,8 @@ async function assertSafeScaffoldTarget(target, fileNames) {
     current = path.join(current, segment);
     try {
       const entry = await lstat(current);
-      if (entry.isSymbolicLink()) fail("Scaffold symlink üzerinden yazamaz.", "EXI_MCP_PATH_LINK");
-      if (!entry.isDirectory()) fail("Scaffold yolu klasör olmalı.");
+      if (entry.isSymbolicLink()) fail("Scaffold cannot write through a symlink.", "EXI_MCP_PATH_LINK");
+      if (!entry.isDirectory()) fail("Scaffold path must be a directory.");
     } catch (error) {
       if (error?.code === "ENOENT") break;
       throw error;
@@ -179,8 +179,8 @@ async function assertSafeScaffoldTarget(target, fileNames) {
     const filePath = path.join(target.resolved, fileName);
     try {
       const entry = await lstat(filePath);
-      if (entry.isSymbolicLink()) fail("Scaffold symlink üzerinden yazamaz.", "EXI_MCP_PATH_LINK");
-      if (!entry.isFile()) fail(`Scaffold hedefi dosya olmalı: ${fileName}`);
+      if (entry.isSymbolicLink()) fail("Scaffold cannot write through a symlink.", "EXI_MCP_PATH_LINK");
+      if (!entry.isFile()) fail(`Scaffold target must be a file: ${fileName}`);
     } catch (error) {
       if (error?.code === "ENOENT") continue;
       throw error;
@@ -204,7 +204,7 @@ function assertProjectJSONBudget(text) {
   let escaped = false;
   const recordNode = () => {
     nodes += 1;
-    if (nodes > MAX_PROJECT_JSON_NODES) fail("Proje JSON düğüm limiti aşıldı.", "EXI_MCP_FILE_LIMIT");
+    if (nodes > MAX_PROJECT_JSON_NODES) fail("Project JSON node limit exceeded.", "EXI_MCP_FILE_LIMIT");
   };
   for (let index = 0; index < text.length; index += 1) {
     const character = text[index];
@@ -222,13 +222,13 @@ function assertProjectJSONBudget(text) {
     if (character === " " || character === "\n" || character === "\r" || character === "\t" || character === "," || character === ":") continue;
     if (character === "{" || character === "[") {
       depth += 1;
-      if (depth > MAX_PROJECT_JSON_DEPTH) fail("Proje JSON derinlik limiti aşıldı.", "EXI_MCP_FILE_LIMIT");
+      if (depth > MAX_PROJECT_JSON_DEPTH) fail("Project JSON depth limit exceeded.", "EXI_MCP_FILE_LIMIT");
       recordNode();
       continue;
     }
     if (character === "}" || character === "]") {
       depth -= 1;
-      if (depth < 0) fail("Proje JSON yapısı geçersiz.", "EXI_MCP_FILE_TYPE");
+      if (depth < 0) fail("Project JSON structure is invalid.", "EXI_MCP_FILE_TYPE");
       continue;
     }
     if (character === "-" || (character >= "0" && character <= "9") || character === "t" || character === "f" || character === "n") {
@@ -240,19 +240,19 @@ function assertProjectJSONBudget(text) {
 
 function resolveProjectFile(relativePath) {
   const target = resolvePath(relativePath);
-  if (target.resolved === ROOT) fail("Proje dosyası repo kökü olamaz.");
+  if (target.resolved === ROOT) fail("Project file cannot be the repository root.");
   const name = path.basename(target.relative).toLowerCase();
-  if (name.startsWith(".env") || /(?:\.pem|\.key|\.p12|\.pfx|\.secret)$/.test(name)) fail("Gizli/credential dosyası MCP file tool ile açılamaz.", "EXI_MCP_FILE_DENIED");
-  if (!projectFileExtensions.has(path.extname(name))) fail("Yalnızca allowlisted text dosyaları kullanılabilir.", "EXI_MCP_FILE_TYPE");
+  if (name.startsWith(".env") || /(?:\.pem|\.key|\.p12|\.pfx|\.secret)$/.test(name)) fail("Secret/credential files cannot be opened with the MCP file tools.", "EXI_MCP_FILE_DENIED");
+  if (!projectFileExtensions.has(path.extname(name))) fail("Only allowlisted text files can be used.", "EXI_MCP_FILE_TYPE");
   return target;
 }
 
 function resolveAssetFile(relativePath) {
   const target = resolvePath(relativePath);
-  if (target.resolved === ROOT) fail("Asset dosyası repo kökü olamaz.");
+  if (target.resolved === ROOT) fail("Asset file cannot be the repository root.");
   const name = path.basename(target.relative).toLowerCase();
-  if (name.startsWith(".env") || /(?:\.pem|\.key|\.p12|\.pfx|\.secret)$/.test(name)) fail("Gizli/credential asset MCP ile açılamaz.", "EXI_MCP_FILE_DENIED");
-  if (!assetFileExtensions.has(path.extname(name))) fail("Yalnızca allowlisted oyun asset uzantıları kullanılabilir.", "EXI_MCP_FILE_TYPE");
+  if (name.startsWith(".env") || /(?:\.pem|\.key|\.p12|\.pfx|\.secret)$/.test(name)) fail("Secret/credential assets cannot be opened over MCP.", "EXI_MCP_FILE_DENIED");
+  if (!assetFileExtensions.has(path.extname(name))) fail("Only allowlisted game asset extensions can be used.", "EXI_MCP_FILE_TYPE");
   return target;
 }
 
@@ -272,11 +272,11 @@ async function writeProjectTarget(target, data, existing) {
 
 function assertScaffoldDirectory(target) {
   const firstSegment = target.relative.split("/")[0]?.toLowerCase();
-  if ([".agents", ".codex", ".git", "src", "test", "tools"].includes(firstSegment)) fail("Scaffold engine/test/tool klasörlerine yazamaz.", "EXI_MCP_FILE_DENIED");
+  if ([".agents", ".codex", ".git", "src", "test", "tools"].includes(firstSegment)) fail("Scaffold cannot write to the engine/test/tool directories.", "EXI_MCP_FILE_DENIED");
 }
 
 function requireScaffoldFile(target) {
-  if (!findScaffoldRoot(target) || !target.relative.includes("/")) fail("File tool yalnızca bu session’da oluşturulmuş scaffold projesinde çalışır.", "EXI_MCP_FILE_SCOPE");
+  if (!findScaffoldRoot(target) || !target.relative.includes("/")) fail("File tools only work in a scaffold project created in this session.", "EXI_MCP_FILE_SCOPE");
 }
 
 function findScaffoldRoot(target) {
@@ -286,7 +286,7 @@ function findScaffoldRoot(target) {
 }
 
 function requireScaffoldDirectory(target) {
-  if (!findScaffoldRoot(target)) fail("File tool yalnızca bu session’da oluşturulmuş scaffold projesinde çalışır.", "EXI_MCP_FILE_SCOPE");
+  if (!findScaffoldRoot(target)) fail("File tools only work in a scaffold project created in this session.", "EXI_MCP_FILE_SCOPE");
 }
 
 async function inspectProjectFile(target, { allowMissingParent = false } = {}) {
@@ -296,20 +296,20 @@ async function inspectProjectFile(target, { allowMissingParent = false } = {}) {
     current = path.join(current, segment);
     try {
       const entry = await lstat(current);
-      if (entry.isSymbolicLink()) fail("Proje dosyası symlink üzerinden açılamaz.", "EXI_MCP_PATH_LINK");
-      if (!entry.isDirectory()) fail("Proje dosyasının parent yolu klasör olmalı.");
+      if (entry.isSymbolicLink()) fail("Project file cannot be opened through a symlink.", "EXI_MCP_PATH_LINK");
+      if (!entry.isDirectory()) fail("Project file parent path must be a directory.");
     } catch (error) {
       if (error?.code === "ENOENT") {
         if (allowMissingParent) return null;
-        fail("Proje dosyasının parent klasörü yok.", "EXI_MCP_FILE_PATH");
+        fail("Project file parent directory does not exist.", "EXI_MCP_FILE_PATH");
       }
       throw error;
     }
   }
   try {
     const entry = await lstat(target.resolved);
-    if (entry.isSymbolicLink()) fail("Proje dosyası symlink üzerinden açılamaz.", "EXI_MCP_PATH_LINK");
-    if (!entry.isFile()) fail("Proje hedefi dosya olmalı.", "EXI_MCP_FILE_PATH");
+    if (entry.isSymbolicLink()) fail("Project file cannot be opened through a symlink.", "EXI_MCP_PATH_LINK");
+    if (!entry.isFile()) fail("Project target must be a file.", "EXI_MCP_FILE_PATH");
     return entry;
   } catch (error) {
     if (error?.code === "ENOENT") return null;
@@ -323,7 +323,7 @@ function projectVersion(entry) {
 
 function normalizeExpectedSha256(value, label) {
   if (value === undefined) return undefined;
-  if (typeof value !== "string" || !/^[a-f0-9]{64}$/i.test(value)) fail(`${label} sha256 64 karakterlik hexadecimal string olmalı.`, "EXI_MCP_ARGUMENT_INVALID");
+  if (typeof value !== "string" || !/^[a-f0-9]{64}$/i.test(value)) fail(`${label} sha256 must be a 64-character hexadecimal string.`, "EXI_MCP_ARGUMENT_INVALID");
   return value.toLowerCase();
 }
 
@@ -332,16 +332,16 @@ function sha256Bytes(value) {
 }
 
 function assertSha256Match(expectedSha256, actualSha256, label) {
-  if (expectedSha256 !== undefined && expectedSha256 !== actualSha256) fail(`${label} sha256 doğrulaması başarısız.`, "EXI_MCP_UPLOAD_INTEGRITY");
+  if (expectedSha256 !== undefined && expectedSha256 !== actualSha256) fail(`${label} sha256 verification failed.`, "EXI_MCP_UPLOAD_INTEGRITY");
 }
 
 function assertExpectedVersion(existing, expectedVersion, label) {
   if (expectedVersion === undefined) return;
   if (!isRecord(expectedVersion) || !Number.isSafeInteger(expectedVersion.bytes) || expectedVersion.bytes < 0 || typeof expectedVersion.mtimeMs !== "number" || !Number.isFinite(expectedVersion.mtimeMs) || expectedVersion.mtimeMs < 0) {
-    fail(`${label} expectedVersion { bytes, mtimeMs } olmalı.`, "EXI_MCP_ARGUMENT_INVALID");
+    fail(`${label} expectedVersion must be { bytes, mtimeMs }.`, "EXI_MCP_ARGUMENT_INVALID");
   }
   if (!existing || existing.size !== expectedVersion.bytes || existing.mtimeMs !== expectedVersion.mtimeMs) {
-    fail(`${label} çağrıdan önce değişti; güncel version ile yeniden dene.`, "EXI_MCP_FILE_CONFLICT");
+    fail(`${label} changed before the call; retry with the current version.`, "EXI_MCP_FILE_CONFLICT");
   }
 }
 
@@ -352,13 +352,13 @@ async function ensureProjectParent(target, createdDirectories = null) {
     current = path.join(current, segment);
     try {
       const entry = await lstat(current);
-      if (entry.isSymbolicLink()) fail("Proje dosyası symlink üzerinden açılamaz.", "EXI_MCP_PATH_LINK");
-      if (!entry.isDirectory()) fail("Proje dosyasının parent yolu klasör olmalı.");
+      if (entry.isSymbolicLink()) fail("Project file cannot be opened through a symlink.", "EXI_MCP_PATH_LINK");
+      if (!entry.isDirectory()) fail("Project file parent path must be a directory.");
     } catch (error) {
       if (error?.code !== "ENOENT") throw error;
       await mkdir(current);
       const created = await lstat(current);
-      if (created.isSymbolicLink() || !created.isDirectory()) fail("Proje parent klasörü güvenli oluşturulamadı.", "EXI_MCP_PATH_LINK");
+      if (created.isSymbolicLink() || !created.isDirectory()) fail("Project parent directory could not be created safely.", "EXI_MCP_PATH_LINK");
       createdDirectories?.push(current);
     }
   }
@@ -369,14 +369,14 @@ function isUtf8Continuation(byte) {
 }
 
 function readUtf8Range(data, offset, limit) {
-  if (offset < data.length && isUtf8Continuation(data[offset])) fail("file_read offset UTF-8 karakterinin ortasında olamaz.", "EXI_MCP_FILE_OFFSET");
+  if (offset < data.length && isUtf8Continuation(data[offset])) fail("file_read offset cannot be in the middle of a UTF-8 character.", "EXI_MCP_FILE_OFFSET");
   let end = Math.min(data.length, offset + limit);
   while (end < data.length && end > offset && isUtf8Continuation(data[end])) end -= 1;
-  if (end === offset && offset < data.length) fail("file_read limit geçerli bir UTF-8 aralığı üretmedi.", "EXI_MCP_FILE_OFFSET");
+  if (end === offset && offset < data.length) fail("file_read limit did not produce a valid UTF-8 range.", "EXI_MCP_FILE_OFFSET");
   try {
     return { content: new TextDecoder("utf-8", { fatal: true }).decode(data.subarray(offset, end)), nextOffset: end };
   } catch {
-    fail("Proje dosyası geçerli UTF-8 değil.", "EXI_MCP_FILE_TYPE");
+    fail("Project file is not valid UTF-8.", "EXI_MCP_FILE_TYPE");
   }
 }
 
@@ -385,39 +385,39 @@ async function readProjectFile(args = {}) {
   const paged = Object.hasOwn(args, "offset") || Object.hasOwn(args, "limit");
   const offset = args.offset === undefined ? 0 : args.offset;
   const limit = args.limit === undefined ? (paged ? MAX_PROJECT_READ_BYTES : MAX_PROJECT_FILE_BYTES) : args.limit;
-  if (!Number.isSafeInteger(offset) || offset < 0) fail("file_read offset güvenli tamsayı olmalı.", "EXI_MCP_FILE_OFFSET");
+  if (!Number.isSafeInteger(offset) || offset < 0) fail("file_read offset must be a safe integer.", "EXI_MCP_FILE_OFFSET");
   const maxLimit = paged ? MAX_PROJECT_READ_BYTES : MAX_PROJECT_FILE_BYTES;
-  if (!Number.isSafeInteger(limit) || limit <= 0 || limit > maxLimit) fail(`file_read limit 1 ile ${maxLimit} arasında olmalı.`, "EXI_MCP_FILE_LIMIT");
+  if (!Number.isSafeInteger(limit) || limit <= 0 || limit > maxLimit) fail(`file_read limit must be between 1 and ${maxLimit}.`, "EXI_MCP_FILE_LIMIT");
   const target = resolveProjectFile(filePath);
   requireScaffoldFile(target);
   const entry = await inspectProjectFile(target);
-  if (!entry) fail(`Proje dosyası bulunamadı: ${target.relative}`, "EXI_MCP_FILE_NOT_FOUND");
-  if (entry.size > MAX_CHUNKED_PROJECT_FILE_BYTES) fail("Proje dosyası chunked boyut limiti aşıldı.", "EXI_MCP_FILE_LIMIT");
-  if (!paged && entry.size > MAX_PROJECT_READ_BYTES) fail(`Büyük dosya için offset/limit ile en fazla ${MAX_PROJECT_READ_BYTES} byte okunmalı.`, "EXI_MCP_FILE_PAGING");
+  if (!entry) fail(`Project file not found: ${target.relative}`, "EXI_MCP_FILE_NOT_FOUND");
+  if (entry.size > MAX_CHUNKED_PROJECT_FILE_BYTES) fail("Project file chunked size limit exceeded.", "EXI_MCP_FILE_LIMIT");
+  if (!paged && entry.size > MAX_PROJECT_READ_BYTES) fail(`For large files read at most ${MAX_PROJECT_READ_BYTES} bytes with offset/limit.`, "EXI_MCP_FILE_PAGING");
   const data = await readFile(target.resolved);
-  if (data.byteLength > MAX_CHUNKED_PROJECT_FILE_BYTES) fail("Proje dosyası chunked boyut limiti aşıldı.", "EXI_MCP_FILE_LIMIT");
+  if (data.byteLength > MAX_CHUNKED_PROJECT_FILE_BYTES) fail("Project file chunked size limit exceeded.", "EXI_MCP_FILE_LIMIT");
   const current = await inspectProjectFile(target);
-  if (!current || current.size !== entry.size || current.mtimeMs !== entry.mtimeMs || current.size !== data.byteLength) fail("Proje dosyası okunurken değişti; version alınamadı.", "EXI_MCP_FILE_CONFLICT");
-  if (offset > data.byteLength) fail("file_read offset dosya boyutunu aşamaz.", "EXI_MCP_FILE_OFFSET");
+  if (!current || current.size !== entry.size || current.mtimeMs !== entry.mtimeMs || current.size !== data.byteLength) fail("Project file changed while reading; version could not be taken.", "EXI_MCP_FILE_CONFLICT");
+  if (offset > data.byteLength) fail("file_read offset cannot exceed the file size.", "EXI_MCP_FILE_OFFSET");
   const range = readUtf8Range(data, offset, limit);
   return { path: target.relative, offset, nextOffset: range.nextOffset, totalBytes: data.byteLength, bytes: Buffer.byteLength(range.content, "utf8"), version: projectVersion(current), complete: range.nextOffset === data.byteLength, content: range.content };
 }
 
 async function listProjectFiles({ path: directoryPath } = {}) {
   const target = resolvePath(directoryPath);
-  if (target.resolved === ROOT) fail("Proje klasörü repo kökü olamaz.", "EXI_MCP_FILE_SCOPE");
+  if (target.resolved === ROOT) fail("Project directory cannot be the repository root.", "EXI_MCP_FILE_SCOPE");
   requireScaffoldDirectory(target);
   const rootEntry = await lstat(target.resolved);
-  if (rootEntry.isSymbolicLink() || !rootEntry.isDirectory()) fail("Proje listeleme hedefi klasör olmalı.", "EXI_MCP_FILE_PATH");
+  if (rootEntry.isSymbolicLink() || !rootEntry.isDirectory()) fail("Project listing target must be a directory.", "EXI_MCP_FILE_PATH");
   const files = [];
   const visit = async (currentPath, currentRelative, depth) => {
-    if (depth > MAX_PROJECT_DEPTH) fail("Proje klasör derinliği limiti aşıldı.", "EXI_MCP_FILE_LIMIT");
+    if (depth > MAX_PROJECT_DEPTH) fail("Project directory depth limit exceeded.", "EXI_MCP_FILE_LIMIT");
     const entries = (await readdir(currentPath)).sort((left, right) => left.localeCompare(right));
     for (const name of entries) {
       const childPath = path.join(currentPath, name);
       const childRelative = `${currentRelative}/${name}`;
       const entry = await lstat(childPath);
-      if (entry.isSymbolicLink()) fail("Proje listeleme symlink üzerinden yapılamaz.", "EXI_MCP_PATH_LINK");
+      if (entry.isSymbolicLink()) fail("Project listing cannot go through a symlink.", "EXI_MCP_PATH_LINK");
       if (entry.isDirectory()) {
         await visit(childPath, childRelative, depth + 1);
         continue;
@@ -427,7 +427,7 @@ async function listProjectFiles({ path: directoryPath } = {}) {
       if (lowerName.startsWith(".env") || /(?:\.pem|\.key|\.p12|\.pfx|\.secret)$/.test(lowerName)) continue;
       if (!projectFileExtensions.has(path.extname(lowerName))) continue;
       files.push({ path: childRelative, bytes: entry.size, version: projectVersion(entry) });
-      if (files.length > MAX_PROJECT_LIST_ENTRIES) fail("Proje dosya listeleme limiti aşıldı.", "EXI_MCP_FILE_LIMIT");
+      if (files.length > MAX_PROJECT_LIST_ENTRIES) fail("Project file listing limit exceeded.", "EXI_MCP_FILE_LIMIT");
     }
   };
   await visit(target.resolved, target.relative, 0);
@@ -436,19 +436,19 @@ async function listProjectFiles({ path: directoryPath } = {}) {
 
 async function listProjectAssets({ path: directoryPath } = {}) {
   const target = resolvePath(directoryPath);
-  if (target.resolved === ROOT) fail("Asset klasörü repo kökü olamaz.", "EXI_MCP_FILE_SCOPE");
+  if (target.resolved === ROOT) fail("Asset directory cannot be the repository root.", "EXI_MCP_FILE_SCOPE");
   requireScaffoldDirectory(target);
   const rootEntry = await lstat(target.resolved);
-  if (rootEntry.isSymbolicLink() || !rootEntry.isDirectory()) fail("Asset listeleme hedefi klasör olmalı.", "EXI_MCP_FILE_PATH");
+  if (rootEntry.isSymbolicLink() || !rootEntry.isDirectory()) fail("Asset listing target must be a directory.", "EXI_MCP_FILE_PATH");
   const assets = [];
   const visit = async (currentPath, currentRelative, depth) => {
-    if (depth > MAX_PROJECT_DEPTH) fail("Asset klasör derinliği limiti aşıldı.", "EXI_MCP_FILE_LIMIT");
+    if (depth > MAX_PROJECT_DEPTH) fail("Asset directory depth limit exceeded.", "EXI_MCP_FILE_LIMIT");
     const entries = (await readdir(currentPath)).sort((left, right) => left.localeCompare(right));
     for (const name of entries) {
       const childPath = path.join(currentPath, name);
       const childRelative = `${currentRelative}/${name}`;
       const entry = await lstat(childPath);
-      if (entry.isSymbolicLink()) fail("Asset listeleme symlink üzerinden yapılamaz.", "EXI_MCP_PATH_LINK");
+      if (entry.isSymbolicLink()) fail("Asset listing cannot go through a symlink.", "EXI_MCP_PATH_LINK");
       if (entry.isDirectory()) {
         await visit(childPath, childRelative, depth + 1);
         continue;
@@ -459,7 +459,7 @@ async function listProjectAssets({ path: directoryPath } = {}) {
       const extension = path.extname(lowerName);
       if (!assetFileExtensions.has(extension)) continue;
       assets.push({ path: childRelative, bytes: entry.size, type: extension.slice(1), version: projectVersion(entry) });
-      if (assets.length > MAX_PROJECT_LIST_ENTRIES) fail("Asset listeleme limiti aşıldı.", "EXI_MCP_FILE_LIMIT");
+      if (assets.length > MAX_PROJECT_LIST_ENTRIES) fail("Asset listing limit exceeded.", "EXI_MCP_FILE_LIMIT");
     }
   };
   await visit(target.resolved, target.relative, 0);
@@ -467,14 +467,14 @@ async function listProjectAssets({ path: directoryPath } = {}) {
 }
 
 async function readProjectAsset({ path: filePath, offset = 0, limit = MAX_ASSET_READ_BYTES } = {}) {
-  if (!Number.isSafeInteger(offset) || offset < 0) fail("Asset read offset güvenli tamsayı olmalı.", "EXI_MCP_FILE_OFFSET");
-  if (!Number.isSafeInteger(limit) || limit <= 0 || limit > MAX_ASSET_READ_BYTES) fail(`Asset read limit 1 ile ${MAX_ASSET_READ_BYTES} arasında olmalı.`, "EXI_MCP_FILE_LIMIT");
+  if (!Number.isSafeInteger(offset) || offset < 0) fail("Asset read offset must be a safe integer.", "EXI_MCP_FILE_OFFSET");
+  if (!Number.isSafeInteger(limit) || limit <= 0 || limit > MAX_ASSET_READ_BYTES) fail(`Asset read limit must be between 1 and ${MAX_ASSET_READ_BYTES}.`, "EXI_MCP_FILE_LIMIT");
   const target = resolveAssetFile(filePath);
   requireScaffoldFile(target);
   const entry = await inspectProjectFile(target);
-  if (!entry) fail(`Asset dosyası bulunamadı: ${target.relative}`, "EXI_MCP_FILE_NOT_FOUND");
-  if (entry.size > MAX_CHUNKED_ASSET_BYTES) fail("Asset dosyası chunked boyut limiti aşıldı.", "EXI_MCP_FILE_LIMIT");
-  if (offset > entry.size) fail("Asset read offset dosya boyutunu aşamaz.", "EXI_MCP_FILE_OFFSET");
+  if (!entry) fail(`Asset file not found: ${target.relative}`, "EXI_MCP_FILE_NOT_FOUND");
+  if (entry.size > MAX_CHUNKED_ASSET_BYTES) fail("Asset file chunked size limit exceeded.", "EXI_MCP_FILE_LIMIT");
+  if (offset > entry.size) fail("Asset read offset cannot exceed the file size.", "EXI_MCP_FILE_OFFSET");
   const length = Math.min(limit, entry.size - offset);
   const data = Buffer.alloc(length);
   const file = await openFile(target.resolved, "r");
@@ -482,7 +482,7 @@ async function readProjectAsset({ path: filePath, offset = 0, limit = MAX_ASSET_
     const { bytesRead } = await file.read(data, 0, length, offset);
     await file.close();
     const current = await inspectProjectFile(target);
-    if (!current || current.size !== entry.size || current.mtimeMs !== entry.mtimeMs) fail("Asset okunurken değişti; version alınamadı.", "EXI_MCP_FILE_CONFLICT");
+    if (!current || current.size !== entry.size || current.mtimeMs !== entry.mtimeMs) fail("Asset changed while reading; version could not be taken.", "EXI_MCP_FILE_CONFLICT");
     return { path: target.relative, offset, nextOffset: offset + bytesRead, totalBytes: entry.size, bytes: bytesRead, version: projectVersion(current), complete: offset + bytesRead === entry.size, data: { $bytes: data.subarray(0, bytesRead).toString("base64") } };
   } finally {
     try { await file.close(); } catch { /* already closed or best-effort cleanup */ }
@@ -490,17 +490,17 @@ async function readProjectAsset({ path: filePath, offset = 0, limit = MAX_ASSET_
 }
 
 async function writeProjectAsset({ path: filePath, bytes, overwrite = false, expectedVersion, expectedSha256 } = {}) {
-  if (typeof overwrite !== "boolean") fail("overwrite boolean olmalı.");
+  if (typeof overwrite !== "boolean") fail("overwrite must be a boolean.");
   const target = resolveAssetFile(filePath);
   requireScaffoldFile(target);
   const normalizedSha256 = normalizeExpectedSha256(expectedSha256, `Asset ${target.relative}`);
   const data = resolveArgument(bytes);
-  if (!(data instanceof Uint8Array)) fail("Asset bytes yalnızca {$bytes: [...]} veya {$bytes: base64} olmalı.");
-  if (data.byteLength > MAX_BINARY_BYTES) fail("Asset byte limiti aşıldı.", "EXI_MCP_FILE_LIMIT");
+  if (!(data instanceof Uint8Array)) fail("Asset bytes must only be {$bytes: [...]} or {$bytes: base64}.");
+  if (data.byteLength > MAX_BINARY_BYTES) fail("Asset byte limit exceeded.", "EXI_MCP_FILE_LIMIT");
   await ensureProjectParent(target);
   const existing = await inspectProjectFile(target);
   assertExpectedVersion(existing, expectedVersion, `Asset ${target.relative}`);
-  if (existing && !overwrite) fail(`Asset dosyası zaten var: ${target.relative}. overwrite=true gerekli.`, "EXI_MCP_FILE_EXISTS");
+  if (existing && !overwrite) fail(`Asset file already exists: ${target.relative}. overwrite=true is required.`, "EXI_MCP_FILE_EXISTS");
   const actualSha256 = sha256Bytes(data);
   assertSha256Match(normalizedSha256, actualSha256, `Asset ${target.relative}`);
   const overwritten = await writeProjectTarget(target, data, existing);
@@ -508,12 +508,12 @@ async function writeProjectAsset({ path: filePath, bytes, overwrite = false, exp
 }
 
 function requireAssetUpload(uploadId) {
-  if (typeof uploadId !== "string" || !/^u[1-9][0-9]*$/.test(uploadId) || !assetUploads.has(uploadId)) fail(`Asset upload bulunamadı: ${uploadId}`, "EXI_MCP_UPLOAD_NOT_FOUND");
+  if (typeof uploadId !== "string" || !/^u[1-9][0-9]*$/.test(uploadId) || !assetUploads.has(uploadId)) fail(`Asset upload not found: ${uploadId}`, "EXI_MCP_UPLOAD_NOT_FOUND");
   return assetUploads.get(uploadId);
 }
 
 function assertChunkedAssetSize(value) {
-  if (!Number.isSafeInteger(value) || value < 0 || value > MAX_CHUNKED_ASSET_BYTES) fail(`Chunked asset boyutu 0 ile ${MAX_CHUNKED_ASSET_BYTES} arasında güvenli tamsayı olmalı.`, "EXI_MCP_FILE_LIMIT");
+  if (!Number.isSafeInteger(value) || value < 0 || value > MAX_CHUNKED_ASSET_BYTES) fail(`Chunked asset size must be a safe integer between 0 and ${MAX_CHUNKED_ASSET_BYTES}.`, "EXI_MCP_FILE_LIMIT");
   return value;
 }
 
@@ -566,11 +566,11 @@ async function writeUploadTempExclusive(tempPath, data, options = {}) {
 
 async function beginAssetUpload({ path: filePath, size, overwrite = false, expectedVersion, expectedSha256 } = {}) {
   await pruneAssetUploads();
-  if (assetUploads.size >= MAX_ASSET_UPLOADS) fail("Aktif asset upload limiti aşıldı.", "EXI_MCP_UPLOAD_LIMIT");
-  if (typeof overwrite !== "boolean") fail("overwrite boolean olmalı.");
+  if (assetUploads.size >= MAX_ASSET_UPLOADS) fail("Active asset upload limit exceeded.", "EXI_MCP_UPLOAD_LIMIT");
+  if (typeof overwrite !== "boolean") fail("overwrite must be a boolean.");
   const expectedBytes = assertChunkedAssetSize(size);
   const pendingBytes = [...assetUploads.values()].reduce((total, upload) => total + upload.expectedBytes, 0);
-  if (pendingBytes + expectedBytes > MAX_PENDING_ASSET_BYTES) fail("Bekleyen asset upload byte bütçesi aşıldı.", "EXI_MCP_UPLOAD_LIMIT");
+  if (pendingBytes + expectedBytes > MAX_PENDING_ASSET_BYTES) fail("Pending asset upload byte budget exceeded.", "EXI_MCP_UPLOAD_LIMIT");
   const target = resolveAssetFile(filePath);
   requireScaffoldFile(target);
   const normalizedSha256 = normalizeExpectedSha256(expectedSha256, `Asset ${target.relative}`);
@@ -578,7 +578,7 @@ async function beginAssetUpload({ path: filePath, size, overwrite = false, expec
   await sweepStaleUploadTemps(path.dirname(target.resolved));
   const existing = await inspectProjectFile(target);
   assertExpectedVersion(existing, expectedVersion, `Asset ${target.relative}`);
-  if (existing && !overwrite) fail(`Asset dosyası zaten var: ${target.relative}. overwrite=true gerekli.`, "EXI_MCP_FILE_EXISTS");
+  if (existing && !overwrite) fail(`Asset file already exists: ${target.relative}. overwrite=true is required.`, "EXI_MCP_FILE_EXISTS");
   const id = `u${nextAssetUploadId++}`;
   const tempPath = `${target.resolved}.exi-upload-${process.pid}-${id}`;
   try {
@@ -594,16 +594,16 @@ async function beginAssetUpload({ path: filePath, size, overwrite = false, expec
 async function writeAssetChunk({ uploadId, offset, bytes } = {}) {
   await pruneAssetUploads();
   const upload = requireAssetUpload(uploadId);
-  if (!Number.isSafeInteger(offset) || offset < 0 || offset !== upload.receivedBytes) fail("Asset chunk offset önceki receivedBytes ile aynı olmalı.", "EXI_MCP_UPLOAD_ORDER");
+  if (!Number.isSafeInteger(offset) || offset < 0 || offset !== upload.receivedBytes) fail("Asset chunk offset must equal the previous receivedBytes.", "EXI_MCP_UPLOAD_ORDER");
   const data = resolveArgument(bytes);
-  if (!(data instanceof Uint8Array) || data.byteLength === 0) fail("Asset chunk boş olmayan {$bytes: [...]} veya {$bytes: base64} olmalı.");
-  if (data.byteLength > MAX_BINARY_BYTES) fail("Tek asset chunk byte limiti aşıldı.", "EXI_MCP_FILE_LIMIT");
-  if (upload.receivedBytes + data.byteLength > upload.expectedBytes) fail("Asset chunk beklenen toplam boyutu aşıyor.", "EXI_MCP_UPLOAD_SIZE");
+  if (!(data instanceof Uint8Array) || data.byteLength === 0) fail("Asset chunk must be a non-empty {$bytes: [...]} or {$bytes: base64}.");
+  if (data.byteLength > MAX_BINARY_BYTES) fail("Single asset chunk byte limit exceeded.", "EXI_MCP_FILE_LIMIT");
+  if (upload.receivedBytes + data.byteLength > upload.expectedBytes) fail("Asset chunk exceeds the expected total size.", "EXI_MCP_UPLOAD_SIZE");
   await appendFile(upload.tempPath, data);
   upload.hash?.update(data);
   // Disk otoritesi: counter yerine lstat ile doğrula (file upload ile aynı desen — #105).
   const entry = await lstat(upload.tempPath);
-  if (entry.isSymbolicLink() || !entry.isFile() || entry.size !== upload.receivedBytes + data.byteLength) fail("Asset upload boyutu doğrulanamadı.", "EXI_MCP_UPLOAD_SIZE");
+  if (entry.isSymbolicLink() || !entry.isFile() || entry.size !== upload.receivedBytes + data.byteLength) fail("Asset upload size could not be verified.", "EXI_MCP_UPLOAD_SIZE");
   upload.receivedBytes = entry.size;
   upload.lastActivityAt = Date.now();
   upload.state = upload.receivedBytes === upload.expectedBytes ? "complete" : "receiving";
@@ -635,12 +635,12 @@ async function replaceUploadedFile(upload, existing) {
 async function commitAssetUpload({ uploadId } = {}) {
   await pruneAssetUploads();
   const upload = requireAssetUpload(uploadId);
-  if (upload.state !== "complete" || upload.receivedBytes !== upload.expectedBytes) fail(`Asset upload tamamlanmadı: ${upload.receivedBytes}/${upload.expectedBytes} byte.`, "EXI_MCP_UPLOAD_INCOMPLETE");
+  if (upload.state !== "complete" || upload.receivedBytes !== upload.expectedBytes) fail(`Asset upload is not complete: ${upload.receivedBytes}/${upload.expectedBytes} bytes.`, "EXI_MCP_UPLOAD_INCOMPLETE");
   const tempEntry = await lstat(upload.tempPath);
-  if (tempEntry.isSymbolicLink() || !tempEntry.isFile()) fail("Asset geçici upload dosyası güvenli değil.", "EXI_MCP_PATH_LINK");
+  if (tempEntry.isSymbolicLink() || !tempEntry.isFile()) fail("Asset temporary upload file is not safe.", "EXI_MCP_PATH_LINK");
   const existing = await inspectProjectFile(upload.target);
   assertExpectedVersion(existing, upload.expectedVersion, `Asset ${upload.target.relative}`);
-  if (existing && !upload.overwrite) fail(`Asset dosyası zaten var: ${upload.target.relative}. overwrite=true gerekli.`, "EXI_MCP_FILE_EXISTS");
+  if (existing && !upload.overwrite) fail(`Asset file already exists: ${upload.target.relative}. overwrite=true is required.`, "EXI_MCP_FILE_EXISTS");
   const actualSha256 = upload.hash ? upload.hash.digest("hex") : null;
   assertSha256Match(upload.expectedSha256, actualSha256, `Asset ${upload.target.relative}`);
   const overwritten = await replaceUploadedFile(upload, existing);
@@ -666,10 +666,10 @@ async function checkHTMLReferences(target, content, signal) {
       const rawReference = match[1].trim();
       let reference;
       try { reference = decodeURIComponent(rawReference).split(/[?#]/, 1)[0]; }
-      catch { return { ok: false, code: 1, stdout: "", stderr: `Geçersiz HTML asset URL'si: ${rawReference}` }; }
+      catch { return { ok: false, code: 1, stdout: "", stderr: `Invalid HTML asset URL: ${rawReference}` }; }
       if (!reference || reference.startsWith("#")) continue;
       if (/^(?:data|blob|javascript|https?):/i.test(reference)) {
-        return { ok: false, code: 1, stdout: "", stderr: `HTML dış/çalıştırılabilir referans içeriyor: ${rawReference}` };
+        return { ok: false, code: 1, stdout: "", stderr: `HTML contains an external/executable reference: ${rawReference}` };
       }
       const relativeReference = reference.startsWith("/")
         ? reference.slice(1)
@@ -678,7 +678,7 @@ async function checkHTMLReferences(target, content, signal) {
       try { referencedTarget = resolvePath(relativeReference); }
       catch (error) { return { ok: false, code: 1, stdout: "", stderr: error instanceof Error ? error.message : String(error) }; }
       const entry = await inspectProjectFile(referencedTarget);
-      if (!entry) return { ok: false, code: 1, stdout: "", stderr: `HTML referansı bulunamadı: ${referencedTarget.relative}` };
+      if (!entry) return { ok: false, code: 1, stdout: "", stderr: `HTML reference not found: ${referencedTarget.relative}` };
       references.push(referencedTarget.relative);
     }
   }
@@ -686,74 +686,74 @@ async function checkHTMLReferences(target, content, signal) {
 }
 
 async function writeProjectFile({ path: filePath, content, overwrite = false, expectedVersion, expectedSha256 } = {}) {
-  if (typeof content !== "string") fail("Proje dosyası content string olmalı.");
-  if (Buffer.byteLength(content, "utf8") > MAX_PROJECT_FILE_BYTES) fail("Proje dosyası boyut limiti aşıldı.", "EXI_MCP_FILE_LIMIT");
-  if (typeof overwrite !== "boolean") fail("overwrite boolean olmalı.");
+  if (typeof content !== "string") fail("Project file content must be a string.");
+  if (Buffer.byteLength(content, "utf8") > MAX_PROJECT_FILE_BYTES) fail("Project file size limit exceeded.", "EXI_MCP_FILE_LIMIT");
+  if (typeof overwrite !== "boolean") fail("overwrite must be a boolean.");
   const target = resolveProjectFile(filePath);
   requireScaffoldFile(target);
-  const normalizedSha256 = normalizeExpectedSha256(expectedSha256, `Proje dosyası ${target.relative}`);
+  const normalizedSha256 = normalizeExpectedSha256(expectedSha256, `Project file ${target.relative}`);
   await ensureProjectParent(target);
   const existing = await inspectProjectFile(target);
-  assertExpectedVersion(existing, expectedVersion, `Proje dosyası ${target.relative}`);
-  if (existing && !overwrite) fail(`Proje dosyası zaten var: ${target.relative}. overwrite=true gerekli.`, "EXI_MCP_FILE_EXISTS");
+  assertExpectedVersion(existing, expectedVersion, `Project file ${target.relative}`);
+  if (existing && !overwrite) fail(`Project file already exists: ${target.relative}. overwrite=true is required.`, "EXI_MCP_FILE_EXISTS");
   const actualSha256 = sha256Bytes(Buffer.from(content, "utf8"));
-  assertSha256Match(normalizedSha256, actualSha256, `Proje dosyası ${target.relative}`);
+  assertSha256Match(normalizedSha256, actualSha256, `Project file ${target.relative}`);
   const overwritten = await writeProjectTarget(target, content, existing);
   return { path: target.relative, bytes: Buffer.byteLength(content, "utf8"), sha256: actualSha256, overwritten };
 }
 
 async function patchProjectFile({ path: filePath, find, replace } = {}) {
-  if (typeof find !== "string" || find.length === 0) fail("Patch find boş olmayan string olmalı.", "EXI_MCP_PATCH_MATCH");
-  if (typeof replace !== "string") fail("Patch replace string olmalı.", "EXI_MCP_PATCH_REPLACE");
-  if (Buffer.byteLength(find, "utf8") > MAX_PROJECT_PATCH_TEXT_BYTES || Buffer.byteLength(replace, "utf8") > MAX_PROJECT_PATCH_TEXT_BYTES) fail("Patch find/replace byte limiti aşıldı.", "EXI_MCP_FILE_LIMIT");
+  if (typeof find !== "string" || find.length === 0) fail("Patch find must be a non-empty string.", "EXI_MCP_PATCH_MATCH");
+  if (typeof replace !== "string") fail("Patch replace must be a string.", "EXI_MCP_PATCH_REPLACE");
+  if (Buffer.byteLength(find, "utf8") > MAX_PROJECT_PATCH_TEXT_BYTES || Buffer.byteLength(replace, "utf8") > MAX_PROJECT_PATCH_TEXT_BYTES) fail("Patch find/replace byte limit exceeded.", "EXI_MCP_FILE_LIMIT");
   const target = resolveProjectFile(filePath);
   requireScaffoldFile(target);
   const existing = await inspectProjectFile(target);
-  if (!existing) fail(`Proje dosyası bulunamadı: ${target.relative}`, "EXI_MCP_FILE_NOT_FOUND");
-  if (existing.size > MAX_CHUNKED_PROJECT_FILE_BYTES) fail("Proje dosyası chunked boyut limiti aşıldı.", "EXI_MCP_FILE_LIMIT");
+  if (!existing) fail(`Project file not found: ${target.relative}`, "EXI_MCP_FILE_NOT_FOUND");
+  if (existing.size > MAX_CHUNKED_PROJECT_FILE_BYTES) fail("Project file chunked size limit exceeded.", "EXI_MCP_FILE_LIMIT");
   const data = await readFile(target.resolved);
-  if (data.byteLength > MAX_CHUNKED_PROJECT_FILE_BYTES) fail("Proje dosyası chunked boyut limiti aşıldı.", "EXI_MCP_FILE_LIMIT");
+  if (data.byteLength > MAX_CHUNKED_PROJECT_FILE_BYTES) fail("Project file chunked size limit exceeded.", "EXI_MCP_FILE_LIMIT");
   let content;
   try { content = new TextDecoder("utf-8", { fatal: true }).decode(data); }
-  catch { fail("Proje dosyası geçerli UTF-8 değil.", "EXI_MCP_FILE_TYPE"); }
+  catch { fail("Project file is not valid UTF-8.", "EXI_MCP_FILE_TYPE"); }
   const matchIndex = content.indexOf(find);
-  if (matchIndex < 0) fail(`Patch metni bulunamadı: ${target.relative}`, "EXI_MCP_PATCH_NOT_FOUND");
-  if (content.indexOf(find, matchIndex + find.length) >= 0) fail(`Patch metni birden fazla eşleşti: ${target.relative}`, "EXI_MCP_PATCH_AMBIGUOUS");
+  if (matchIndex < 0) fail(`Patch text not found: ${target.relative}`, "EXI_MCP_PATCH_NOT_FOUND");
+  if (content.indexOf(find, matchIndex + find.length) >= 0) fail(`Patch text matched more than once: ${target.relative}`, "EXI_MCP_PATCH_AMBIGUOUS");
   const nextContent = `${content.slice(0, matchIndex)}${replace}${content.slice(matchIndex + find.length)}`;
   const nextBytes = Buffer.byteLength(nextContent, "utf8");
-  if (nextBytes > MAX_CHUNKED_PROJECT_FILE_BYTES) fail("Patch sonrası proje dosyası chunked boyut limiti aşıldı.", "EXI_MCP_FILE_LIMIT");
+  if (nextBytes > MAX_CHUNKED_PROJECT_FILE_BYTES) fail("Project file chunked size limit exceeded after patch.", "EXI_MCP_FILE_LIMIT");
   const overwritten = await writeProjectTarget(target, nextContent, existing);
   return { path: target.relative, bytes: nextBytes, replacedBytes: Buffer.byteLength(replace, "utf8"), matchCount: 1, overwritten };
 }
 
 async function applyProjectFiles({ path: directoryPath, files, overwrite = false } = {}) {
-  if (!Array.isArray(files) || files.length === 0 || files.length > MAX_PROJECT_APPLY_FILES) fail(`Project apply 1 ile ${MAX_PROJECT_APPLY_FILES} dosya arasında olmalı.`, "EXI_MCP_PROJECT_APPLY_LIMIT");
-  if (typeof overwrite !== "boolean") fail("overwrite boolean olmalı.");
+  if (!Array.isArray(files) || files.length === 0 || files.length > MAX_PROJECT_APPLY_FILES) fail(`Project apply must have between 1 and ${MAX_PROJECT_APPLY_FILES} files.`, "EXI_MCP_PROJECT_APPLY_LIMIT");
+  if (typeof overwrite !== "boolean") fail("overwrite must be a boolean.");
   const directory = resolvePath(directoryPath);
   requireScaffoldDirectory(directory);
   const directoryEntry = await lstat(directory.resolved);
-  if (directoryEntry.isSymbolicLink() || !directoryEntry.isDirectory()) fail("Project apply hedefi klasör olmalı.", "EXI_MCP_PATH_LINK");
+  if (directoryEntry.isSymbolicLink() || !directoryEntry.isDirectory()) fail("Project apply target must be a directory.", "EXI_MCP_PATH_LINK");
   const seen = new Set();
   let totalBytes = 0;
   const entries = [];
   for (const file of files) {
-    if (!isRecord(file) || typeof file.path !== "string" || !file.path.trim()) fail("Project apply dosyası path içermeli.", "EXI_MCP_PROJECT_APPLY_INPUT");
-    if (typeof file.content !== "string") fail("Project apply dosyası content string olmalı.", "EXI_MCP_PROJECT_APPLY_INPUT");
+    if (!isRecord(file) || typeof file.path !== "string" || !file.path.trim()) fail("Project apply file must contain a path.", "EXI_MCP_PROJECT_APPLY_INPUT");
+    if (typeof file.content !== "string") fail("Project apply file content must be a string.", "EXI_MCP_PROJECT_APPLY_INPUT");
     const relativeFile = file.path.replaceAll("\\", "/");
-    if (path.isAbsolute(file.path) || relativeFile.startsWith("/") || relativeFile.includes("\0") || relativeFile.split("/").some((part) => part === "..")) fail("Project apply dosya yolu relative ve traversal’sız olmalı.", "EXI_MCP_FILE_PATH");
+    if (path.isAbsolute(file.path) || relativeFile.startsWith("/") || relativeFile.includes("\0") || relativeFile.split("/").some((part) => part === "..")) fail("Project apply file path must be relative and traversal-free.", "EXI_MCP_FILE_PATH");
     const target = resolveProjectFile(`${directory.relative}/${relativeFile}`);
     const key = target.relative.toLowerCase();
-    if (seen.has(key)) fail(`Project apply aynı dosyayı birden fazla içeriyor: ${target.relative}`, "EXI_MCP_PROJECT_APPLY_DUPLICATE");
+    if (seen.has(key)) fail(`Project apply contains the same file more than once: ${target.relative}`, "EXI_MCP_PROJECT_APPLY_DUPLICATE");
     seen.add(key);
     const bytes = Buffer.byteLength(file.content, "utf8");
-    if (bytes > MAX_PROJECT_FILE_BYTES) fail(`Project apply tek dosya byte limiti aşıldı: ${target.relative}`, "EXI_MCP_FILE_LIMIT");
+    if (bytes > MAX_PROJECT_FILE_BYTES) fail(`Project apply single file byte limit exceeded: ${target.relative}`, "EXI_MCP_FILE_LIMIT");
     totalBytes += bytes;
-    if (totalBytes > MAX_PROJECT_APPLY_BYTES) fail(`Project apply toplam byte limiti ${MAX_PROJECT_APPLY_BYTES} aşıldı.`, "EXI_MCP_PROJECT_APPLY_LIMIT");
+    if (totalBytes > MAX_PROJECT_APPLY_BYTES) fail(`Project apply total byte limit ${MAX_PROJECT_APPLY_BYTES} exceeded.`, "EXI_MCP_PROJECT_APPLY_LIMIT");
     requireScaffoldFile(target);
     const existing = await inspectProjectFile(target, { allowMissingParent: true });
     const expectedVersion = file.expectedVersion;
     assertExpectedVersion(existing, expectedVersion, `Project apply ${target.relative}`);
-    if (existing && !overwrite) fail(`Proje dosyası zaten var: ${target.relative}. overwrite=true gerekli.`, "EXI_MCP_FILE_EXISTS");
+    if (existing && !overwrite) fail(`Project file already exists: ${target.relative}. overwrite=true is required.`, "EXI_MCP_FILE_EXISTS");
     entries.push({ target, content: file.content, bytes, existing, expectedVersion, id: `a${nextWriteId++}`, tempPath: null, backupPath: null, committed: false });
   }
 
@@ -763,9 +763,9 @@ async function applyProjectFiles({ path: directoryPath, files, overwrite = false
     const current = await inspectProjectFile(entry.target);
     const expectedVersion = entry.expectedVersion || projectVersion(entry.existing);
     if (expectedVersion) {
-      if (!current || current.size !== expectedVersion.bytes || current.mtimeMs !== expectedVersion.mtimeMs) fail(`Project apply hedefi çağrı sırasında değişti: ${entry.target.relative}`, "EXI_MCP_FILE_CONFLICT");
+      if (!current || current.size !== expectedVersion.bytes || current.mtimeMs !== expectedVersion.mtimeMs) fail(`Project apply target changed during the call: ${entry.target.relative}`, "EXI_MCP_FILE_CONFLICT");
     } else if (current) {
-      fail(`Project apply hedefi çağrı sırasında oluşturuldu: ${entry.target.relative}`, "EXI_MCP_FILE_CONFLICT");
+      fail(`Project apply target was created during the call: ${entry.target.relative}`, "EXI_MCP_FILE_CONFLICT");
     }
   };
   try {
@@ -776,7 +776,7 @@ async function applyProjectFiles({ path: directoryPath, files, overwrite = false
       staged.push(entry);
       await writeFile(entry.tempPath, entry.content, { encoding: "utf8", flag: "wx" });
       const tempEntry = await lstat(entry.tempPath);
-      if (tempEntry.isSymbolicLink() || !tempEntry.isFile() || tempEntry.size !== entry.bytes) fail("Project apply geçici dosyası güvenli değil.", "EXI_MCP_PATH_LINK");
+      if (tempEntry.isSymbolicLink() || !tempEntry.isFile() || tempEntry.size !== entry.bytes) fail("Project apply temporary file is not safe.", "EXI_MCP_PATH_LINK");
     }
     for (const entry of staged) {
       await assertUnchanged(entry);
@@ -813,19 +813,19 @@ async function applyProjectFiles({ path: directoryPath, files, overwrite = false
 }
 
 function assertChunkedProjectFileSize(value) {
-  if (!Number.isSafeInteger(value) || value < 0 || value > MAX_CHUNKED_PROJECT_FILE_BYTES) fail(`Chunked proje dosyası boyutu 0 ile ${MAX_CHUNKED_PROJECT_FILE_BYTES} arasında güvenli tamsayı olmalı.`, "EXI_MCP_FILE_LIMIT");
+  if (!Number.isSafeInteger(value) || value < 0 || value > MAX_CHUNKED_PROJECT_FILE_BYTES) fail(`Chunked project file size must be a safe integer between 0 and ${MAX_CHUNKED_PROJECT_FILE_BYTES}.`, "EXI_MCP_FILE_LIMIT");
   return value;
 }
 
 function requireProjectFileUpload(uploadId) {
-  if (typeof uploadId !== "string" || !/^f[1-9][0-9]*$/.test(uploadId) || !projectFileUploads.has(uploadId)) fail(`Proje file upload bulunamadı: ${uploadId}`, "EXI_MCP_UPLOAD_NOT_FOUND");
+  if (typeof uploadId !== "string" || !/^f[1-9][0-9]*$/.test(uploadId) || !projectFileUploads.has(uploadId)) fail(`Project file upload not found: ${uploadId}`, "EXI_MCP_UPLOAD_NOT_FOUND");
   return projectFileUploads.get(uploadId);
 }
 
 function assertProjectFileChunk(content) {
-  if (typeof content !== "string" || content.length === 0) fail("Proje file chunk boş olmayan UTF-8 string olmalı.");
+  if (typeof content !== "string" || content.length === 0) fail("Project file chunk must be a non-empty UTF-8 string.");
   const bytes = Buffer.byteLength(content, "utf8");
-  if (bytes > MAX_PROJECT_FILE_CHUNK_BYTES) fail("Tek proje file chunk byte limiti aşıldı.", "EXI_MCP_FILE_LIMIT");
+  if (bytes > MAX_PROJECT_FILE_CHUNK_BYTES) fail("Single project file chunk byte limit exceeded.", "EXI_MCP_FILE_LIMIT");
   return { content, bytes };
 }
 
@@ -845,19 +845,19 @@ async function pruneProjectFileUploads() {
 
 async function beginProjectFileUpload({ path: filePath, size, overwrite = false, expectedVersion, expectedSha256 } = {}) {
   await pruneProjectFileUploads();
-  if (projectFileUploads.size >= MAX_PROJECT_FILE_UPLOADS) fail("Aktif proje file upload limiti aşıldı.", "EXI_MCP_UPLOAD_LIMIT");
-  if (typeof overwrite !== "boolean") fail("overwrite boolean olmalı.");
+  if (projectFileUploads.size >= MAX_PROJECT_FILE_UPLOADS) fail("Active project file upload limit exceeded.", "EXI_MCP_UPLOAD_LIMIT");
+  if (typeof overwrite !== "boolean") fail("overwrite must be a boolean.");
   const expectedBytes = assertChunkedProjectFileSize(size);
   const pendingBytes = [...projectFileUploads.values()].reduce((total, upload) => total + upload.expectedBytes, 0);
-  if (pendingBytes + expectedBytes > MAX_PENDING_PROJECT_FILE_BYTES) fail("Bekleyen proje file upload byte bütçesi aşıldı.", "EXI_MCP_UPLOAD_LIMIT");
+  if (pendingBytes + expectedBytes > MAX_PENDING_PROJECT_FILE_BYTES) fail("Pending project file upload byte budget exceeded.", "EXI_MCP_UPLOAD_LIMIT");
   const target = resolveProjectFile(filePath);
   requireScaffoldFile(target);
-  const normalizedSha256 = normalizeExpectedSha256(expectedSha256, `Proje dosyası ${target.relative}`);
+  const normalizedSha256 = normalizeExpectedSha256(expectedSha256, `Project file ${target.relative}`);
   await ensureProjectParent(target);
   await sweepStaleUploadTemps(path.dirname(target.resolved));
   const existing = await inspectProjectFile(target);
-  assertExpectedVersion(existing, expectedVersion, `Proje dosyası ${target.relative}`);
-  if (existing && !overwrite) fail(`Proje dosyası zaten var: ${target.relative}. overwrite=true gerekli.`, "EXI_MCP_FILE_EXISTS");
+  assertExpectedVersion(existing, expectedVersion, `Project file ${target.relative}`);
+  if (existing && !overwrite) fail(`Project file already exists: ${target.relative}. overwrite=true is required.`, "EXI_MCP_FILE_EXISTS");
   const id = `f${nextProjectFileUploadId++}`;
   const tempPath = `${target.resolved}.exi-file-upload-${process.pid}-${id}`;
   try {
@@ -873,13 +873,13 @@ async function beginProjectFileUpload({ path: filePath, size, overwrite = false,
 async function writeProjectFileChunk({ fileUploadId, offset, content } = {}) {
   await pruneProjectFileUploads();
   const upload = requireProjectFileUpload(fileUploadId);
-  if (!Number.isSafeInteger(offset) || offset < 0 || offset !== upload.receivedBytes) fail("Proje file chunk offset önceki receivedBytes ile aynı olmalı.", "EXI_MCP_UPLOAD_ORDER");
+  if (!Number.isSafeInteger(offset) || offset < 0 || offset !== upload.receivedBytes) fail("Project file chunk offset must equal the previous receivedBytes.", "EXI_MCP_UPLOAD_ORDER");
   const chunk = assertProjectFileChunk(content);
-  if (upload.receivedBytes + chunk.bytes > upload.expectedBytes) fail("Proje file chunk beklenen toplam boyutu aşıyor.", "EXI_MCP_UPLOAD_SIZE");
+  if (upload.receivedBytes + chunk.bytes > upload.expectedBytes) fail("Project file chunk exceeds the expected total size.", "EXI_MCP_UPLOAD_SIZE");
   await appendFile(upload.tempPath, chunk.content, { encoding: "utf8" });
   upload.hash?.update(Buffer.from(chunk.content, "utf8"));
   const entry = await lstat(upload.tempPath);
-  if (entry.isSymbolicLink() || !entry.isFile() || entry.size !== upload.receivedBytes + chunk.bytes) fail("Proje file upload boyutu doğrulanamadı.", "EXI_MCP_UPLOAD_SIZE");
+  if (entry.isSymbolicLink() || !entry.isFile() || entry.size !== upload.receivedBytes + chunk.bytes) fail("Project file upload size could not be verified.", "EXI_MCP_UPLOAD_SIZE");
   upload.receivedBytes = entry.size;
   upload.lastActivityAt = Date.now();
   upload.state = upload.receivedBytes === upload.expectedBytes ? "complete" : "receiving";
@@ -889,14 +889,14 @@ async function writeProjectFileChunk({ fileUploadId, offset, content } = {}) {
 async function commitProjectFileUpload({ fileUploadId } = {}) {
   await pruneProjectFileUploads();
   const upload = requireProjectFileUpload(fileUploadId);
-  if (upload.state !== "complete" || upload.receivedBytes !== upload.expectedBytes) fail(`Proje file upload tamamlanmadı: ${upload.receivedBytes}/${upload.expectedBytes} byte.`, "EXI_MCP_UPLOAD_INCOMPLETE");
+  if (upload.state !== "complete" || upload.receivedBytes !== upload.expectedBytes) fail(`Project file upload is not complete: ${upload.receivedBytes}/${upload.expectedBytes} bytes.`, "EXI_MCP_UPLOAD_INCOMPLETE");
   const tempEntry = await lstat(upload.tempPath);
-  if (tempEntry.isSymbolicLink() || !tempEntry.isFile() || tempEntry.size !== upload.expectedBytes) fail("Proje file geçici upload dosyası güvenli değil.", "EXI_MCP_PATH_LINK");
+  if (tempEntry.isSymbolicLink() || !tempEntry.isFile() || tempEntry.size !== upload.expectedBytes) fail("Project file temporary upload file is not safe.", "EXI_MCP_PATH_LINK");
   const existing = await inspectProjectFile(upload.target);
-  assertExpectedVersion(existing, upload.expectedVersion, `Proje dosyası ${upload.target.relative}`);
-  if (existing && !upload.overwrite) fail(`Proje dosyası zaten var: ${upload.target.relative}. overwrite=true gerekli.`, "EXI_MCP_FILE_EXISTS");
+  assertExpectedVersion(existing, upload.expectedVersion, `Project file ${upload.target.relative}`);
+  if (existing && !upload.overwrite) fail(`Project file already exists: ${upload.target.relative}. overwrite=true is required.`, "EXI_MCP_FILE_EXISTS");
   const actualSha256 = upload.hash ? upload.hash.digest("hex") : null;
-  assertSha256Match(upload.expectedSha256, actualSha256, `Proje dosyası ${upload.target.relative}`);
+  assertSha256Match(upload.expectedSha256, actualSha256, `Project file ${upload.target.relative}`);
   const overwritten = await replaceUploadedFile(upload, existing);
   projectFileUploads.delete(upload.id);
   return { fileUploadId, path: upload.target.relative, bytes: upload.expectedBytes, ...(actualSha256 ? { sha256: actualSha256 } : {}), overwritten };
@@ -913,13 +913,13 @@ async function checkProjectFile({ path: filePath } = {}, signal) {
   const target = resolveProjectFile(filePath);
   requireScaffoldFile(target);
   const entry = await inspectProjectFile(target);
-  if (!entry) fail(`Proje dosyası bulunamadı: ${target.relative}`, "EXI_MCP_FILE_NOT_FOUND");
-  if (entry.size > MAX_CHUNKED_PROJECT_FILE_BYTES) fail("Proje dosyası chunked boyut limiti aşıldı.", "EXI_MCP_FILE_LIMIT");
+  if (!entry) fail(`Project file not found: ${target.relative}`, "EXI_MCP_FILE_NOT_FOUND");
+  if (entry.size > MAX_CHUNKED_PROJECT_FILE_BYTES) fail("Project file chunked size limit exceeded.", "EXI_MCP_FILE_LIMIT");
   const extension = path.extname(target.relative).toLowerCase();
   if (extension === ".json") {
     const content = await readFile(target.resolved, { encoding: "utf8", signal });
     throwIfCancelled(signal);
-    if (Buffer.byteLength(content, "utf8") > MAX_CHUNKED_PROJECT_FILE_BYTES) fail("Proje dosyası chunked boyut limiti aşıldı.", "EXI_MCP_FILE_LIMIT");
+    if (Buffer.byteLength(content, "utf8") > MAX_CHUNKED_PROJECT_FILE_BYTES) fail("Project file chunked size limit exceeded.", "EXI_MCP_FILE_LIMIT");
     assertProjectJSONBudget(content);
     try {
       JSON.parse(content);
@@ -931,10 +931,10 @@ async function checkProjectFile({ path: filePath } = {}, signal) {
   if (htmlCheckExtensions.has(extension)) {
     const content = await readFile(target.resolved, { encoding: "utf8", signal });
     throwIfCancelled(signal);
-    if (Buffer.byteLength(content, "utf8") > MAX_CHUNKED_PROJECT_FILE_BYTES) fail("Proje dosyası chunked boyut limiti aşıldı.", "EXI_MCP_FILE_LIMIT");
+    if (Buffer.byteLength(content, "utf8") > MAX_CHUNKED_PROJECT_FILE_BYTES) fail("Project file chunked size limit exceeded.", "EXI_MCP_FILE_LIMIT");
     return { path: target.relative, kind: "html", ...await checkHTMLReferences(target, content, signal) };
   }
-  if (!syntaxCheckExtensions.has(extension)) fail("Syntax check yalnızca .js, .mjs veya .json dosyalarında çalışır.", "EXI_MCP_FILE_TYPE");
+  if (!syntaxCheckExtensions.has(extension)) fail("Syntax check only works on .js, .mjs or .json files.", "EXI_MCP_FILE_TYPE");
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, ["--check", target.resolved], {
       cwd: ROOT,
@@ -961,7 +961,7 @@ async function checkProjectFile({ path: filePath } = {}, signal) {
       if (settled) return;
       settled = true;
       signal?.removeEventListener("abort", onAbort);
-      finishAfterCleanup(() => resolve({ path: target.relative, kind: "javascript", ok: false, code: 1, signal: "SIGTERM", stdout, stderr: `${stderr}\nsyntax check zaman aşımı.`.slice(-MAX_OUTPUT_BYTES) }));
+      finishAfterCleanup(() => resolve({ path: target.relative, kind: "javascript", ok: false, code: 1, signal: "SIGTERM", stdout, stderr: `${stderr}\nsyntax check timed out.`.slice(-MAX_OUTPUT_BYTES) }));
     }, 30_000);
     child.stdout.on("data", (chunk) => { stdout = append(stdout, chunk.toString()); });
     child.stderr.on("data", (chunk) => { stderr = append(stderr, chunk.toString()); });
@@ -987,8 +987,8 @@ async function checkProject({ path: directoryPath } = {}, signal, progressToken)
   const listing = await listProjectFiles({ path: directoryPath });
   throwIfCancelled(signal);
   const checkable = listing.files.filter((file) => [".html", ".js", ".json", ".mjs"].includes(path.extname(file.path).toLowerCase()));
-  if (checkable.length > MAX_PROJECT_CHECK_FILES) fail(`Tek çağrıda en fazla ${MAX_PROJECT_CHECK_FILES} proje dosyası kontrol edilebilir.`, "EXI_MCP_FILE_LIMIT");
-  sendProgress(progressToken, 0, checkable.length, "Proje statik kontrolü başladı.");
+  if (checkable.length > MAX_PROJECT_CHECK_FILES) fail(`At most ${MAX_PROJECT_CHECK_FILES} project files can be checked in one call.`, "EXI_MCP_FILE_LIMIT");
+  sendProgress(progressToken, 0, checkable.length, "Project static check started.");
   const failures = [];
   let failureCount = 0;
   for (const [index, file] of checkable.entries()) {
@@ -1004,7 +1004,7 @@ async function checkProject({ path: directoryPath } = {}, signal, progressToken)
       failureCount += 1;
       if (failures.length < MAX_PROJECT_CHECK_FAILURES) failures.push({ path: result.path, kind: result.kind, code: result.code ?? 1, stderr: String(result.stderr || "").slice(-MAX_PROJECT_CHECK_ERROR_BYTES) });
     }
-    sendProgress(progressToken, index + 1, checkable.length, `Kontrol edildi: ${file.path}`);
+    sendProgress(progressToken, index + 1, checkable.length, `Checked: ${file.path}`);
   }
   throwIfCancelled(signal);
   return { directory: listing.directory, ok: failureCount === 0, files: listing.files.length, checked: checkable.length, skipped: listing.files.length - checkable.length, failureCount, failures };
@@ -1139,19 +1139,19 @@ function apiContract() {
 }
 
 function assertPublicPath(value, label = "path") {
-  if (typeof value !== "string" || !value || value.length > 512) fail(`${label} geçersiz.`);
+  if (typeof value !== "string" || !value || value.length > 512) fail(`${label} is invalid.`);
   const segments = value.split(".");
-  if (segments.some((segment) => !segment || segment.startsWith("_") || forbiddenKeys.has(segment) || !/^[A-Za-z][A-Za-z0-9_$]*$/.test(segment))) fail(`${label} public export yolu olmalı.`);
+  if (segments.some((segment) => !segment || segment.startsWith("_") || forbiddenKeys.has(segment) || !/^[A-Za-z][A-Za-z0-9_$]*$/.test(segment))) fail(`${label} must be a public export path.`);
   return segments;
 }
 
 function resolveExportPath(value) {
   const segments = assertPublicPath(value);
   let current = engineExports[segments[0]];
-  if (current === undefined) fail(`Public export bulunamadı: ${value}`);
+  if (current === undefined) fail(`Public export not found: ${value}`);
   let parent = null;
   for (const segment of segments.slice(1)) {
-    if ((current === null || (typeof current !== "object" && typeof current !== "function")) || !Object.hasOwn(current, segment)) fail(`Public export yolu bulunamadı: ${value}`);
+    if ((current === null || (typeof current !== "object" && typeof current !== "function")) || !Object.hasOwn(current, segment)) fail(`Public export path not found: ${value}`);
     parent = current;
     current = current[segment];
   }
@@ -1166,7 +1166,7 @@ function registerHandle(value, protectedValue = false) {
     if (protectedValue) protectedHandles.add(existing);
     return existing;
   }
-  if (handles.size >= MAX_HANDLES) fail("Aktif engine handle limiti aşıldı.", "EXI_MCP_HANDLE_LIMIT");
+  if (handles.size >= MAX_HANDLES) fail("Active engine handle limit exceeded.", "EXI_MCP_HANDLE_LIMIT");
   const handle = `h${nextHandleId++}`;
   handles.set(handle, value);
   if (protectedValue) protectedHandles.add(handle);
@@ -1182,30 +1182,30 @@ function isHandleable(value) {
 }
 
 function requireHandle(value) {
-  if (typeof value !== "string" || !/^h[1-9][0-9]*$/.test(value)) fail("Geçersiz engine handle.");
+  if (typeof value !== "string" || !/^h[1-9][0-9]*$/.test(value)) fail("Invalid engine handle.");
   const object = handles.get(value);
-  if (!object) fail(`Engine handle bulunamadı: ${value}`);
+  if (!object) fail(`Engine handle not found: ${value}`);
   return object;
 }
 
 function resolveBytes(value) {
   if (Object.keys(value).length !== 1 || !Object.hasOwn(value, "$bytes")) return null;
   if (Array.isArray(value.$bytes)) {
-    if (value.$bytes.length > MAX_BINARY_BYTES) fail("Byte array limiti aşıldı.");
-    if (value.$bytes.some((byte) => !Number.isInteger(byte) || byte < 0 || byte > 255)) fail("Byte array yalnızca 0..255 tamsayıları içermeli.");
+    if (value.$bytes.length > MAX_BINARY_BYTES) fail("Byte array limit exceeded.");
+    if (value.$bytes.some((byte) => !Number.isInteger(byte) || byte < 0 || byte > 255)) fail("Byte array must only contain integers 0..255.");
     return Uint8Array.from(value.$bytes);
   }
-  if (typeof value.$bytes !== "string") fail("$bytes base64 metni veya byte array olmalı.");
+  if (typeof value.$bytes !== "string") fail("$bytes must be base64 text or a byte array.");
   const encoded = value.$bytes;
-  if (encoded.length > MAX_BASE64_STRING_LENGTH) fail("Base64 byte metni limiti aşıldı.");
-  if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(encoded)) fail("$bytes geçerli base64 olmalı.");
+  if (encoded.length > MAX_BASE64_STRING_LENGTH) fail("Base64 byte text limit exceeded.");
+  if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(encoded)) fail("$bytes must be valid base64.");
   const bytes = Uint8Array.from(Buffer.from(encoded, "base64"));
-  if (bytes.byteLength > MAX_BINARY_BYTES) fail("Byte verisi limiti aşıldı.");
+  if (bytes.byteLength > MAX_BINARY_BYTES) fail("Byte data limit exceeded.");
   return bytes;
 }
 
 function resolveArgument(value, depth = 0) {
-  if (depth > MAX_VALUE_DEPTH) fail("Argüman veri derinliği limiti aşıldı.");
+  if (depth > MAX_VALUE_DEPTH) fail("Argument data depth limit exceeded.");
   if (Array.isArray(value)) return value.map((item) => resolveArgument(item, depth + 1));
   if (!value || typeof value !== "object") return value;
   const bytes = resolveBytes(value);
@@ -1213,7 +1213,7 @@ function resolveArgument(value, depth = 0) {
   if (Object.keys(value).length === 1 && typeof value.$handle === "string") return requireHandle(value.$handle);
   const resolved = {};
   for (const [key, item] of Object.entries(value)) {
-    if (forbiddenKeys.has(key)) fail(`Güvenli olmayan argüman alanı: ${key}`);
+    if (forbiddenKeys.has(key)) fail(`Unsafe argument field: ${key}`);
     resolved[key] = resolveArgument(item, depth + 1);
   }
   return resolved;
@@ -1221,7 +1221,7 @@ function resolveArgument(value, depth = 0) {
 
 function resolveArgs(value) {
   if (value === undefined) return [];
-  if (!Array.isArray(value)) fail("args array olmalı.", "EXI_MCP_ARGS_TYPE");
+  if (!Array.isArray(value)) fail("args must be an array.", "EXI_MCP_ARGS_TYPE");
   return value.map((item) => resolveArgument(item));
 }
 
@@ -1298,25 +1298,25 @@ function getPublicMethod(object, method) {
     const ownerName = prototype.constructor?.name;
     const descriptor = Object.getOwnPropertyDescriptor(prototype, method);
     if (descriptor) {
-      if (!isPublicMethod(ownerName, method)) fail(`Public method değil: ${method}`);
-      if (typeof descriptor.value !== "function") fail(`Public method değil: ${method}`);
+      if (!isPublicMethod(ownerName, method)) fail(`Not a public method: ${method}`);
+      if (typeof descriptor.value !== "function") fail(`Not a public method: ${method}`);
       return descriptor.value;
     }
     prototype = Object.getPrototypeOf(prototype);
   }
-  fail(`Engine method bulunamadı: ${method}`);
+  fail(`Engine method not found: ${method}`);
 }
 
 function getPublicStaticMethod(Constructor, method) {
   assertPublicName(method, "method");
   const descriptor = Object.getOwnPropertyDescriptor(Constructor, method);
-  if (!descriptor || typeof descriptor.value !== "function") fail(`Static method bulunamadı: ${Constructor.name}.${method}`);
+  if (!descriptor || typeof descriptor.value !== "function") fail(`Static method not found: ${Constructor.name}.${method}`);
   return descriptor.value;
 }
 
 function getPublicProperty(object, property) {
   assertPublicName(property, "property");
-  if (!findPropertyDescriptor(object, property)) fail(`Engine property bulunamadı: ${property}`);
+  if (!findPropertyDescriptor(object, property)) fail(`Engine property not found: ${property}`);
   return object[property];
 }
 
@@ -1355,24 +1355,24 @@ function inspectHandle(object, handle) {
 function createExported(name, args) {
   assertPublicName(name, "type");
   const Constructor = engineExports[name];
-  if (!isClass(Constructor)) fail(`Oluşturulabilir public class bulunamadı: ${name}`);
+  if (!isClass(Constructor)) fail(`Constructible public class not found: ${name}`);
   return new Constructor(...args);
 }
 
 async function buildScene(spec, state, depth = 0) {
-  if (!spec || typeof spec !== "object" || Array.isArray(spec)) fail("Sahne spec nesne olmalı.");
-  if (depth > MAX_SCENE_DEPTH) fail("Sahne derinliği limiti aşıldı.", "EXI_MCP_SCENE_LIMIT");
-  for (const key of Object.keys(spec)) if (!sceneSpecFields.has(key)) fail(`Sahne spec alanı bilinmiyor: ${key}`, "EXI_MCP_SCENE_SCHEMA");
+  if (!spec || typeof spec !== "object" || Array.isArray(spec)) fail("Scene spec must be an object.");
+  if (depth > MAX_SCENE_DEPTH) fail("Scene depth limit exceeded.", "EXI_MCP_SCENE_LIMIT");
+  for (const key of Object.keys(spec)) if (!sceneSpecFields.has(key)) fail(`Unknown scene spec field: ${key}`, "EXI_MCP_SCENE_SCHEMA");
   state.nodes += 1;
-  if (state.nodes > MAX_SCENE_NODES) fail("Sahne node limiti aşıldı.", "EXI_MCP_SCENE_LIMIT");
+  if (state.nodes > MAX_SCENE_NODES) fail("Scene node limit exceeded.", "EXI_MCP_SCENE_LIMIT");
   const type = assertPublicName(spec.type, "scene.type");
-  if (spec.options !== undefined && !isRecord(spec.options)) fail("Sahne options object olmalı.", "EXI_MCP_SCENE_SCHEMA");
+  if (spec.options !== undefined && !isRecord(spec.options)) fail("Scene options must be an object.", "EXI_MCP_SCENE_SCHEMA");
   const options = spec.options === undefined ? [] : [resolveArgument(spec.options)];
   const object = createExported(type, options);
   const handle = registerHandle(object);
   state.created.push(handle);
   const children = spec.children === undefined ? [] : spec.children;
-  if (!Array.isArray(children) || children.length > MAX_SCENE_NODES) fail("Sahne children alanı geçersiz.", "EXI_MCP_SCENE_SCHEMA");
+  if (!Array.isArray(children) || children.length > MAX_SCENE_NODES) fail("Scene children field is invalid.", "EXI_MCP_SCENE_SCHEMA");
   if (children.length) {
     const add = getPublicMethod(object, "add");
     for (const child of children) await buildScene(child, state, depth + 1).then((built) => add.call(object, requireHandle(built.$handle)));
@@ -1393,7 +1393,7 @@ function scaffoldFiles(relativeDirectory) {
 
 async function scaffold({ directory = "ai-game", overwrite = false } = {}) {
   const target = resolvePath(directory);
-  if (target.resolved === ROOT) fail("Scaffold repo köküne değil, ayrı bir alt klasöre yazmalı.");
+  if (target.resolved === ROOT) fail("Scaffold must write to a separate subdirectory, not the repository root.");
   assertScaffoldDirectory(target);
   const files = scaffoldFiles(target.relative);
   files["game.js"] = files["game.js"].replace(
@@ -1415,7 +1415,7 @@ async function scaffold({ directory = "ai-game", overwrite = false } = {}) {
     for (const name of fileNames) {
       try { await lstat(path.join(target.resolved, name)); }
       catch (error) { if (error?.code === "ENOENT") continue; throw error; }
-      fail(`Scaffold dosyası zaten var: ${target.relative}/${name}. overwrite=true gerekli.`);
+      fail(`Scaffold file already exists: ${target.relative}/${name}. overwrite=true is required.`);
     }
   }
   const entries = Object.entries(files).map(([name, content]) => ({ name, content, targetPath: path.join(target.resolved, name), tempPath: null, backupPath: null, backedUp: false, committed: false }));
@@ -1431,8 +1431,8 @@ async function scaffold({ directory = "ai-game", overwrite = false } = {}) {
         throw error;
       });
       if (existing) {
-        if (existing.isSymbolicLink()) fail("Scaffold symlink üzerinden yazamaz.", "EXI_MCP_PATH_LINK");
-        if (!existing.isFile()) fail(`Scaffold hedefi dosya olmalı: ${entry.name}`);
+        if (existing.isSymbolicLink()) fail("Scaffold cannot write through a symlink.", "EXI_MCP_PATH_LINK");
+        if (!existing.isFile()) fail(`Scaffold target must be a file: ${entry.name}`);
         entry.backupPath = `${entry.targetPath}.exi-scaffold-backup-${process.pid}-${nextWriteId++}`;
         await rename(entry.targetPath, entry.backupPath);
         entry.backedUp = true;
@@ -1476,17 +1476,17 @@ async function scaffold({ directory = "ai-game", overwrite = false } = {}) {
 async function openProject({ path: directoryPath } = {}, signal, progressToken) {
   throwIfCancelled(signal);
   const target = resolvePath(directoryPath);
-  if (target.resolved === ROOT) fail("Proje klasörü repo kökü olamaz.", "EXI_MCP_FILE_SCOPE");
+  if (target.resolved === ROOT) fail("Project directory cannot be the repository root.", "EXI_MCP_FILE_SCOPE");
   assertScaffoldDirectory(target);
   await assertSafeScaffoldTarget(target, []);
   const entry = await lstat(target.resolved);
-  if (entry.isSymbolicLink() || !entry.isDirectory()) fail("Açılacak proje yolu klasör olmalı.", "EXI_MCP_FILE_PATH");
+  if (entry.isSymbolicLink() || !entry.isDirectory()) fail("Project path to open must be a directory.", "EXI_MCP_FILE_PATH");
   await sweepStaleUploadTemps(target.resolved);
   scaffoldDirectories.add(target.relative);
   try {
     const check = await checkProject({ path: target.relative }, signal, progressToken);
     throwIfCancelled(signal);
-    if (check.checked === 0) fail("Açılacak projede kontrol edilebilir HTML/JS/JSON dosyası bulunamadı.", "EXI_MCP_FILE_SCOPE");
+    if (check.checked === 0) fail("No checkable HTML/JS/JSON file was found in the project to open.", "EXI_MCP_FILE_SCOPE");
     return { directory: target.relative, opened: true, ...check };
   } catch (error) {
     scaffoldDirectories.delete(target.relative);
@@ -1518,9 +1518,9 @@ async function terminateProcessTree(child) {
 
 function runCheck(mode, signal, progressToken) {
   const commands = { doctor: ["run", "doctor"], test: ["test"], verify: ["run", "verify"] };
-  if (!Object.hasOwn(commands, mode)) fail("check mode yalnızca doctor, test veya verify olabilir.");
+  if (!Object.hasOwn(commands, mode)) fail("check mode can only be doctor, test or verify.");
   throwIfCancelled(signal);
-  sendProgress(progressToken, 0, 1, `check ${mode} başladı.`);
+  sendProgress(progressToken, 0, 1, `check ${mode} started.`);
   const timeoutMs = { doctor: 60_000, test: 180_000, verify: 300_000 }[mode];
   return new Promise((resolve, reject) => {
     const windows = process.platform === "win32";
@@ -1545,7 +1545,7 @@ function runCheck(mode, signal, progressToken) {
       if (settled) return;
       settled = true;
       signal?.removeEventListener("abort", onAbort);
-      rejectAfterCleanup(new Error(`check ${mode} zaman aşımına uğradı.`));
+      rejectAfterCleanup(new Error(`check ${mode} timed out.`));
     }, timeoutMs);
     child.stdout.on("data", (chunk) => { stdout = append(stdout, chunk.toString()); });
     child.stderr.on("data", (chunk) => { stderr = append(stderr, chunk.toString()); });
@@ -1555,7 +1555,7 @@ function runCheck(mode, signal, progressToken) {
       settled = true;
       clearTimeout(timer);
       signal?.removeEventListener("abort", onAbort);
-      sendProgress(progressToken, 1, 1, `check ${mode} tamamlandı.`);
+      sendProgress(progressToken, 1, 1, `check ${mode} completed.`);
       resolve({ mode, ok: code === 0, code: code ?? 1, signal: exitSignal || null, stdout, stderr });
     });
   });
@@ -1609,25 +1609,25 @@ const promptDefinitions = [
 
 async function readResource(uri) {
   const definition = resourceDefinitions.find((resource) => resource.uri === uri);
-  if (!definition) fail(`MCP resource bulunamadı: ${uri}`, "EXI_MCP_RESOURCE_NOT_FOUND");
+  if (!definition) fail(`MCP resource not found: ${uri}`, "EXI_MCP_RESOURCE_NOT_FOUND");
   let text;
   if (uri === "exi://api") text = JSON.stringify(apiContract(), null, 2);
   else if (uri === "exi://runtime") text = JSON.stringify(runtimeContract, null, 2);
   else if (uri === "exi://clients") text = JSON.stringify(clientContract, null, 2);
   else text = await readFile(path.join(ROOT, resourceFiles.get(uri)), "utf8");
-  if (Buffer.byteLength(text, "utf8") > MAX_RESOURCE_BYTES) fail("MCP resource boyutu limiti aşıldı.", "EXI_MCP_RESOURCE_LIMIT");
+  if (Buffer.byteLength(text, "utf8") > MAX_RESOURCE_BYTES) fail("MCP resource size limit exceeded.", "EXI_MCP_RESOURCE_LIMIT");
   return { contents: [{ uri, mimeType: definition.mimeType, text }] };
 }
 
 function getPrompt(name, rawArguments = {}) {
   assertSafeData(rawArguments);
   const definition = promptDefinitions.find((prompt) => prompt.name === name);
-  if (!definition) fail(`MCP prompt bulunamadı: ${name}`, "EXI_MCP_PROMPT_NOT_FOUND");
-  if (!isRecord(rawArguments)) fail("MCP prompt arguments object olmalı.", "EXI_MCP_PROMPT_ARGS_TYPE");
+  if (!definition) fail(`MCP prompt not found: ${name}`, "EXI_MCP_PROMPT_NOT_FOUND");
+  if (!isRecord(rawArguments)) fail("MCP prompt arguments must be an object.", "EXI_MCP_PROMPT_ARGS_TYPE");
   const allowedArguments = new Set(definition.arguments.map((argument) => argument.name));
-  for (const key of Object.keys(rawArguments)) if (!allowedArguments.has(key)) fail(`Bilinmeyen MCP prompt argümanı: ${key}`, "EXI_MCP_ARGUMENT_UNKNOWN");
-  if (name === "exi_create_game" && rawArguments.goal !== undefined && typeof rawArguments.goal !== "string") fail("Prompt goal string olmalı.", "EXI_MCP_ARGUMENT_TYPE");
-  if (name === "exi_verify_runtime" && rawArguments.path !== undefined && typeof rawArguments.path !== "string") fail("Prompt path string olmalı.", "EXI_MCP_ARGUMENT_TYPE");
+  for (const key of Object.keys(rawArguments)) if (!allowedArguments.has(key)) fail(`Unknown MCP prompt argument: ${key}`, "EXI_MCP_ARGUMENT_UNKNOWN");
+  if (name === "exi_create_game" && rawArguments.goal !== undefined && typeof rawArguments.goal !== "string") fail("Prompt goal must be a string.", "EXI_MCP_ARGUMENT_TYPE");
+  if (name === "exi_verify_runtime" && rawArguments.path !== undefined && typeof rawArguments.path !== "string") fail("Prompt path must be a string.", "EXI_MCP_ARGUMENT_TYPE");
   const goal = typeof rawArguments.goal === "string" && rawArguments.goal.trim() ? rawArguments.goal.trim() : "a small playable 2D game";
   const previewPath = typeof rawArguments.path === "string" && rawArguments.path.trim() ? rawArguments.path.trim() : "/ai-game/index.html";
   const text = name === "exi_create_game"
@@ -1657,26 +1657,26 @@ function getPrompt(name, rawArguments = {}) {
 }
 
 function resolveBatchResultPath(result, resultPath) {
-  if (typeof resultPath !== "string" || !resultPath || resultPath.length > 128) fail("Batch result path geçersiz.");
+  if (typeof resultPath !== "string" || !resultPath || resultPath.length > 128) fail("Batch result path is invalid.");
   const segments = resultPath.split(".");
-  if (segments.some((segment) => !segment || forbiddenKeys.has(segment) || !/^[A-Za-z][A-Za-z0-9_$]*$/.test(segment))) fail("Batch result path güvenli property yolu olmalı.");
+  if (segments.some((segment) => !segment || forbiddenKeys.has(segment) || !/^[A-Za-z][A-Za-z0-9_$]*$/.test(segment))) fail("Batch result path must be a safe property path.");
   let current = result;
   for (const segment of segments) {
-    if (current === null || (typeof current !== "object" && typeof current !== "function") || !Object.hasOwn(current, segment)) fail(`Batch result property bulunamadı: ${resultPath}.`);
+    if (current === null || (typeof current !== "object" && typeof current !== "function") || !Object.hasOwn(current, segment)) fail(`Batch result property not found: ${resultPath}.`);
     current = current[segment];
   }
   return current;
 }
 
 function resolveBatchReferences(value, results, depth = 0, key = "") {
-  if (depth > MAX_VALUE_DEPTH) fail("Batch reference veri derinliği limiti aşıldı.");
+  if (depth > MAX_VALUE_DEPTH) fail("Batch reference data depth limit exceeded.");
   if (Array.isArray(value)) return value.map((item) => resolveBatchReferences(item, results, depth + 1));
   if (!value || typeof value !== "object") return value;
   const referenceKeys = Object.keys(value);
   const hasResultReference = Number.isSafeInteger(value.$result) && (referenceKeys.length === 1 || (referenceKeys.length === 2 && referenceKeys.includes("$path")));
   if (hasResultReference) {
     const reference = results[value.$result];
-    if (!reference || !reference.ok) fail(`Batch result referansı geçersiz: ${value.$result}.`);
+    if (!reference || !reference.ok) fail(`Batch result reference is invalid: ${value.$result}.`);
     const result = Object.hasOwn(value, "$path") ? resolveBatchResultPath(reference.result, value.$path) : reference.result;
     if (result && typeof result === "object" && typeof result.$handle === "string") {
       return key === "handle" ? result.$handle : { $handle: result.$handle };
@@ -1685,23 +1685,23 @@ function resolveBatchReferences(value, results, depth = 0, key = "") {
   }
   const resolved = {};
   for (const [property, item] of Object.entries(value)) {
-    if (forbiddenKeys.has(property)) fail(`Güvenli olmayan batch alanı: ${property}`);
+    if (forbiddenKeys.has(property)) fail(`Unsafe batch field: ${property}`);
     resolved[property] = resolveBatchReferences(item, results, depth + 1, property);
   }
   return resolved;
 }
 
 async function runBatch({ calls, stopOnError = true } = {}, signal, progressToken) {
-  if (!Array.isArray(calls) || calls.length === 0 || calls.length > 128) fail("Batch calls 1 ile 128 arasında olmalı.");
-  if (typeof stopOnError !== "boolean") fail("Batch stopOnError boolean olmalı.");
+  if (!Array.isArray(calls) || calls.length === 0 || calls.length > 128) fail("Batch calls must be between 1 and 128.");
+  if (typeof stopOnError !== "boolean") fail("Batch stopOnError must be a boolean.");
   const results = [];
-  sendProgress(progressToken, 0, calls.length, "Batch başladı.");
+  sendProgress(progressToken, 0, calls.length, "Batch started.");
   for (let index = 0; index < calls.length; index += 1) {
     throwIfCancelled(signal);
     const call = calls[index];
-    if (!call || typeof call !== "object" || Array.isArray(call) || typeof call.name !== "string" || !call.name) fail(`Batch call ${index} geçersiz.`);
+    if (!call || typeof call !== "object" || Array.isArray(call) || typeof call.name !== "string" || !call.name) fail(`Batch call ${index} is invalid.`);
     try {
-      if (call.name === "exi_batch") fail("Nested exi_batch çağrısı reddedildi.");
+      if (call.name === "exi_batch") fail("Nested exi_batch call was rejected.");
       const batchArguments = Object.hasOwn(call, "arguments") ? call.arguments : {};
       const result = await callTool(call.name, resolveBatchReferences(batchArguments, results), { signal, progressToken });
       results.push({ index, name: call.name, ok: true, result });
@@ -1709,7 +1709,7 @@ async function runBatch({ calls, stopOnError = true } = {}, signal, progressToke
       results.push({ index, name: call.name, ok: false, error: error instanceof Error ? error.message : String(error), code: error?.code || "EXI_MCP_BATCH_ERROR" });
       if (stopOnError) break;
     }
-    sendProgress(progressToken, index + 1, calls.length, `Batch çağrısı tamamlandı: ${call.name}`);
+    sendProgress(progressToken, index + 1, calls.length, `Batch call completed: ${call.name}`);
   }
   return { completed: results.filter((entry) => entry.ok).length, failed: results.filter((entry) => !entry.ok).length, stopped: results.length < calls.length, results };
 }
@@ -1727,7 +1727,7 @@ function findFreePort() {
 }
 
 function requirePreview(previewId) {
-  if (typeof previewId !== "string" || !/^p[1-9][0-9]*$/.test(previewId) || !previews.has(previewId)) fail(`Preview bulunamadı: ${previewId}`);
+  if (typeof previewId !== "string" || !/^p[1-9][0-9]*$/.test(previewId) || !previews.has(previewId)) fail(`Preview not found: ${previewId}`);
   return previews.get(previewId);
 }
 
@@ -1773,14 +1773,14 @@ function inferPreviewDirectory(pagePath) {
 
 async function startPreview({ port = null, path: pagePath = "/", directory = null } = {}, signal, progressToken) {
   throwIfCancelled(signal);
-  sendProgress(progressToken, 0, 1, "Preview başlatılıyor.");
+  sendProgress(progressToken, 0, 1, "Preview starting.");
   pruneExitedPreviews();
-  if (previews.size >= MAX_PREVIEWS) fail(`Aynı anda en fazla ${MAX_PREVIEWS} preview çalışabilir.`, "EXI_MCP_PREVIEW_LIMIT");
+  if (previews.size >= MAX_PREVIEWS) fail(`At most ${MAX_PREVIEWS} previews can run at the same time.`, "EXI_MCP_PREVIEW_LIMIT");
   const safePagePath = safePreviewPath(pagePath);
   const previewDirectory = directory ?? inferPreviewDirectory(safePagePath);
   const requestedPort = port === null || port === undefined ? await findFreePort() : Number(port);
   throwIfCancelled(signal);
-  if (!Number.isSafeInteger(requestedPort) || requestedPort <= 0 || requestedPort > 65_535) fail("Preview portu geçersiz.");
+  if (!Number.isSafeInteger(requestedPort) || requestedPort <= 0 || requestedPort > 65_535) fail("Preview port is invalid.");
   const previewId = `p${nextPreviewId++}`;
   const runtimeToken = randomBytes(18).toString("base64url");
   const preview = { id: previewId, directory: previewDirectory, pagePath: safePagePath, port: requestedPort, url: `http://127.0.0.1:${requestedPort}/`, runtimeToken, child: null, state: "starting", exited: false, stopPromise: null, stdout: "", stderr: "" };
@@ -1802,21 +1802,21 @@ async function startPreview({ port = null, path: pagePath = "/", directory = nul
   }
   if (!ready) {
     await stopPreview(previewId);
-    fail(`Preview başlatılamadı: ${preview.stderr || "server hazır olmadı"}`, "EXI_MCP_PREVIEW_START");
+    fail(`Preview could not be started: ${preview.stderr || "server did not become ready"}`, "EXI_MCP_PREVIEW_START");
   }
   preview.state = "ready";
-  sendProgress(progressToken, 1, 1, "Preview hazır.");
+  sendProgress(progressToken, 1, 1, "Preview ready.");
   return { previewId, url: preview.url, pagePath: safePagePath, pageUrl: new URL(safePagePath, preview.url).href, port: preview.port, state: "ready", ready: true, runtime: { path: "/__exi/runtime", tokenManaged: true } };
 }
 
 async function projectPreview({ path: directoryPath, port = null } = {}, signal, progressToken) {
   const target = resolvePath(directoryPath);
-  if (target.resolved === ROOT) fail("Proje klasörü repo kökü olamaz.", "EXI_MCP_FILE_SCOPE");
+  if (target.resolved === ROOT) fail("Project directory cannot be the repository root.", "EXI_MCP_FILE_SCOPE");
   const projectCheck = await checkProject({ path: target.relative }, signal, progressToken);
   if (!projectCheck.ok) return { ok: false, phase: "project-check", directory: target.relative, projectCheck, preview: null };
   const entryPath = `${target.relative}/index.html`;
   const entry = await inspectProjectFile(resolveProjectFile(entryPath));
-  if (!entry) return { ok: false, phase: "entry", directory: target.relative, entryPath, projectCheck, preview: null, error: { code: "EXI_MCP_ENTRY_NOT_FOUND", message: `Preview entry bulunamadı: ${entryPath}` } };
+  if (!entry) return { ok: false, phase: "entry", directory: target.relative, entryPath, projectCheck, preview: null, error: { code: "EXI_MCP_ENTRY_NOT_FOUND", message: `Preview entry not found: ${entryPath}` } };
   const preview = await startPreview({ port, path: `/${entryPath}`, directory: target.relative }, signal, progressToken);
   return { ok: true, phase: "preview", directory: target.relative, entryPath, projectCheck, preview };
 }
@@ -1824,7 +1824,7 @@ async function projectPreview({ path: directoryPath, port = null } = {}, signal,
 async function projectStatus({ path: directoryPath } = {}, signal, progressToken) {
   throwIfCancelled(signal);
   const target = resolvePath(directoryPath);
-  if (target.resolved === ROOT) fail("Proje klasörü repo kökü olamaz.", "EXI_MCP_FILE_SCOPE");
+  if (target.resolved === ROOT) fail("Project directory cannot be the repository root.", "EXI_MCP_FILE_SCOPE");
   requireScaffoldDirectory(target);
   const files = await listProjectFiles({ path: target.relative });
   throwIfCancelled(signal);
@@ -1910,7 +1910,7 @@ function getHandleType(value) {
 
 async function readResponseLimited(response, maxBytes = MAX_OUTPUT_BYTES) {
   const contentLength = Number(response.headers.get("content-length"));
-  if (Number.isSafeInteger(contentLength) && contentLength > maxBytes) fail("Preview response boyutu limiti aşıldı.", "EXI_MCP_PREVIEW_LIMIT");
+  if (Number.isSafeInteger(contentLength) && contentLength > maxBytes) fail("Preview response size limit exceeded.", "EXI_MCP_PREVIEW_LIMIT");
   if (!response.body) return "";
   const reader = response.body.getReader();
   const chunks = [];
@@ -1919,7 +1919,7 @@ async function readResponseLimited(response, maxBytes = MAX_OUTPUT_BYTES) {
     const result = await reader.read();
     if (result.done) break;
     total += result.value.byteLength;
-    if (total > maxBytes) { await reader.cancel(); fail("Preview response boyutu limiti aşıldı.", "EXI_MCP_PREVIEW_LIMIT"); }
+    if (total > maxBytes) { await reader.cancel(); fail("Preview response size limit exceeded.", "EXI_MCP_PREVIEW_LIMIT"); }
     chunks.push(result.value);
   }
   const bytes = new Uint8Array(total);
@@ -1940,16 +1940,16 @@ async function cancelPreviewRuntimeCommand(preview, commandId) {
 async function callPreviewRuntime({ previewId, operation, ...command } = {}, signal) {
   throwIfCancelled(signal);
   const preview = requirePreview(previewId);
-  if (typeof operation !== "string" || !runtimeOperations.has(operation)) fail(`Runtime operation desteklenmiyor: ${operation}`, "EXI_MCP_RUNTIME_OPERATION");
-  if (operation === "batch" && (!Array.isArray(command.calls) || command.calls.length === 0 || command.calls.length > MAX_RUNTIME_BATCH_CALLS)) fail(`Runtime batch calls 1 ile ${MAX_RUNTIME_BATCH_CALLS} arasında olmalı.`, "EXI_MCP_RUNTIME_BATCH_LIMIT");
+  if (typeof operation !== "string" || !runtimeOperations.has(operation)) fail(`Runtime operation is not supported: ${operation}`, "EXI_MCP_RUNTIME_OPERATION");
+  if (operation === "batch" && (!Array.isArray(command.calls) || command.calls.length === 0 || command.calls.length > MAX_RUNTIME_BATCH_CALLS)) fail(`Runtime batch calls must be between 1 and ${MAX_RUNTIME_BATCH_CALLS}.`, "EXI_MCP_RUNTIME_BATCH_LIMIT");
   const commandId = `r${nextRuntimeCommandId++}`;
   const payload = { id: commandId, operation, ...command };
   const body = JSON.stringify(payload);
-  if (Buffer.byteLength(body, "utf8") > MAX_RUNTIME_COMMAND_BYTES) fail("Runtime command boyutu limiti aşıldı.", "EXI_MCP_RUNTIME_LIMIT");
+  if (Buffer.byteLength(body, "utf8") > MAX_RUNTIME_COMMAND_BYTES) fail("Runtime command size limit exceeded.", "EXI_MCP_RUNTIME_LIMIT");
   let completed = false;
   try {
     const accepted = await fetch(`${preview.url}__exi/runtime-command`, { method: "POST", headers: { "content-type": "application/json", "x-exi-runtime-token": preview.runtimeToken }, body, signal: signal || AbortSignal.timeout(5_000) });
-    if (accepted.status !== 202) fail(`Runtime command kabul edilmedi: HTTP ${accepted.status}`, "EXI_MCP_RUNTIME_UNAVAILABLE");
+    if (accepted.status !== 202) fail(`Runtime command was not accepted: HTTP ${accepted.status}`, "EXI_MCP_RUNTIME_UNAVAILABLE");
     const deadline = Date.now() + MAX_RUNTIME_COMMAND_WAIT_MS;
     while (Date.now() < deadline) {
       throwIfCancelled(signal);
@@ -1959,29 +1959,29 @@ async function callPreviewRuntime({ previewId, operation, ...command } = {}, sig
       });
       if (resultResponse?.status === 200) {
         const result = JSON.parse(await readResponseLimited(resultResponse, MAX_RUNTIME_RESULT_BYTES));
-        if (result.id !== commandId) fail("Runtime result id eşleşmedi.", "EXI_MCP_RUNTIME_RESULT");
+        if (result.id !== commandId) fail("Runtime result id did not match.", "EXI_MCP_RUNTIME_RESULT");
         completed = true;
         if (!result.ok) {
-          const error = new Error(result.error?.message || "Browser runtime command başarısız.");
+          const error = new Error(result.error?.message || "Browser runtime command failed.");
           error.code = result.error?.code || "EXI_MCP_RUNTIME_ERROR";
           throw error;
         }
         return result.value;
       }
-      if (resultResponse && resultResponse.status !== 404) fail(`Runtime result alınamadı: HTTP ${resultResponse.status}`, "EXI_MCP_RUNTIME_UNAVAILABLE");
+      if (resultResponse && resultResponse.status !== 404) fail(`Runtime result could not be retrieved: HTTP ${resultResponse.status}`, "EXI_MCP_RUNTIME_UNAVAILABLE");
       await new Promise((resolve) => setTimeout(resolve, 75));
     }
-    fail("Browser runtime command zaman aşımına uğradı.", "EXI_MCP_RUNTIME_TIMEOUT");
+    fail("Browser runtime command timed out.", "EXI_MCP_RUNTIME_TIMEOUT");
   } finally {
     if (!completed) await cancelPreviewRuntimeCommand(preview, commandId);
   }
 }
 
 function safePreviewPath(value) {
-  if (typeof value !== "string" || !value || value.length > 512 || value.includes("\0")) fail("Preview path geçersiz.");
+  if (typeof value !== "string" || !value || value.length > 512 || value.includes("\0")) fail("Preview path is invalid.");
   let decoded;
-  try { decoded = decodeURIComponent(value); } catch { fail("Preview path encoding geçersiz."); }
-  if (!decoded.startsWith("/") || decoded.split("/").some((part) => part === "..") || decoded.includes("\\")) fail("Preview path traversal reddedildi.");
+  try { decoded = decodeURIComponent(value); } catch { fail("Preview path encoding is invalid."); }
+  if (!decoded.startsWith("/") || decoded.split("/").some((part) => part === "..") || decoded.includes("\\")) fail("Preview path traversal was rejected.");
   return decoded;
 }
 
@@ -1990,7 +1990,7 @@ async function probePreview({ previewId, path: requestPath = "/" } = {}, signal)
   const preview = requirePreview(previewId);
   const pathname = safePreviewPath(requestPath);
   const url = new URL(pathname, preview.url);
-  if (url.origin !== preview.url.slice(0, -1)) fail("Preview origini geçersiz.");
+  if (url.origin !== preview.url.slice(0, -1)) fail("Preview origin is invalid.");
   const headers = pathname === "/__exi/runtime" ? { "x-exi-runtime-token": preview.runtimeToken } : undefined;
   const response = await fetch(url, { redirect: "error", headers, signal: AbortSignal.timeout(5_000) });
   throwIfCancelled(signal);
@@ -1999,7 +1999,7 @@ async function probePreview({ previewId, path: requestPath = "/" } = {}, signal)
 }
 
 async function stopPreview(previewId) {
-  if (typeof previewId !== "string" || !/^p[1-9][0-9]*$/.test(previewId)) fail(`Preview bulunamadı: ${previewId}`);
+  if (typeof previewId !== "string" || !/^p[1-9][0-9]*$/.test(previewId)) fail(`Preview not found: ${previewId}`);
   const preview = previews.get(previewId);
   if (!preview) return { stopped: previewId, alreadyStopped: true, state: "exited" };
   if (preview.stopPromise) {
@@ -2022,53 +2022,53 @@ async function stopPreview(previewId) {
   return { stopped: previewId, alreadyStopped: !wasActive, state: "exited" };
 }
 
-const expectedVersionSchema = { type: "object", required: ["bytes", "mtimeMs"], additionalProperties: false, properties: { bytes: { type: "integer", minimum: 0 }, mtimeMs: { type: "number", minimum: 0 } }, description: "Önceki read/list sonucundaki version; stale overwrite'ı reddetmek için kullanılır." };
-const expectedSha256Schema = { type: "string", maxLength: 64, description: "İsteğe bağlı SHA-256 hex digest; upload commit içeriğiyle eşleşmelidir." };
+const expectedVersionSchema = { type: "object", required: ["bytes", "mtimeMs"], additionalProperties: false, properties: { bytes: { type: "integer", minimum: 0 }, mtimeMs: { type: "number", minimum: 0 } }, description: "Version from a previous read/list result; used to reject a stale overwrite." };
+const expectedSha256Schema = { type: "string", maxLength: 64, description: "Optional SHA-256 hex digest; must match the upload commit content." };
 
 const tools = [
-  { name: "exi_api", description: "ExiEngine public class, function, method ve sabit manifestini döndürür.", inputSchema: { type: "object", properties: {} }, annotations: { title: "ExiEngine API manifest", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
-  { name: "exi_session_status", description: "Bu MCP oturumundaki handle, scope, bekleyen upload ve preview metadata’sını getter çalıştırmadan bounded biçimde döndürür; token değerini açmaz.", inputSchema: { type: "object", properties: {} }, annotations: { title: "Inspect engine session", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
-  { name: "exi_session_reset", description: "Bu MCP oturumundaki tüm engine handle'larını güvenli biçimde bırakır.", inputSchema: { type: "object", properties: {} }, annotations: { title: "Reset engine session", readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false } },
-  { name: "exi_create", description: "ExiEngine public class'ından handle oluşturur.", inputSchema: { type: "object", required: ["type"], properties: { type: { type: "string" }, args: { type: "array" } } }, annotations: { title: "Create engine object", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false } },
-  { name: "exi_function", description: "ExiEngine public fonksiyonunu handle argümanlarıyla çağırır.", inputSchema: { type: "object", required: ["name"], properties: { name: { type: "string" }, args: { type: "array" } } }, annotations: { title: "Call engine function", readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false } },
-  { name: "exi_export_get", description: "src/index.js export ağacındaki allowlisted sabit veya static değeri okur.", inputSchema: { type: "object", required: ["path"], properties: { path: { type: "string" } } }, annotations: { title: "Read engine export", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
-  { name: "exi_export_call", description: "src/index.js export ağacındaki allowlisted public fonksiyonu async olarak çağırır.", inputSchema: { type: "object", required: ["path"], properties: { path: { type: "string" }, args: { type: "array" } } }, annotations: { title: "Call engine export", readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false } },
-  { name: "exi_static_call", description: "Public class üzerindeki static metodu çağırır.", inputSchema: { type: "object", required: ["type", "method"], properties: { type: { type: "string" }, method: { type: "string" }, args: { type: "array" } } }, annotations: { title: "Call static engine method", readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false } },
-  { name: "exi_call", description: "Bir engine handle üzerindeki public metodu çağırır.", inputSchema: { type: "object", required: ["handle", "method"], properties: { handle: { type: "string" }, method: { type: "string" }, args: { type: "array" } } }, annotations: { title: "Call engine method", readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false } },
-  { name: "exi_inspect", description: "Bir engine handle’ın değer okumadan public method ve property metadata’sını döndürür; AI çağrı planını güvenilir kurabilir.", inputSchema: { type: "object", required: ["handle"], properties: { handle: { type: "string" } } }, annotations: { title: "Inspect engine handle", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
-  { name: "exi_get", description: "Bir engine handle üzerindeki public property/getter değerini okur.", inputSchema: { type: "object", required: ["handle", "property"], properties: { handle: { type: "string" }, property: { type: "string" } } }, annotations: { title: "Read engine property", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
-  { name: "exi_set", description: "Bir engine handle üzerindeki public veri alanını JSON değeriyle değiştirir.", inputSchema: { type: "object", required: ["handle", "property", "value"], properties: { handle: { type: "string" }, property: { type: "string" }, value: {} } }, annotations: { title: "Set engine property", readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false } },
-  { name: "exi_release", description: "Handle'ı bırakır ve varsa destroy() yaşam döngüsünü çalıştırır.", inputSchema: { type: "object", required: ["handle"], properties: { handle: { type: "string" } } }, annotations: { title: "Release engine handle", readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false } },
-  { name: "exi_build_scene", description: "JSON deklarasyonundan sınırlı ve güvenli bir ExiEngine node ağacı kurar.", inputSchema: { type: "object", required: ["scene"], properties: { scene: { type: "object" } } }, annotations: { title: "Build scene graph", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false } },
-  { name: "exi_scaffold", description: "Repo içinde traversal korumalı minimal tarayıcı oyun projesi oluşturur.", inputSchema: { type: "object", properties: { directory: { type: "string" }, overwrite: { type: "boolean" } } }, annotations: { title: "Scaffold browser game", readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false } },
-  { name: "exi_project_apply", description: "Aynı session scope’undaki oyun klasörüne en fazla 16 bounded text dosyasını tek transactional akışta yazar; preflight veya commit hatasında önceki dosyaları rollback eder. Her dosyada read/list version verilirse stale overwrite reddedilir.", inputSchema: { type: "object", required: ["path", "files"], properties: { path: { type: "string" }, files: { type: "array", minItems: 1, maxItems: MAX_PROJECT_APPLY_FILES, items: { type: "object", required: ["path", "content"], additionalProperties: false, properties: { path: { type: "string", minLength: 1 }, content: { type: "string", maxLength: MAX_PROJECT_FILE_BYTES }, expectedVersion: expectedVersionSchema } } }, overwrite: { type: "boolean", default: false } } }, annotations: { title: "Apply project text files", readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false } },
-  { name: "exi_file_read", description: "Repo kökü altındaki allowlisted text proje dosyasını bounded içerikle okur; büyük dosyalarda UTF-8 offset/limit paging kullanır.", inputSchema: { type: "object", required: ["path"], properties: { path: { type: "string" }, offset: { type: "integer", minimum: 0 }, limit: { type: "integer", minimum: 1, maximum: MAX_PROJECT_READ_BYTES } } }, annotations: { title: "Read project text file", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
-  { name: "exi_file_list", description: "Aynı session’da scaffold edilen veya exi_project_open ile açılan proje klasöründeki allowlisted text dosyalarını bounded metadata ile listeler.", inputSchema: { type: "object", required: ["path"], properties: { path: { type: "string" } } }, annotations: { title: "List project files", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
-  { name: "exi_file_write", description: "Repo kökü altındaki allowlisted text proje dosyasını bounded UTF-8 içerikle oluşturur veya açık overwrite ile günceller; expectedVersion stale overwrite'ı, expectedSha256 ise içerik bozulmasını reddeder.", inputSchema: { type: "object", required: ["path", "content"], properties: { path: { type: "string" }, content: { type: "string", maxLength: MAX_PROJECT_FILE_BYTES }, overwrite: { type: "boolean", default: false }, expectedVersion: expectedVersionSchema, expectedSha256: expectedSha256Schema } }, annotations: { title: "Write project text file", readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false } },
-  { name: "exi_file_patch", description: "Allowlisted mevcut text proje dosyasında find metninin tam bir eşleşmesini atomik olarak replace eder; sıfır veya birden fazla eşleşmede dosyaya dokunmaz.", inputSchema: { type: "object", required: ["path", "find", "replace"], properties: { path: { type: "string" }, find: { type: "string", minLength: 1, maxLength: MAX_PROJECT_PATCH_TEXT_BYTES }, replace: { type: "string", maxLength: MAX_PROJECT_PATCH_TEXT_BYTES } } }, annotations: { title: "Patch project text file", readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false } },
-  { name: "exi_file_begin", description: "64 KiB üzeri allowlisted text proje dosyası için sıralı chunk upload başlatır; geçici dosya proje scope’u içinde tutulur, expectedVersion stale commit'i ve expectedSha256 bozuk içeriği reddeder.", inputSchema: { type: "object", required: ["path", "size"], properties: { path: { type: "string" }, size: { type: "integer", minimum: 0, maximum: MAX_CHUNKED_PROJECT_FILE_BYTES }, overwrite: { type: "boolean", default: false }, expectedVersion: expectedVersionSchema, expectedSha256: expectedSha256Schema } }, annotations: { title: "Begin chunked project file", readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false } },
-  { name: "exi_file_chunk", description: "Chunk upload’a sıralı UTF-8 text parçası ekler; offset önceki receivedBytes ile eşleşmelidir.", inputSchema: { type: "object", required: ["fileUploadId", "offset", "content"], properties: { fileUploadId: { type: "string" }, offset: { type: "integer", minimum: 0 }, content: { type: "string", maxLength: MAX_PROJECT_FILE_CHUNK_BYTES } } }, annotations: { title: "Write project file chunk", readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false } },
-  { name: "exi_file_commit", description: "Tamamlanan text upload’ı doğrulanmış hedef dosyaya commit eder.", inputSchema: { type: "object", required: ["fileUploadId"], properties: { fileUploadId: { type: "string" } } }, annotations: { title: "Commit project file", readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false } },
-  { name: "exi_file_abort", description: "Chunked text upload geçici dosyasını temizler.", inputSchema: { type: "object", required: ["fileUploadId"], properties: { fileUploadId: { type: "string" } } }, annotations: { title: "Abort project file", readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false } },
-  { name: "exi_asset_list", description: "Aynı session’da scaffold edilen veya exi_project_open ile açılan klasördeki allowlisted oyun asset’lerini bounded metadata ile listeler.", inputSchema: { type: "object", required: ["path"], properties: { path: { type: "string" } } }, annotations: { title: "List game assets", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
-  { name: "exi_asset_read", description: "Aynı session’daki allowlisted oyun asset’inin en fazla 32 KiB byte aralığını base64 olarak okur; tam dosya belleğe alınmaz.", inputSchema: { type: "object", required: ["path"], properties: { path: { type: "string" }, offset: { type: "integer", minimum: 0 }, limit: { type: "integer", minimum: 1, maximum: MAX_ASSET_READ_BYTES } } }, annotations: { title: "Read game asset bytes", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
-  { name: "exi_asset_write", description: "Aynı session’da scaffold edilen veya exi_project_open ile açılan klasöre bounded binary oyun asset’i yükler; expectedVersion stale overwrite'ı, expectedSha256 ise içerik bozulmasını reddeder.", inputSchema: { type: "object", required: ["path", "bytes"], properties: { path: { type: "string" }, bytes: binaryPayloadSchema, overwrite: { type: "boolean", default: false }, expectedVersion: expectedVersionSchema, expectedSha256: expectedSha256Schema } }, annotations: { title: "Upload game asset", readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false } },
-  { name: "exi_asset_begin", description: "512 KiB üstü allowlisted asset için sıralı chunk upload başlatır; geçici dosya proje scope’u içinde tutulur, expectedVersion stale commit'i ve expectedSha256 bozuk içeriği reddeder.", inputSchema: { type: "object", required: ["path", "size"], properties: { path: { type: "string" }, size: { type: "integer", minimum: 0, maximum: MAX_CHUNKED_ASSET_BYTES }, overwrite: { type: "boolean", default: false }, expectedVersion: expectedVersionSchema, expectedSha256: expectedSha256Schema } }, annotations: { title: "Begin chunked asset upload", readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false } },
-  { name: "exi_asset_chunk", description: "Chunk upload’a sıralı bounded byte parçası ekler; offset önceki receivedBytes ile eşleşmelidir.", inputSchema: { type: "object", required: ["uploadId", "offset", "bytes"], properties: { uploadId: { type: "string" }, offset: { type: "integer", minimum: 0 }, bytes: binaryPayloadSchema } }, annotations: { title: "Write asset chunk", readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false } },
-  { name: "exi_asset_commit", description: "Tamamlanan chunk upload’ı doğrulanmış hedef asset adına taşır; overwrite açıkça verilmişse mevcut dosyayı değiştirir.", inputSchema: { type: "object", required: ["uploadId"], properties: { uploadId: { type: "string" } } }, annotations: { title: "Commit asset upload", readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false } },
-  { name: "exi_asset_abort", description: "Chunk upload geçici dosyasını temizler.", inputSchema: { type: "object", required: ["uploadId"], properties: { uploadId: { type: "string" } } }, annotations: { title: "Abort asset upload", readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false } },
-  { name: "exi_file_check", description: "Aynı session’da scaffold edilen veya exi_project_open ile açılan .html/.js/.mjs/.json proje dosyasını kod çalıştırmadan bounded statik kontrolünden geçirir.", inputSchema: { type: "object", required: ["path"], properties: { path: { type: "string" } } }, annotations: { title: "Check project file syntax", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
-  { name: "exi_project_status", description: "Aynı session’daki projeyi tek bounded read-only sonuçta dosya, asset, statik kontrol ve projeye bağlı preview telemetry özetiyle döndürür; browser/GPU yoksa bunu açıkça ayırır.", inputSchema: { type: "object", required: ["path"], properties: { path: { type: "string" } } }, annotations: { title: "Inspect game project status", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
-  { name: "exi_project_check", description: "Aynı session’da scaffold edilen veya exi_project_open ile açılan oyunun allowlisted text dosyalarını tek bounded akışta kontrol eder; arbitrary code çalıştırmaz.", inputSchema: { type: "object", required: ["path"], properties: { path: { type: "string" } } }, annotations: { title: "Check whole game project", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
-  { name: "exi_project_preview", description: "Aynı session scope’undaki oyunu önce statik kontrol eder; tüm checkable dosyalar geçerse index.html için loopback preview başlatır ve pageUrl döndürür. Browser/GPU kanıtı üretmez.", inputSchema: { type: "object", required: ["path"], properties: { path: { type: "string" }, port: { type: "integer", minimum: 1, maximum: 65535 } } }, annotations: { title: "Check and preview game", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false } },
-  { name: "exi_project_open", description: "Repo içindeki mevcut oyun klasörünü önce statik kontrol edip aynı session’ın bounded file/asset scope’una açar; arbitrary code çalıştırmaz.", inputSchema: { type: "object", required: ["path"], properties: { path: { type: "string" } } }, annotations: { title: "Open existing game project", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
-  { name: "exi_check", description: "Arbitrary shell çalıştırmadan doctor, test veya verify release kontrolü yapar.", inputSchema: { type: "object", required: ["mode"], properties: { mode: { enum: ["doctor", "test", "verify"] } } }, annotations: { title: "Run ExiEngine checks", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
-  { name: "exi_preview_start", description: "Repo server.mjs'yi güvenli loopback portunda başlatır; istenen oyun page path'i HTTP 200 olmadan hazır dönmez ve pageUrl döndürür.", inputSchema: { type: "object", properties: { port: { type: "integer", minimum: 1, maximum: 65535 }, path: { type: "string", minLength: 1, maxLength: 512, description: "Repo içindeki oyun sayfası, örn. /ai-game/index.html" } } }, annotations: { title: "Start local preview", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false } },
-  { name: "exi_preview_call", description: "Token-korumalı demo veya scaffold RuntimeAgent üzerinden çalışan browser engine API'sini allowlisted operation ile çağırır; observe bounded canvas grid/hash, snapshot sınırlı scene graph/hash, scenario ise bounded input → fixed-step → observe/snapshot akışı verir; callback isteyen API'lerde yalnızca sayfada kayıtlı {\"$callback\":\"name\"} referansı kullanılabilir; eval veya arbitrary script çalıştırmaz. Batch için exi_preview_batch kullanılır.", inputSchema: { type: "object", required: ["previewId", "operation"], properties: { previewId: { type: "string" }, operation: { enum: ["function", "create", "export_get", "export_call", "static_call", "call", "inspect", "get", "set", "release", "observe", "snapshot", "scenario"] }, name: { type: "string" }, path: { type: "string" }, type: { type: "string" }, method: { type: "string" }, handle: { type: "string" }, property: { type: "string" }, value: {}, args: { type: "array", description: "JSON argümanları; observe için {columns,rows}, snapshot için [{offset,limit}], scenario için [{frames:[{delta,input,observe,snapshot}],resume?}], callback gereken browser API'leri için sayfada kayıtlı {\"$callback\":\"name\"} referansı desteklenir." } } }, annotations: { title: "Call browser engine runtime", readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false } },
-  { name: "exi_preview_batch", description: "Browser RuntimeAgent üzerinde en fazla 8 allowlisted operation'ı sırayla çalıştırır; observe bounded canvas grid/hash, snapshot sınırlı scene graph/hash, scenario bounded input/step gözlemi verir; önceki sonuçlar $result ile sonraki çağrılara bağlanabilir, callback isteyen API'ler sayfada kayıtlı {\"$callback\":\"name\"} referansı kullanır.", inputSchema: { type: "object", required: ["previewId", "calls"], properties: { previewId: { type: "string" }, calls: { type: "array", minItems: 1, maxItems: 8, items: { type: "object", required: ["operation"], additionalProperties: false, properties: { operation: { enum: ["function", "create", "export_get", "export_call", "static_call", "call", "inspect", "get", "set", "release", "observe", "snapshot", "scenario"] }, name: { type: "string" }, path: { type: "string" }, type: { type: "string" }, method: { type: "string" }, handle: {}, property: { type: "string" }, value: {}, args: { type: "array", description: "JSON argümanları; observe için {columns,rows}, snapshot için [{offset,limit}], scenario için [{frames:[{delta,input,observe,snapshot}],resume?}], callback için sayfada kayıtlı {\"$callback\":\"name\"} referansı kullanılır, callback gövdesi taşınmaz." } } } }, stopOnError: { type: "boolean", default: true } } }, annotations: { title: "Batch browser engine runtime", readOnlyHint: false, destructiveHint: true, openWorldHint: false } },
-  { name: "exi_preview_probe", description: "Başlatılmış loopback preview içindeki GET kaynağını bounded response ile doğrular; /__exi/runtime yolu token-managed browser telemetry döndürür.", inputSchema: { type: "object", required: ["previewId"], properties: { previewId: { type: "string" }, path: { type: "string" } } }, annotations: { title: "Probe local preview", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
-  { name: "exi_preview_stop", description: "Bu MCP oturumunun başlattığı loopback preview process'ini durdurur.", inputSchema: { type: "object", required: ["previewId"], properties: { previewId: { type: "string" } } }, annotations: { title: "Stop local preview", readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false } },
-  { name: "exi_batch", description: "En fazla 128 public ExiEngine tool çağrısını aynı session kuyruğunda sırayla çalıştırır; handle sonuçları ve {$result:0,$path:\"fileUploadId\"} alan referansları sonraki çağrılarda kullanılabilir.", inputSchema: { type: "object", required: ["calls"], properties: { calls: { type: "array", maxItems: 128, items: { type: "object", required: ["name"], additionalProperties: false, properties: { name: { type: "string" }, arguments: { type: "object" } } } }, stopOnError: { type: "boolean", default: true } } }, annotations: { title: "Batch engine calls", readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false } },
+  { name: "exi_api", description: "Returns the manifest of ExiEngine public classes, functions, methods and constants.", inputSchema: { type: "object", properties: {} }, annotations: { title: "ExiEngine API manifest", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
+  { name: "exi_session_status", description: "Returns this MCP session's handle, scope, pending upload and preview metadata in bounded form without running getters; does not reveal the token.", inputSchema: { type: "object", properties: {} }, annotations: { title: "Inspect engine session", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
+  { name: "exi_session_reset", description: "Safely releases all engine handles in this MCP session.", inputSchema: { type: "object", properties: {} }, annotations: { title: "Reset engine session", readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false } },
+  { name: "exi_create", description: "Creates a handle from an ExiEngine public class.", inputSchema: { type: "object", required: ["type"], properties: { type: { type: "string" }, args: { type: "array" } } }, annotations: { title: "Create engine object", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false } },
+  { name: "exi_function", description: "Calls an ExiEngine public function with handle arguments.", inputSchema: { type: "object", required: ["name"], properties: { name: { type: "string" }, args: { type: "array" } } }, annotations: { title: "Call engine function", readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false } },
+  { name: "exi_export_get", description: "Reads an allowlisted constant or static value from the src/index.js export tree.", inputSchema: { type: "object", required: ["path"], properties: { path: { type: "string" } } }, annotations: { title: "Read engine export", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
+  { name: "exi_export_call", description: "Calls an allowlisted public function from the src/index.js export tree asynchronously.", inputSchema: { type: "object", required: ["path"], properties: { path: { type: "string" }, args: { type: "array" } } }, annotations: { title: "Call engine export", readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false } },
+  { name: "exi_static_call", description: "Calls a static method on a public class.", inputSchema: { type: "object", required: ["type", "method"], properties: { type: { type: "string" }, method: { type: "string" }, args: { type: "array" } } }, annotations: { title: "Call static engine method", readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false } },
+  { name: "exi_call", description: "Calls a public method on an engine handle.", inputSchema: { type: "object", required: ["handle", "method"], properties: { handle: { type: "string" }, method: { type: "string" }, args: { type: "array" } } }, annotations: { title: "Call engine method", readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false } },
+  { name: "exi_inspect", description: "Returns an engine handle's public method and property metadata without reading values, so an AI can build a reliable call plan.", inputSchema: { type: "object", required: ["handle"], properties: { handle: { type: "string" } } }, annotations: { title: "Inspect engine handle", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
+  { name: "exi_get", description: "Reads a public property/getter value on an engine handle.", inputSchema: { type: "object", required: ["handle", "property"], properties: { handle: { type: "string" }, property: { type: "string" } } }, annotations: { title: "Read engine property", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
+  { name: "exi_set", description: "Replaces a public data field on an engine handle with a JSON value.", inputSchema: { type: "object", required: ["handle", "property", "value"], properties: { handle: { type: "string" }, property: { type: "string" }, value: {} } }, annotations: { title: "Set engine property", readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false } },
+  { name: "exi_release", description: "Releases the handle and runs its destroy() lifecycle if present.", inputSchema: { type: "object", required: ["handle"], properties: { handle: { type: "string" } } }, annotations: { title: "Release engine handle", readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false } },
+  { name: "exi_build_scene", description: "Builds a bounded, safe ExiEngine node tree from a JSON declaration.", inputSchema: { type: "object", required: ["scene"], properties: { scene: { type: "object" } } }, annotations: { title: "Build scene graph", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false } },
+  { name: "exi_scaffold", description: "Creates a minimal, traversal-protected browser game project inside the repository.", inputSchema: { type: "object", properties: { directory: { type: "string" }, overwrite: { type: "boolean" } } }, annotations: { title: "Scaffold browser game", readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false } },
+  { name: "exi_project_apply", description: "Writes up to 16 bounded text files to a game folder in the same session scope in one transactional flow; rolls back earlier files on a preflight or commit error. If a read/list version is given for each file, a stale overwrite is rejected.", inputSchema: { type: "object", required: ["path", "files"], properties: { path: { type: "string" }, files: { type: "array", minItems: 1, maxItems: MAX_PROJECT_APPLY_FILES, items: { type: "object", required: ["path", "content"], additionalProperties: false, properties: { path: { type: "string", minLength: 1 }, content: { type: "string", maxLength: MAX_PROJECT_FILE_BYTES }, expectedVersion: expectedVersionSchema } } }, overwrite: { type: "boolean", default: false } } }, annotations: { title: "Apply project text files", readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false } },
+  { name: "exi_file_read", description: "Reads an allowlisted text project file under the repository root with bounded content; uses UTF-8 offset/limit paging for large files.", inputSchema: { type: "object", required: ["path"], properties: { path: { type: "string" }, offset: { type: "integer", minimum: 0 }, limit: { type: "integer", minimum: 1, maximum: MAX_PROJECT_READ_BYTES } } }, annotations: { title: "Read project text file", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
+  { name: "exi_file_list", description: "Lists the allowlisted text files in a project folder scaffolded in the same session or opened with exi_project_open, with bounded metadata.", inputSchema: { type: "object", required: ["path"], properties: { path: { type: "string" } } }, annotations: { title: "List project files", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
+  { name: "exi_file_write", description: "Creates an allowlisted text project file under the repository root with bounded UTF-8 content, or updates it with explicit overwrite; expectedVersion rejects a stale overwrite and expectedSha256 rejects corrupted content.", inputSchema: { type: "object", required: ["path", "content"], properties: { path: { type: "string" }, content: { type: "string", maxLength: MAX_PROJECT_FILE_BYTES }, overwrite: { type: "boolean", default: false }, expectedVersion: expectedVersionSchema, expectedSha256: expectedSha256Schema } }, annotations: { title: "Write project text file", readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false } },
+  { name: "exi_file_patch", description: "Atomically replaces exactly one exact match of the find text in an existing allowlisted text project file; with zero or several matches the file is not touched.", inputSchema: { type: "object", required: ["path", "find", "replace"], properties: { path: { type: "string" }, find: { type: "string", minLength: 1, maxLength: MAX_PROJECT_PATCH_TEXT_BYTES }, replace: { type: "string", maxLength: MAX_PROJECT_PATCH_TEXT_BYTES } } }, annotations: { title: "Patch project text file", readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false } },
+  { name: "exi_file_begin", description: "Starts a sequential chunk upload for an allowlisted text project file over 64 KiB; the temporary file is kept inside the project scope, expectedVersion rejects a stale commit and expectedSha256 rejects corrupted content.", inputSchema: { type: "object", required: ["path", "size"], properties: { path: { type: "string" }, size: { type: "integer", minimum: 0, maximum: MAX_CHUNKED_PROJECT_FILE_BYTES }, overwrite: { type: "boolean", default: false }, expectedVersion: expectedVersionSchema, expectedSha256: expectedSha256Schema } }, annotations: { title: "Begin chunked project file", readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false } },
+  { name: "exi_file_chunk", description: "Appends a sequential UTF-8 text chunk to a chunk upload; offset must equal the previous receivedBytes.", inputSchema: { type: "object", required: ["fileUploadId", "offset", "content"], properties: { fileUploadId: { type: "string" }, offset: { type: "integer", minimum: 0 }, content: { type: "string", maxLength: MAX_PROJECT_FILE_CHUNK_BYTES } } }, annotations: { title: "Write project file chunk", readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false } },
+  { name: "exi_file_commit", description: "Commits a completed text upload to the verified target file.", inputSchema: { type: "object", required: ["fileUploadId"], properties: { fileUploadId: { type: "string" } } }, annotations: { title: "Commit project file", readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false } },
+  { name: "exi_file_abort", description: "Cleans up the temporary file of a chunked text upload.", inputSchema: { type: "object", required: ["fileUploadId"], properties: { fileUploadId: { type: "string" } } }, annotations: { title: "Abort project file", readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false } },
+  { name: "exi_asset_list", description: "Lists the allowlisted game assets in a folder scaffolded in the same session or opened with exi_project_open, with bounded metadata.", inputSchema: { type: "object", required: ["path"], properties: { path: { type: "string" } } }, annotations: { title: "List game assets", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
+  { name: "exi_asset_read", description: "Reads a byte range of at most 32 KiB of an allowlisted game asset in the same session as base64; the whole file is not loaded into memory.", inputSchema: { type: "object", required: ["path"], properties: { path: { type: "string" }, offset: { type: "integer", minimum: 0 }, limit: { type: "integer", minimum: 1, maximum: MAX_ASSET_READ_BYTES } } }, annotations: { title: "Read game asset bytes", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
+  { name: "exi_asset_write", description: "Uploads a bounded binary game asset to a folder scaffolded in the same session or opened with exi_project_open; expectedVersion rejects a stale overwrite and expectedSha256 rejects corrupted content.", inputSchema: { type: "object", required: ["path", "bytes"], properties: { path: { type: "string" }, bytes: binaryPayloadSchema, overwrite: { type: "boolean", default: false }, expectedVersion: expectedVersionSchema, expectedSha256: expectedSha256Schema } }, annotations: { title: "Upload game asset", readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false } },
+  { name: "exi_asset_begin", description: "Starts a sequential chunk upload for an allowlisted asset over 512 KiB; the temporary file is kept inside the project scope, expectedVersion rejects a stale commit and expectedSha256 rejects corrupted content.", inputSchema: { type: "object", required: ["path", "size"], properties: { path: { type: "string" }, size: { type: "integer", minimum: 0, maximum: MAX_CHUNKED_ASSET_BYTES }, overwrite: { type: "boolean", default: false }, expectedVersion: expectedVersionSchema, expectedSha256: expectedSha256Schema } }, annotations: { title: "Begin chunked asset upload", readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false } },
+  { name: "exi_asset_chunk", description: "Appends a sequential bounded byte chunk to a chunk upload; offset must equal the previous receivedBytes.", inputSchema: { type: "object", required: ["uploadId", "offset", "bytes"], properties: { uploadId: { type: "string" }, offset: { type: "integer", minimum: 0 }, bytes: binaryPayloadSchema } }, annotations: { title: "Write asset chunk", readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false } },
+  { name: "exi_asset_commit", description: "Moves a completed chunk upload to the verified target asset name; replaces an existing file only if overwrite is given explicitly.", inputSchema: { type: "object", required: ["uploadId"], properties: { uploadId: { type: "string" } } }, annotations: { title: "Commit asset upload", readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false } },
+  { name: "exi_asset_abort", description: "Cleans up the temporary file of a chunk upload.", inputSchema: { type: "object", required: ["uploadId"], properties: { uploadId: { type: "string" } } }, annotations: { title: "Abort asset upload", readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false } },
+  { name: "exi_file_check", description: "Runs a bounded static check, without executing code, on a .html/.js/.mjs/.json project file scaffolded in the same session or opened with exi_project_open.", inputSchema: { type: "object", required: ["path"], properties: { path: { type: "string" } } }, annotations: { title: "Check project file syntax", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
+  { name: "exi_project_status", description: "Returns the same-session project in one bounded read-only result with files, assets, the static check and a summary of the project's preview telemetry; explicitly separates the case with no browser/GPU.", inputSchema: { type: "object", required: ["path"], properties: { path: { type: "string" } } }, annotations: { title: "Inspect game project status", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
+  { name: "exi_project_check", description: "Checks the allowlisted text files of a game scaffolded in the same session or opened with exi_project_open in one bounded flow; does not run arbitrary code.", inputSchema: { type: "object", required: ["path"], properties: { path: { type: "string" } } }, annotations: { title: "Check whole game project", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
+  { name: "exi_project_preview", description: "Statically checks the game in the same session scope first; if all checkable files pass, starts a loopback preview for index.html and returns pageUrl. Does not produce browser/GPU evidence.", inputSchema: { type: "object", required: ["path"], properties: { path: { type: "string" }, port: { type: "integer", minimum: 1, maximum: 65535 } } }, annotations: { title: "Check and preview game", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false } },
+  { name: "exi_project_open", description: "Statically checks an existing game folder in the repository first, then opens it to the same session's bounded file/asset scope; does not run arbitrary code.", inputSchema: { type: "object", required: ["path"], properties: { path: { type: "string" } } }, annotations: { title: "Open existing game project", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
+  { name: "exi_check", description: "Runs the doctor, test or verify release check without running an arbitrary shell.", inputSchema: { type: "object", required: ["mode"], properties: { mode: { enum: ["doctor", "test", "verify"] } } }, annotations: { title: "Run ExiEngine checks", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
+  { name: "exi_preview_start", description: "Starts the repository server.mjs on a safe loopback port; does not report ready until the requested game page path returns HTTP 200, and returns pageUrl.", inputSchema: { type: "object", properties: { port: { type: "integer", minimum: 1, maximum: 65535 }, path: { type: "string", minLength: 1, maxLength: 512, description: "Game page inside the repository, e.g. /ai-game/index.html" } } }, annotations: { title: "Start local preview", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false } },
+  { name: "exi_preview_call", description: "Calls the browser engine API running behind the token-protected demo or scaffold RuntimeAgent with an allowlisted operation; observe gives a bounded canvas grid/hash, snapshot a bounded scene graph/hash, and scenario a bounded input → fixed-step → observe/snapshot flow; APIs that take callbacks can only use a {\"$callback\":\"name\"} reference registered on the page; does not run eval or arbitrary scripts. Use exi_preview_batch for batches.", inputSchema: { type: "object", required: ["previewId", "operation"], properties: { previewId: { type: "string" }, operation: { enum: ["function", "create", "export_get", "export_call", "static_call", "call", "inspect", "get", "set", "release", "observe", "snapshot", "scenario"] }, name: { type: "string" }, path: { type: "string" }, type: { type: "string" }, method: { type: "string" }, handle: { type: "string" }, property: { type: "string" }, value: {}, args: { type: "array", description: "JSON arguments; {columns,rows} for observe, [{offset,limit}] for snapshot, [{frames:[{delta,input,observe,snapshot}],resume?}] for scenario; browser APIs that need a callback accept a {\"$callback\":\"name\"} reference registered on the page." } } }, annotations: { title: "Call browser engine runtime", readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false } },
+  { name: "exi_preview_batch", description: "Runs up to 8 allowlisted operations in order on the browser RuntimeAgent; observe gives a bounded canvas grid/hash, snapshot a bounded scene graph/hash, scenario a bounded input/step observation; earlier results can be passed to later calls with $result, and APIs that take callbacks use a {\"$callback\":\"name\"} reference registered on the page.", inputSchema: { type: "object", required: ["previewId", "calls"], properties: { previewId: { type: "string" }, calls: { type: "array", minItems: 1, maxItems: 8, items: { type: "object", required: ["operation"], additionalProperties: false, properties: { operation: { enum: ["function", "create", "export_get", "export_call", "static_call", "call", "inspect", "get", "set", "release", "observe", "snapshot", "scenario"] }, name: { type: "string" }, path: { type: "string" }, type: { type: "string" }, method: { type: "string" }, handle: {}, property: { type: "string" }, value: {}, args: { type: "array", description: "JSON arguments; {columns,rows} for observe, [{offset,limit}] for snapshot, [{frames:[{delta,input,observe,snapshot}],resume?}] for scenario; callbacks use a {\"$callback\":\"name\"} reference registered on the page, and no callback body is carried." } } } }, stopOnError: { type: "boolean", default: true } } }, annotations: { title: "Batch browser engine runtime", readOnlyHint: false, destructiveHint: true, openWorldHint: false } },
+  { name: "exi_preview_probe", description: "Verifies a GET resource inside a started loopback preview with a bounded response; the /__exi/runtime path returns token-managed browser telemetry.", inputSchema: { type: "object", required: ["previewId"], properties: { previewId: { type: "string" }, path: { type: "string" } } }, annotations: { title: "Probe local preview", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
+  { name: "exi_preview_stop", description: "Stops the loopback preview process started by this MCP session.", inputSchema: { type: "object", required: ["previewId"], properties: { previewId: { type: "string" } } }, annotations: { title: "Stop local preview", readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false } },
+  { name: "exi_batch", description: "Runs up to 128 public ExiEngine tool calls in order on the same session queue; handle results and {$result:0,$path:\"fileUploadId\"} field references can be used in later calls.", inputSchema: { type: "object", required: ["calls"], properties: { calls: { type: "array", maxItems: 128, items: { type: "object", required: ["name"], additionalProperties: false, properties: { name: { type: "string" }, arguments: { type: "object" } } } }, stopOnError: { type: "boolean", default: true } } }, annotations: { title: "Batch engine calls", readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false } },
 ];
 
 for (const tool of tools) tool.inputSchema.additionalProperties = false;
@@ -2094,18 +2094,18 @@ function validateToolSchema(value, schema, path) {
         // Another bounded schema branch may match.
       }
     }
-    fail(`${path} MCP şemasına uymuyor.`, "EXI_MCP_ARGUMENT_INVALID");
+    fail(`${path} does not match the MCP schema.`, "EXI_MCP_ARGUMENT_INVALID");
   }
-  if (schema.type && !schemaTypeMatches(value, schema.type)) fail(`${path} ${schema.type} olmalı.`, path === "arguments.args" ? "EXI_MCP_ARGS_TYPE" : "EXI_MCP_ARGUMENT_TYPE");
-  if (Array.isArray(schema.enum) && !schema.enum.includes(value)) fail(`${path} geçerli bir enum değeri değil.`, "EXI_MCP_ARGUMENT_ENUM");
+  if (schema.type && !schemaTypeMatches(value, schema.type)) fail(`${path} must be ${schema.type}.`, path === "arguments.args" ? "EXI_MCP_ARGS_TYPE" : "EXI_MCP_ARGUMENT_TYPE");
+  if (Array.isArray(schema.enum) && !schema.enum.includes(value)) fail(`${path} is not a valid enum value.`, "EXI_MCP_ARGUMENT_ENUM");
   if ((schema.type === "integer" || schema.type === "number") && typeof value === "number") {
-    if (Number.isFinite(schema.minimum) && value < schema.minimum) fail(`${path} minimum sınırının altında.`, "EXI_MCP_ARGUMENT_LIMIT");
-    if (Number.isFinite(schema.maximum) && value > schema.maximum) fail(`${path} maximum sınırını aşıyor.`, "EXI_MCP_ARGUMENT_LIMIT");
+    if (Number.isFinite(schema.minimum) && value < schema.minimum) fail(`${path} is below the minimum.`, "EXI_MCP_ARGUMENT_LIMIT");
+    if (Number.isFinite(schema.maximum) && value > schema.maximum) fail(`${path} exceeds the maximum.`, "EXI_MCP_ARGUMENT_LIMIT");
   }
-  if (typeof value === "string" && Number.isSafeInteger(schema.maxLength) && value.length > schema.maxLength) fail(`${path} uzunluk limiti aşıldı.`, "EXI_MCP_ARGUMENT_LIMIT");
+  if (typeof value === "string" && Number.isSafeInteger(schema.maxLength) && value.length > schema.maxLength) fail(`${path} length limit exceeded.`, "EXI_MCP_ARGUMENT_LIMIT");
   if (Array.isArray(value)) {
-    if (Number.isSafeInteger(schema.minItems) && value.length < schema.minItems) fail(`${path} en az ${schema.minItems} öğe içermeli.`, "EXI_MCP_ARGUMENT_LIMIT");
-    if (Number.isSafeInteger(schema.maxItems) && value.length > schema.maxItems) fail(`${path} en fazla ${schema.maxItems} öğe içermeli.`, "EXI_MCP_ARGUMENT_LIMIT");
+    if (Number.isSafeInteger(schema.minItems) && value.length < schema.minItems) fail(`${path} must contain at least ${schema.minItems} items.`, "EXI_MCP_ARGUMENT_LIMIT");
+    if (Number.isSafeInteger(schema.maxItems) && value.length > schema.maxItems) fail(`${path} must contain at most ${schema.maxItems} items.`, "EXI_MCP_ARGUMENT_LIMIT");
     if (schema.items) for (let index = 0; index < value.length; index += 1) validateToolSchema(value[index], schema.items, `${path}[${index}]`);
   }
   if (isRecord(value) && schema.properties) {
@@ -2113,7 +2113,7 @@ function validateToolSchema(value, schema, path) {
       if (!Object.hasOwn(value, required) || value[required] === undefined) fail(`${path}.${required} zorunlu.`, "EXI_MCP_ARGUMENT_REQUIRED");
     }
     if (schema.additionalProperties === false) {
-      for (const key of Object.keys(value)) if (!Object.hasOwn(schema.properties, key)) fail(`${path}.${key} bilinmeyen alan.`, "EXI_MCP_ARGUMENT_UNKNOWN");
+      for (const key of Object.keys(value)) if (!Object.hasOwn(schema.properties, key)) fail(`${path}.${key} is an unknown field.`, "EXI_MCP_ARGUMENT_UNKNOWN");
     }
     for (const [key, childSchema] of Object.entries(schema.properties)) {
       if (Object.hasOwn(value, key)) validateToolSchema(value[key], childSchema, `${path}.${key}`);
@@ -2124,15 +2124,15 @@ function validateToolSchema(value, schema, path) {
 async function callTool(name, rawArguments = {}, context = {}) {
   assertSafeData(rawArguments);
   const definition = tools.find((tool) => tool.name === name);
-  if (!definition) fail(`MCP tool bulunamadı: ${name}`, "EXI_MCP_TOOL_NOT_FOUND");
+  if (!definition) fail(`MCP tool not found: ${name}`, "EXI_MCP_TOOL_NOT_FOUND");
   const signal = context?.signal;
   const progressToken = context?.progressToken;
   throwIfCancelled(signal);
   const args = rawArguments === undefined ? {} : rawArguments;
-  if (!isRecord(args)) fail("MCP tool arguments object olmalı.", "EXI_MCP_ARGS_TYPE");
-  if (name === "exi_preview_call" && args.operation === "batch") fail("Runtime batch için exi_preview_batch aracı kullanılmalı.", "EXI_MCP_RUNTIME_BATCH_ROUTE");
-  if (name === "exi_preview_call" && typeof args.operation === "string" && !runtimeOperations.has(args.operation)) fail(`Runtime operation desteklenmiyor: ${args.operation}`, "EXI_MCP_RUNTIME_OPERATION");
-  if (name === "exi_preview_batch" && Array.isArray(args.calls) && (args.calls.length === 0 || args.calls.length > MAX_RUNTIME_BATCH_CALLS)) fail(`Runtime batch calls 1 ile ${MAX_RUNTIME_BATCH_CALLS} arasında olmalı.`, "EXI_MCP_RUNTIME_BATCH_LIMIT");
+  if (!isRecord(args)) fail("MCP tool arguments must be an object.", "EXI_MCP_ARGS_TYPE");
+  if (name === "exi_preview_call" && args.operation === "batch") fail("Use the exi_preview_batch tool for runtime batches.", "EXI_MCP_RUNTIME_BATCH_ROUTE");
+  if (name === "exi_preview_call" && typeof args.operation === "string" && !runtimeOperations.has(args.operation)) fail(`Runtime operation is not supported: ${args.operation}`, "EXI_MCP_RUNTIME_OPERATION");
+  if (name === "exi_preview_batch" && Array.isArray(args.calls) && (args.calls.length === 0 || args.calls.length > MAX_RUNTIME_BATCH_CALLS)) fail(`Runtime batch calls must be between 1 and ${MAX_RUNTIME_BATCH_CALLS}.`, "EXI_MCP_RUNTIME_BATCH_LIMIT");
   validateToolSchema(args, definition.inputSchema, "arguments");
   if (name === "exi_api") return apiContract();
   if (name === "exi_session_status") return sessionStatus();
@@ -2160,19 +2160,19 @@ async function callTool(name, rawArguments = {}, context = {}) {
   if (name === "exi_create") return resultValue(await createExported(args.type, resolveArgs(args.args)));
   if (name === "exi_function") {
     const fn = engineExports[assertPublicName(args.name, "name")];
-    if (typeof fn !== "function" || isClass(fn)) fail(`Public function bulunamadı: ${args.name}`);
+    if (typeof fn !== "function" || isClass(fn)) fail(`Public function not found: ${args.name}`);
     return resultValue(await fn(...resolveArgs(args.args)));
   }
   if (name === "exi_export_get") return protectedResultValue(await resolveExportPath(args.path).value);
   if (name === "exi_export_call") {
     const resolved = resolveExportPath(args.path);
-    if (typeof resolved.value !== "function") fail(`Public export function değil: ${args.path}`);
+    if (typeof resolved.value !== "function") fail(`Public export is not a function: ${args.path}`);
     return resultValue(await resolved.value.apply(resolved.parent, resolveArgs(args.args)));
   }
   if (name === "exi_static_call") {
     const type = assertPublicName(args.type, "type");
     const Constructor = engineExports[type];
-    if (!isClass(Constructor)) fail(`Static method bulunamadı: ${type}.${args.method}`);
+    if (!isClass(Constructor)) fail(`Static method not found: ${type}.${args.method}`);
     return resultValue(await getPublicStaticMethod(Constructor, args.method).apply(Constructor, resolveArgs(args.args)));
   }
   if (name === "exi_call") {
@@ -2185,14 +2185,14 @@ async function callTool(name, rawArguments = {}, context = {}) {
     const object = requireHandle(args.handle);
     const property = assertPublicName(args.property, "property");
     const descriptor = findPropertyDescriptor(object, property);
-    if (!descriptor) fail(`Engine property bulunamadı: ${property}`);
-    if (typeof descriptor.value === "function") fail(`Method property olarak yazılamaz: ${property}`);
-    if ("value" in descriptor && descriptor.writable !== true) fail(`Property yazılabilir değil: ${property}`);
-    if (!("value" in descriptor) && typeof descriptor.set !== "function") fail(`Property yazılabilir değil: ${property}`);
+    if (!descriptor) fail(`Engine property not found: ${property}`);
+    if (typeof descriptor.value === "function") fail(`Method cannot be written as a property: ${property}`);
+    if ("value" in descriptor && descriptor.writable !== true) fail(`Property is not writable: ${property}`);
+    if (!("value" in descriptor) && typeof descriptor.set !== "function") fail(`Property is not writable: ${property}`);
     const current = object[property];
-    if (Array.isArray(current) || current instanceof Map || current instanceof Set) fail(`Collection property doğrudan yazılamaz: ${property}`);
+    if (Array.isArray(current) || current instanceof Map || current instanceof Set) fail(`Collection property cannot be written directly: ${property}`);
     const next = resolveArgument(args.value);
-    if (current && typeof current === "object" && next && typeof next === "object" && !objectHandles.has(next)) fail(`Object property handle ile değiştirilmelidir: ${property}`);
+    if (current && typeof current === "object" && next && typeof next === "object" && !objectHandles.has(next)) fail(`Object property must be changed through a handle: ${property}`);
     object[property] = next;
     return { handle: args.handle, property, value: serialize(object[property]) };
   }
@@ -2241,14 +2241,14 @@ async function callTool(name, rawArguments = {}, context = {}) {
   if (name === "exi_check") return runCheck(args.mode, signal, progressToken);
   if (name === "exi_preview_start") return startPreview(args, signal, progressToken);
   if (name === "exi_preview_call") {
-    if (args.operation === "batch") fail("Runtime batch için exi_preview_batch aracı kullanılmalı.", "EXI_MCP_RUNTIME_BATCH_ROUTE");
+    if (args.operation === "batch") fail("Use the exi_preview_batch tool for runtime batches.", "EXI_MCP_RUNTIME_BATCH_ROUTE");
     return callPreviewRuntime(args, signal);
   }
   if (name === "exi_preview_batch") return callPreviewRuntime({ ...args, operation: "batch" }, signal);
   if (name === "exi_preview_probe") return probePreview(args, signal);
   if (name === "exi_preview_stop") return stopPreview(args.previewId);
   if (name === "exi_batch") return runBatch(args, signal, progressToken);
-  fail(`MCP tool bulunamadı: ${name}`, "EXI_MCP_TOOL_NOT_FOUND");
+  fail(`MCP tool not found: ${name}`, "EXI_MCP_TOOL_NOT_FOUND");
 }
 
 function send(message) {
@@ -2277,19 +2277,19 @@ function requestEra(message) {
     return { modern: true, error: unsupportedProtocolResponse(message.id, requestedVersion) };
   }
   if (!isRecord(meta[MODERN_CLIENT_CAPABILITIES_META_KEY])) {
-    return { modern: true, error: errorResponse(message.id, -32602, "Modern MCP isteğinde clientCapabilities zorunlu.") };
+    return { modern: true, error: errorResponse(message.id, -32602, "clientCapabilities is required in a modern MCP request.") };
   }
   if (meta[MODERN_CLIENT_INFO_META_KEY] !== undefined && !isRecord(meta[MODERN_CLIENT_INFO_META_KEY])) {
-    return { modern: true, error: errorResponse(message.id, -32602, "Modern MCP clientInfo nesne olmalı.") };
+    return { modern: true, error: errorResponse(message.id, -32602, "Modern MCP clientInfo must be an object.") };
   }
   if (Object.hasOwn(message, "id") && (message.id === null || (typeof message.id !== "string" && !Number.isSafeInteger(message.id)))) {
-    return { modern: true, error: errorResponse(null, -32600, "Modern MCP request id null olmayan string veya safe integer olmalı.") };
+    return { modern: true, error: errorResponse(null, -32600, "Modern MCP request id must be a non-null string or a safe integer.") };
   }
   return { modern: true, meta };
 }
 
 function unsupportedProtocolResponse(id, requested) {
-  return errorResponse(id, -32022, "Desteklenmeyen MCP protokol sürümü.", { supported: SUPPORTED_PROTOCOLS, requested });
+  return errorResponse(id, -32022, "Unsupported MCP protocol version.", { supported: SUPPORTED_PROTOCOLS, requested });
 }
 
 function modernResult(result) {
@@ -2304,7 +2304,7 @@ function response(id, result, modern = false) {
 
 function assertOutputSize(value) {
   const bytes = Buffer.byteLength(JSON.stringify(value), "utf8");
-  if (bytes > MAX_OUTPUT_BYTES) fail("MCP tool output boyutu limiti aşıldı.", "EXI_MCP_OUTPUT_LIMIT");
+  if (bytes > MAX_OUTPUT_BYTES) fail("MCP tool output size limit exceeded.", "EXI_MCP_OUTPUT_LIMIT");
   return value;
 }
 
@@ -2314,13 +2314,13 @@ function errorResponse(id, code, message, data) {
 
 async function handleMessage(line) {
   if (Buffer.byteLength(line, "utf8") > MAX_MESSAGE_BYTES) {
-    send(errorResponse(null, -32600, "MCP mesaj boyutu limiti aşıldı."));
+    send(errorResponse(null, -32600, "MCP message size limit exceeded."));
     return;
   }
   let message;
-  try { message = JSON.parse(line); } catch { send(errorResponse(null, -32700, "Geçersiz JSON.")); return; }
+  try { message = JSON.parse(line); } catch { send(errorResponse(null, -32700, "Invalid JSON.")); return; }
   if (!message || message.jsonrpc !== "2.0" || typeof message.method !== "string") {
-    send(errorResponse(message?.id, -32600, "Geçersiz JSON-RPC isteği."));
+    send(errorResponse(message?.id, -32600, "Invalid JSON-RPC request."));
     return;
   }
   if (message.method === "notifications/cancelled") {
@@ -2389,7 +2389,7 @@ async function handleMessage(line) {
   }
   if (message.method === "tools/call") {
     if (activeRequests.has(message.id)) {
-      send(errorResponse(message.id, -32600, "Aynı request id ile çalışan MCP isteği var."));
+      send(errorResponse(message.id, -32600, "An MCP request with the same request id is already running."));
       return;
     }
     const progressToken = message.params?._meta?.progressToken;
@@ -2417,7 +2417,7 @@ async function handleMessage(line) {
     toolQueue = run.catch(() => {});
     return;
   }
-  send(errorResponse(message.id, -32601, `Method bulunamadı: ${message.method}`));
+  send(errorResponse(message.id, -32601, `Method not found: ${message.method}`));
 }
 
 const input = createInterface({ input: process.stdin, crlfDelay: Infinity });

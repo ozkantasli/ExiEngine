@@ -409,7 +409,7 @@ try {
   assert.ok(callableNodeInspection.properties.some((property) => property.name === "position" && property.readable));
   const hiddenMethod = await request("tools/call", { name: "exi_call", arguments: { handle: callableNode.$handle, method: "collectSprites" } });
   assert.equal(hiddenMethod.result.isError, true);
-  assert.match(hiddenMethod.result.content[0].text, /Public method değil/);
+  assert.match(hiddenMethod.result.content[0].text, /Not a public method/);
   const callableCollider = toolResult(await request("tools/call", { name: "exi_create", arguments: { type: "Collider", args: [{ $handle: callableNode.$handle }] } }));
   const callableColliderInspection = toolResult(await request("tools/call", { name: "exi_inspect", arguments: { handle: callableCollider.$handle } }));
   const layerProperty = callableColliderInspection.properties.find((property) => property.name === "layer");
@@ -659,7 +659,7 @@ try {
   previewId = null;
   const rejectedPreviewPath = await request("tools/call", { name: "exi_preview_start", arguments: { path: "/%2e%2e/package.json" } });
   assert.equal(rejectedPreviewPath.result.isError, true);
-  assert.match(rejectedPreviewPath.result.content[0].text, /Repo dışına çıkan yol|traversal/);
+  assert.match(rejectedPreviewPath.result.content[0].text, /Path escaping the repository|traversal/);
 
   const scaffold = toolResult(await request("tools/call", { name: "exi_scaffold", arguments: { directory: scaffoldRelative } }));
   assert.equal(scaffold.files.length, 3);
