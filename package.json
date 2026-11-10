@@ -1,14 +1,64 @@
 {
   "name": "exi-engine",
   "version": "0.2.0",
-  "private": true,
   "license": "MIT",
   "type": "module",
-  "exports": "./src/index.js",
+  "main": "./src/index.js",
+  "module": "./src/index.js",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./src/index.js",
+      "default": "./src/index.js"
+    },
+    "./dist/exi-engine.js": {
+      "types": "./index.d.ts",
+      "default": "./dist/exi-engine.js"
+    },
+    "./dist/exi-engine.global.js": "./dist/exi-engine.global.js",
+    "./runtime-agent": "./src/ai/runtime-agent.js",
+    "./package.json": "./package.json"
+  },
   "types": "index.d.ts",
-  "description": "A dependency-free 2D WebGL2/WebGPU renderer core.",
+  "description": "A dependency-free 2D WebGL2/WebGPU game engine with an AI-agent (MCP) bridge.",
+  "keywords": [
+    "game-engine",
+    "2d",
+    "webgl2",
+    "webgpu",
+    "html5",
+    "canvas",
+    "tilemap",
+    "tiled",
+    "mcp",
+    "ai"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ozkantasli/ExiEngine.git"
+  },
+  "homepage": "https://github.com/ozkantasli/ExiEngine#readme",
+  "bugs": {
+    "url": "https://github.com/ozkantasli/ExiEngine/issues"
+  },
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22"
+  },
+  "files": [
+    "src/",
+    "!src/demo.js",
+    "dist/",
+    "index.d.ts",
+    "README.md",
+    "API.md",
+    "LICENSE"
+  ],
   "scripts": {
     "dev": "node server.mjs --port 4173",
+    "build": "node tools/build.mjs",
+    "test:build": "node test/build-smoke.mjs",
+    "prepack": "node tools/build.mjs",
     "doctor": "node test/doctor.mjs",
     "check": "npm test",
     "mcp": "node tools/exi-mcp-server.mjs",

@@ -10,6 +10,7 @@ Read [API.md](API.md) for the detailed API and MCP reference with examples; [ind
 npm run doctor   # environment, exports and repository contract
 npm test         # fast static/server/engine smoke + unit + typecheck
 npm run lint     # zero-dep syntax + anti-pattern scan
+npm run build    # dist/exi-engine.js (ESM) + dist/exi-engine.global.js via tools/build.mjs
 npm run test:typecheck  # index.d.ts integrity + TS consumer fixture
 npm run test:coverage   # unit suite coverage thresholds
 npm run bench:regression  # benchmark baseline drift gate
@@ -78,7 +79,7 @@ For `Node.traverse`, `Node.find`, `Scene.pick`, input/physics filters and other 
 
 ## Test infrastructure
 
-- `test/run-all.mjs`: the `npm test` orchestrator — runs every stage sequentially but independently; even if a stage fails, the following ones still run and a summary is reported. Stages: static, server, doctor, clients, mcp, engine-smoke, unit, typecheck.
+- `test/run-all.mjs`: the `npm test` orchestrator — runs every stage sequentially but independently; even if a stage fails, the following ones still run and a summary is reported. Stages: static, server, doctor, clients, mcp, engine-smoke, unit, typecheck, build.
 - `test/coverage/` + `test/coverage/thresholds.mjs`: unit suite coverage thresholds (after Phase 3, 20 files / ~210 tests; webgl2 %75+, webgpu %85+, unit modules %90+; GPU renderers verify the contract with a fake GL/device, hardware-soak is the real GPU evidence).
 - `tools/lint.mjs`: zero-dep lint — `node --check` syntax + bans on engine imports/eval/console.log (MCP)/mixed indentation.
 - `test/typecheck-syntax.mjs`: runs `index.d.ts` integrity + the `test/fixtures/typecheck.ts` consumer with `--experimental-strip-types` (Node 22.6+; SKIP on Node 22, fully runs on Node 24).

@@ -67,13 +67,37 @@ npm run dev
 Then open `http://127.0.0.1:4173/` in your browser. The server listens on loopback
 only and sends CSP/`nosniff` headers.
 
-### Quick start
+### Install
 
-The package is not published to npm yet; import `src/index.js` from the repository
-directly.
+The package is npm-ready (`npm pack` / `npm publish` produce a tarball with `src/`,
+prebuilt single-file bundles in `dist/` and `index.d.ts`). There are no runtime
+dependencies, so any of these work:
+
+```bash
+npm install exi-engine            # once published; or: npm install github:ozkantasli/ExiEngine
+```
 
 ```js
-import { ExiEngine, Scene, Sprite, Camera } from "./ExiEngine/src/index.js";
+import { ExiEngine, Scene, Sprite } from "exi-engine";             // bundlers / import maps
+import { ExiEngine } from "./ExiEngine/src/index.js";              // straight from a checkout
+import { ExiEngine } from "./vendor/exi-engine.js";                // copied dist/exi-engine.js (one file)
+```
+
+```html
+<!-- No build step: classic script tag, exposes globalThis.Exi -->
+<script src="./vendor/exi-engine.global.js"></script>
+<script>const { ExiEngine, Scene } = Exi;</script>
+```
+
+`npm run build` writes `dist/exi-engine.js` (ES module) and `dist/exi-engine.global.js`
+(classic script) with the zero-dependency bundler in `tools/build.mjs`. Once the package
+is on npm, the same files are served by CDNs such as
+`https://cdn.jsdelivr.net/npm/exi-engine@<version>/dist/exi-engine.js`.
+
+### Quick start
+
+```js
+import { ExiEngine, Scene, Sprite, Camera } from "exi-engine";
 
 const scene = new Scene();
 const player = new Sprite({
@@ -158,9 +182,10 @@ with `exi_preview_call`. All tools and their safety limits:
 | Command | What it does |
 |---|---|
 | `npm run doctor` | Fast environment, export and agent-contract check |
-| `npm test` | Static, server, engine smoke, unit and typecheck stages |
+| `npm test` | Static, server, engine smoke, unit, typecheck and build stages |
 | `npm run test:unit` | Unit tests only |
 | `npm run lint` | Zero-dependency syntax and anti-pattern scan |
+| `npm run build` | Single-file ESM + global bundles in `dist/` (also runs on `npm pack`) |
 | `npm run test:coverage` | Unit suite coverage thresholds |
 | `npm run test:mcp` | Modern and legacy MCP end-to-end smoke test |
 | `npm run test:e2e:browser` | Real Chrome/Chromium canvas and runtime telemetry test |

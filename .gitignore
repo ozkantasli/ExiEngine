@@ -9,3 +9,6 @@ browser-callback-*/
 
 # Coverage çıktıları (yalnızca kök seviye; test/coverage/ kaynak kodudur ve ignore edilmez)
 /coverage/
+
+# Build output (npm run build / prepack)
+/dist/
