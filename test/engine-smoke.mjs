@@ -1564,7 +1564,7 @@ assert.equal(webgpuProbe.getInfo().gpuCullBufferResizes, 1);
 assert.equal(webgpuProbe.ensureGpuCullResources({ gpuOwner: gpuCullOwner, instanceData: new Float32Array(16), instanceCount: 1, instanceStride: 16 }), gpuCullResource);
 assert.equal(webgpuProbe.getInfo().gpuCullBufferResizes, 1);
 assert.ok(webgpuProbe.gpuCullResources.has(gpuCullOwner));
-assert.throws(() => webgpuProbe.ensureGpuCullResources({ gpuOwner: gpuCullOwner, instanceData: new Float32Array(16), instanceCount: 0, instanceStride: 16 }), /sayÄ±sÄ±/);
+assert.throws(() => webgpuProbe.ensureGpuCullResources({ gpuOwner: gpuCullOwner, instanceData: new Float32Array(16), instanceCount: 0, instanceStride: 16 }), /sayısı/);
 const originalGpuCullCreateBindGroup = webgpuProbe.device.createBindGroup;
 let failGpuCullBindGroup = false;
 webgpuProbe.device.createBindGroup = (...args) => {

@@ -440,11 +440,11 @@ export class WebGPURenderer {
     this.assertResourceBudget();
     if (!Number.isSafeInteger(bytes) || bytes < 0) throw new RangeError("WebGPU instanced batch device limit exceeded.");
     if (bytes <= this.instanceBufferSize) return;
-    if (bytes > MAX_INSTANCE_BUFFER_BYTES) throw new RangeError("WebGPU instanced batch buffer limiti aÅŸÄ±ldÄ±.");
+    if (bytes > MAX_INSTANCE_BUFFER_BYTES) throw new RangeError("WebGPU instanced batch buffer limiti aşıldı.");
     if (bytes > this.maxInstanceBufferBytes) throw new RangeError("WebGPU instanced batch device limit exceeded.");
     const size = Math.min(this.maxInstanceBufferBytes, Math.max(4096, 2 ** Math.ceil(Math.log2(bytes))));
     if (size > this.maxInstanceBufferBytes) throw new RangeError("WebGPU instanced batch device limit exceeded.");
-    if (size < bytes) throw new Error("WebGPU instanced batch buffer limiti aÅŸÄ±ldÄ±.");
+    if (size < bytes) throw new Error("WebGPU instanced batch buffer limiti aşıldı.");
     const nextBuffer = this.device.createBuffer({ size, usage: bufferUsage.VERTEX | bufferUsage.COPY_DST });
     this.instanceBuffer?.destroy();
     this.instanceBuffer = nextBuffer;
@@ -532,7 +532,7 @@ export class WebGPURenderer {
 
   ensureGpuCullResources(batch) {
     this.assertResourceBudget();
-    if (!Number.isSafeInteger(batch.instanceCount) || batch.instanceCount <= 0) throw new RangeError("WebGPU GPU culling instance sayÄ±sÄ± geÃ§ersiz.");
+    if (!Number.isSafeInteger(batch.instanceCount) || batch.instanceCount <= 0) throw new RangeError("WebGPU GPU culling instance sayısı geçersiz.");
     const owner = batch.gpuOwner || batch;
     if (!(batch.instanceData instanceof Float32Array)) throw new TypeError("WebGPU GPU culling instance data must be Float32Array.");
     const sourceStride = batch.instanceStride === undefined ? GPU_SOURCE_STRIDE / Float32Array.BYTES_PER_ELEMENT : batch.instanceStride;
@@ -547,14 +547,14 @@ export class WebGPURenderer {
     if (!resource) {
       resource = { input: null, output: null, counter: null, arguments: null, params: null, inputSize: 0, outputSize: 0, cullBindGroup: null, indirectBindGroup: null };
     }
-    if (sourceBytes !== batch.instanceData.byteLength) throw new RangeError("WebGPU GPU culling instance stride geÃ§ersiz.");
-    if (sourceBytes > this.maxGpuCullBufferBytes || outputBytes > this.maxGpuCullBufferBytes) throw new RangeError("WebGPU GPU culling device limiti aÅŸÄ±ldÄ±.");
+    if (sourceBytes !== batch.instanceData.byteLength) throw new RangeError("WebGPU GPU culling instance stride geçersiz.");
+    if (sourceBytes > this.maxGpuCullBufferBytes || outputBytes > this.maxGpuCullBufferBytes) throw new RangeError("WebGPU GPU culling device limiti aşıldı.");
     const needsNewBuffers = sourceBytes > resource.inputSize || outputBytes > resource.outputSize;
     const inputSize = needsNewBuffers ? Math.min(this.maxGpuCullBufferBytes, Math.max(4096, 2 ** Math.ceil(Math.log2(sourceBytes)))) : resource.inputSize;
     const outputSize = needsNewBuffers ? Math.min(this.maxGpuCullBufferBytes, Math.max(4096, 2 ** Math.ceil(Math.log2(outputBytes)))) : resource.outputSize;
     if (inputSize < sourceBytes || outputSize < outputBytes) throw new RangeError("WebGPU GPU culling device limit exceeded.");
     const projectedBytes = this.gpuCullBytes - resource.inputSize - resource.outputSize + inputSize + outputSize;
-    if (projectedBytes > this.maxGpuCullMemoryBytes) throw new RangeError("WebGPU toplam GPU culling bellek limiti aÅŸÄ±ldÄ±.");
+    if (projectedBytes > this.maxGpuCullMemoryBytes) throw new RangeError("WebGPU toplam GPU culling bellek limiti aşıldı.");
     const previousInput = resource.input;
     const previousOutput = resource.output;
     const previousCounter = resource.counter;
@@ -643,7 +643,7 @@ export class WebGPURenderer {
     if (!entry.buffer || bytes > entry.size) {
       const size = Math.min(this.maxVertexBufferBytes, Math.max(4096, 2 ** Math.ceil(Math.log2(bytes))));
       if (size > this.maxVertexBufferBytes) throw new RangeError("WebGPU static batch buffer device limit exceeded.");
-      if (size < bytes) throw new Error("WebGPU static batch buffer limiti aÅŸÄ±ldÄ±.");
+      if (size < bytes) throw new Error("WebGPU static batch buffer limiti aşıldı.");
       let nextBuffer = null;
       try {
         nextBuffer = this.device.createBuffer({ size, usage: bufferUsage.VERTEX | bufferUsage.COPY_DST });
@@ -678,7 +678,7 @@ export class WebGPURenderer {
     const width = Number(baseTexture.sourceWidth); const height = Number(baseTexture.sourceHeight);
     const maxSize = Number(this.device.limits?.maxTextureDimension2D) || Infinity;
     if (baseTexture.source && (Number(baseTexture.source.width) !== width || Number(baseTexture.source.height) !== height)) throw new RangeError("WebGPU texture source size mismatch.");
-    if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width <= 0 || height <= 0 || width > maxSize || height > maxSize || width * height > this.maxTexturePixels) throw new RangeError("WebGPU texture boyutu/pixel limiti aÅŸÄ±ldÄ±.");
+    if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width <= 0 || height <= 0 || width > maxSize || height > maxSize || width * height > this.maxTexturePixels) throw new RangeError("WebGPU texture boyutu/pixel limiti aşıldı.");
     const hasSource = Boolean(baseTexture.source);
     const allocationBytes = hasSource ? width * height * 4 : 4;
     this.assertTextureBudget(allocationBytes);

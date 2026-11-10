@@ -211,7 +211,7 @@ export class SpriteBatch extends Node {
     if (!(texture instanceof Texture)) throw new TypeError("SpriteBatch sprite texture bekleniyor.");
     const batchBase = this.texture.baseTexture || this.texture;
     const spriteBase = texture.baseTexture || texture;
-    if (batchBase !== spriteBase) throw new Error("SpriteBatch sprite texture aynÄ± atlas/base texture kullanmalÄ±.");
+    if (batchBase !== spriteBase) throw new Error("SpriteBatch sprite texture aynı atlas/base texture kullanmalı.");
   }
 
   validateSpriteAnimation(animation) {
@@ -383,7 +383,7 @@ export class SpriteBatch extends Node {
     const batchBase = texture.baseTexture || texture;
     for (const sprite of this.sprites) {
       const spriteBase = sprite.texture.baseTexture || sprite.texture;
-      if (batchBase !== spriteBase) throw new Error("SpriteBatch mevcut sprite texture'larÄ±yla aynÄ± atlas/base texture kullanmalÄ±.");
+      if (batchBase !== spriteBase) throw new Error("SpriteBatch mevcut sprite texture'larıyla aynı atlas/base texture kullanmalı.");
     }
     this.texture = texture;
     this.invalidate();

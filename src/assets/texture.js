@@ -83,15 +83,15 @@ export class Texture {
   markDirty() {
     const base = this.baseTexture === this ? this : this.baseTexture;
     if (base.source && (Number(base.source.width) !== base.sourceWidth || Number(base.source.height) !== base.sourceHeight)) throw new RangeError("Texture kaynak boyutu değiştirilemez.");
-    if (base.destroyed) throw new Error("Texture yok edilmiÅŸ.");
+    if (base.destroyed) throw new Error("Texture yok edilmiş.");
     base.version += 1;
     return this;
   }
 
   updateSource(source) {
     const base = this.baseTexture === this ? this : this.baseTexture;
-    if (base.destroyed) throw new Error("Texture yok edilmiÅŸ.");
-    if (!source || source.width !== base.sourceWidth || source.height !== base.sourceHeight) throw new RangeError("Texture kaynak boyutu deÄŸiÅŸtirilemez.");
+    if (base.destroyed) throw new Error("Texture yok edilmiş.");
+    if (!source || source.width !== base.sourceWidth || source.height !== base.sourceHeight) throw new RangeError("Texture kaynak boyutu değiştirilemez.");
     base.source = source;
     base.version += 1;
     return this;

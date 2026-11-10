@@ -281,7 +281,7 @@ export class WebGL2Renderer {
       const instanceMaskLocation = gl.getUniformLocation(instancedProgram, "u_mask");
       const instanceMaskRectLocation = gl.getUniformLocation(instancedProgram, "u_mask_rect");
       if (positionLocation < 0 || uvLocation < 0 || colorLocation < 0 || !resolutionLocation || !textureLocation || !filterLocation || !maskLocation || !maskRectLocation) throw new Error("WebGL shader konumları alınamadı.");
-      if (instanceOriginLocation < 0 || instanceAxisXLocation < 0 || instanceAxisYLocation < 0 || instanceUvRectLocation < 0 || instanceColorLocation < 0 || !instanceResolutionLocation || !instanceTextureLocation || !instanceFilterLocation || !instanceMaskLocation || !instanceMaskRectLocation) throw new Error("WebGL instanced shader konumlarÄ± alÄ±namadÄ±.");
+      if (instanceOriginLocation < 0 || instanceAxisXLocation < 0 || instanceAxisYLocation < 0 || instanceUvRectLocation < 0 || instanceColorLocation < 0 || !instanceResolutionLocation || !instanceTextureLocation || !instanceFilterLocation || !instanceMaskLocation || !instanceMaskRectLocation) throw new Error("WebGL instanced shader konumları alınamadı.");
       this.positionLocation = positionLocation;
       this.uvLocation = uvLocation;
       this.colorLocation = colorLocation;
@@ -348,7 +348,7 @@ export class WebGL2Renderer {
     const allocationWidth = hasSource ? width : 1;
     const allocationHeight = hasSource ? height : 1;
     const allocationBytes = allocationWidth * allocationHeight * 4;
-    if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width <= 0 || height <= 0 || allocationWidth > maxSize || allocationHeight > maxSize || allocationWidth * allocationHeight > this.maxTexturePixels) throw new RangeError("WebGL texture boyutu/pixel limiti aÅŸÄ±ldÄ±.");
+    if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width <= 0 || height <= 0 || allocationWidth > maxSize || allocationHeight > maxSize || allocationWidth * allocationHeight > this.maxTexturePixels) throw new RangeError("WebGL texture boyutu/pixel limiti aşıldı.");
     this.assertTextureBudget(allocationBytes);
     const gpuTexture = gl.createTexture();
     if (!gpuTexture) throw new Error("WebGL texture oluşturulamadı.");
@@ -576,7 +576,7 @@ export class WebGL2Renderer {
   ensureInstanceBuffer(bytes) {
     if (!Number.isSafeInteger(bytes) || bytes < 0) throw new RangeError("WebGL instanced batch buffer limiti aşıldı.");
     if (bytes <= this.instanceBufferSize) return;
-    if (bytes > MAX_INSTANCE_BUFFER_BYTES) throw new RangeError("WebGL instanced batch buffer limiti aÅŸÄ±ldÄ±.");
+    if (bytes > MAX_INSTANCE_BUFFER_BYTES) throw new RangeError("WebGL instanced batch buffer limiti aşıldı.");
     const size = Math.max(4096, 2 ** Math.ceil(Math.log2(bytes)));
     const previousBuffer = this.instanceBuffer;
     const nextBuffer = this.gl.createBuffer();
@@ -603,7 +603,7 @@ export class WebGL2Renderer {
       const size = Math.max(4096, 2 ** Math.ceil(Math.log2(batch.data.byteLength)));
       if (size > MAX_VERTEX_BUFFER_BYTES) throw new RangeError("WebGL static vertex buffer limiti aşıldı.");
       const nextBuffer = this.gl.createBuffer();
-      if (!nextBuffer) throw new Error("WebGL static vertex buffer oluÅŸturulamadÄ±.");
+      if (!nextBuffer) throw new Error("WebGL static vertex buffer oluşturulamadı.");
       try {
         this.gl.bindBuffer(this.gl.ARRAY_BUFFER, nextBuffer);
         this.gl.bufferData(this.gl.ARRAY_BUFFER, size, this.gl.DYNAMIC_DRAW);

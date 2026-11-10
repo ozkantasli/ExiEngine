@@ -272,8 +272,8 @@ export class AssetLoader {
     this._maxJSONDepthCapacity = this.maxJSONDepth;
     this._maxImageSizeCapacity = this.maxImageSize;
     this._maxTexturePixelsCapacity = this.maxTexturePixels;
-    if (!Number.isSafeInteger(maxCacheTextures) || maxCacheTextures <= 0 || maxCacheTextures > MAX_CACHE_TEXTURES) throw new RangeError("Texture cache sayÄ± limiti geÃ§ersiz.");
-    if (!Number.isSafeInteger(maxCachePixels) || maxCachePixels <= 0 || maxCachePixels > MAX_CACHE_PIXELS) throw new RangeError("Texture cache pixel limiti geÃ§ersiz.");
+    if (!Number.isSafeInteger(maxCacheTextures) || maxCacheTextures <= 0 || maxCacheTextures > MAX_CACHE_TEXTURES) throw new RangeError("Texture cache sayı limiti geçersiz.");
+    if (!Number.isSafeInteger(maxCachePixels) || maxCachePixels <= 0 || maxCachePixels > MAX_CACHE_PIXELS) throw new RangeError("Texture cache pixel limiti geçersiz.");
     this._cacheTextureCapacity = maxCacheTextures;
     this._cachePixelCapacity = maxCachePixels;
     this.maxCacheTextures = maxCacheTextures;
