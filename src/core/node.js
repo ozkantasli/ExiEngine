@@ -83,8 +83,14 @@ function normalizeTabIndex(value) {
   return Number.isSafeInteger(number) ? Math.max(-1, Math.min(MAX_TAB_INDEX, number)) : 0;
 }
 
+// Color filters (1-6) work per pixel anywhere; spatial filters (7-10) sample
+// neighbouring texels and are meant for whole textures such as RenderGroup
+// targets; vignette (11) darkens toward the texture edges.
+export const FILTER_TYPES = Object.freeze(["none", "grayscale", "invert", "brightness", "sepia", "contrast", "saturate", "blur", "glow", "outline", "pixelate", "vignette"]);
+const FILTER_MODES = new Map(FILTER_TYPES.map((name, index) => [name, index]));
+
 export function normalizeFilterType(value) {
-  return value === "grayscale" || value === "invert" || value === "brightness" || value === "sepia" || value === "contrast" || value === "saturate" ? value : "none";
+  return value !== "none" && FILTER_MODES.has(value) ? value : "none";
 }
 
 export function normalizeFilterAmount(value, fallback = 1) {
@@ -99,7 +105,7 @@ function normalizeMaskTexture(value) {
 }
 
 export function filterMode(value) {
-  return value === "grayscale" ? 1 : value === "invert" ? 2 : value === "brightness" ? 3 : value === "sepia" ? 4 : value === "contrast" ? 5 : value === "saturate" ? 6 : 0;
+  return FILTER_MODES.get(value) ?? 0;
 }
 
 function boundsVisible(node, bounds, camera, width, height, scratch) {
@@ -493,9 +499,9 @@ export class Node {
     if (typeof this.alpha !== "number" || !Number.isFinite(this.alpha) || this.alpha < 0 || this.alpha > 1 || Object.is(this.alpha, -0)) this.alpha = normalizeAlpha(this.alpha);
     const inheritedAlpha = typeof parentAlpha === "number" && Number.isFinite(parentAlpha) && parentAlpha >= 0 && parentAlpha <= 1 && !Object.is(parentAlpha, -0) ? parentAlpha : normalizeAlpha(parentAlpha);
     this.worldAlpha = inheritedAlpha * this.alpha;
-    if (this.filter !== "none" && this.filter !== "grayscale" && this.filter !== "invert" && this.filter !== "brightness" && this.filter !== "sepia" && this.filter !== "contrast" && this.filter !== "saturate") this.filter = normalizeFilterType(this.filter);
+    if (!FILTER_MODES.has(this.filter)) this.filter = normalizeFilterType(this.filter);
     if (typeof this.filterAmount !== "number" || !Number.isFinite(this.filterAmount) || this.filterAmount < 0 || this.filterAmount > 1 || Object.is(this.filterAmount, -0)) this.filterAmount = normalizeFilterAmount(this.filterAmount);
-    const inheritedFilter = parentFilter === "none" || parentFilter === "grayscale" || parentFilter === "invert" || parentFilter === "brightness" || parentFilter === "sepia" || parentFilter === "contrast" || parentFilter === "saturate" ? parentFilter : normalizeFilterType(parentFilter);
+    const inheritedFilter = FILTER_MODES.has(parentFilter) ? parentFilter : normalizeFilterType(parentFilter);
     const inheritedFilterAmount = typeof parentFilterAmount === "number" && Number.isFinite(parentFilterAmount) && parentFilterAmount >= 0 && parentFilterAmount <= 1 && !Object.is(parentFilterAmount, -0) ? parentFilterAmount : normalizeFilterAmount(parentFilterAmount);
     this.worldFilter = this.filter === "none" ? inheritedFilter : this.filter;
     this.worldFilterAmount = this.filter === "none" ? inheritedFilterAmount : this.filterAmount;

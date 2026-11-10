@@ -18,7 +18,7 @@
 - Concave/convex polygons with `Graphics.polygon()`; ear-clipping is done once when the command is added and kept within a 256-point limit
 - Optional local `cullBounds` for large containers/subtrees; if a branch is off-screen, its child renderables are cut before they enter the scene queue
 - Node/container `alpha` is inherited by children as `worldAlpha`; in the regular, static and instanced/WebGPU source flows the cache keys track alpha changes
-- Node/container `filter` is inherited by children; lightweight `grayscale`, `invert`, `brightness`, `sepia`, `contrast` and `saturate` shader filters are applied in regular/static/instanced WebGL2/WebGPU draws
+- Node/container `filter` is inherited by children; lightweight `grayscale`, `invert`, `brightness`, `sepia`, `contrast` and `saturate` color filters plus `blur`, `glow`, `outline`, `pixelate` and `vignette` (`FILTER_TYPES`) are applied in regular/static/instanced WebGL2/WebGPU draws
 - Protection of the matrix and GPU stream against finite but extremely large transform/geometry values through the shared `MAX_WORLD_COORDINATE` limit
 - A WebGL2/WebGPU instanced draw path with `SpriteBatch({ instanced: true })`; the CPU only produces a 14-float sprite instance record and reuses a same-size stream buffer
 - WebGPU compute culling and indirect draw with `SpriteBatch({ instanced: true, gpuCulling: true })`; WebGL2 uses a safe instanced fallback with the same API
@@ -40,7 +40,7 @@
 - UV-level `flipX`/`flipY` for `Sprite` and `SpriteBatch`; direction changes without changing geometry, anchor or the instanced buffer format
 - A sampleable WebGL2 framebuffer/WebGPU render target in the same core with `RenderTexture`; `engine.renderToTexture()` for minimaps, portals and UI composition; if a resize allocation fails, the previous working target is kept
 - Drawing the child scene graph in an independent `RenderTexture` pass with `RenderGroup` and bringing it into the main scene as a single composite quad; nested groups are processed in post-order and WebGL2/WebGPU use the same lifecycle
-- Running up to four allowlisted shader effects in a bounded ping-pong chain with two intermediate targets via `RenderGroup({ effects: [{ filter, amount }] })`; the effect passes reuse the existing WebGL2/WebGPU filter shaders (`grayscale`, `invert`, `brightness`, `sepia`, `contrast`, `saturate`)
+- Running up to four allowlisted shader effects in a bounded ping-pong chain with two intermediate targets via `RenderGroup({ effects: [{ filter, amount }] })`; the effect passes reuse the WebGL2/WebGPU filter shaders, including the spatial `blur`, `glow`, `outline`, `pixelate` and `vignette` effects; group targets are cleared to transparent so empty areas never cover the scene behind the group
 - `engine.prepare()` pre-warms the visible RenderGroup children, group targets and ping-pong intermediate targets alongside the main scene; the first-frame GPU allocation/upload spike becomes measurable
 - Pixel-art nearest sampling with `Texture({ filter: "nearest" })`; linear filtering by default
 - Node-based `blendMode: "normal" | "additive" | "multiply"`; WebGL2 blend state and WebGPU pipeline variants with the same API

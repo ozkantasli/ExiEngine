@@ -2,7 +2,8 @@ export type RendererKind = "auto" | "webgpu" | "webgl2";
 export type ResizeMode = "resize" | "contain" | "cover";
 export type EngineLifecycleState = "created" | "ready" | "running" | "paused" | "visibility-paused" | "stopped" | "destroyed";
 export type BlendMode = "normal" | "additive" | "multiply";
-export type FilterKind = "none" | "grayscale" | "invert" | "brightness" | "sepia" | "contrast" | "saturate";
+export type FilterKind = "none" | "grayscale" | "invert" | "brightness" | "sepia" | "contrast" | "saturate" | "blur" | "glow" | "outline" | "pixelate" | "vignette";
+export const FILTER_TYPES: readonly FilterKind[];
 export type PostProcessEffectKind = Exclude<FilterKind, "none">;
 export interface PostProcessEffect { filter: PostProcessEffectKind; amount?: number; }
 export type Point = { x: number; y: number };

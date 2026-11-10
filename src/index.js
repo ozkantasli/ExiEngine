@@ -1,6 +1,6 @@
 export { ExiEngine } from "./core/exi-engine.js";
 export { Camera } from "./core/camera.js";
-export { Node, Scene } from "./core/node.js";
+export { Node, Scene, FILTER_TYPES } from "./core/node.js";
 export { RenderGroup } from "./core/render-group.js";
 export { TileMap } from "./core/tilemap.js";
 export { Sprite } from "./core/sprite.js";

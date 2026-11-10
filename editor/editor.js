@@ -5,7 +5,7 @@
 // exactly what deserializeScene() loads in a game. Drags and tile painting edit
 // the live nodes directly and are committed when the pointer is released.
 import {
-  Camera, ExiEngine, Graphics, NineSliceSprite, Node, Scene, Sprite, Text, Texture, TileMap,
+  Camera, ExiEngine, FILTER_TYPES, Graphics, NineSliceSprite, Node, Scene, Sprite, Text, Texture, TileMap,
   SCENE_FORMAT, SCENE_FORMAT_VERSION, deserializeScene, getAABB, serializeScene,
 } from "../src/index.js";
 
@@ -402,7 +402,8 @@ function renderInspector() {
   field("Alpha", numberInput(node.alpha, (value) => setOption("alpha", Math.max(0, Math.min(1, value))), { step: 0.05, min: 0, max: 1 }));
   field("Z index", numberInput(node.zIndex, (value) => setOption("zIndex", value)));
   field("Visible", checkbox(node.visible, (value) => setOption("visible", value)));
-  field("Filter", selectInput(node.filter, ["none", "grayscale", "invert", "brightness", "sepia", "contrast", "saturate"], (value) => setOption("filter", value)));
+  field("Filter", selectInput(node.filter, FILTER_TYPES, (value) => setOption("filter", value)));
+  field("Filter amount", numberInput(node.filterAmount, (value) => setOption("filterAmount", Math.max(0, Math.min(1, value))), { step: 0.05, min: 0, max: 1 }));
   field("Blend", selectInput(node.blendMode, ["normal", "additive", "multiply"], (value) => setOption("blendMode", value)));
 
   if (node instanceof Text) {

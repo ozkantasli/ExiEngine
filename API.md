@@ -53,7 +53,7 @@ engine.start();
 
 `BlendMode`: `"normal" | "additive" | "multiply"`.
 
-`FilterKind`: `"none" | "grayscale" | "invert" | "brightness" | "sepia" | "contrast" | "saturate"`.
+`FilterKind` (also exported as `FILTER_TYPES`): color filters `"none" | "grayscale" | "invert" | "brightness" | "sepia" | "contrast" | "saturate"`, spatial filters `"blur" | "glow" | "outline" | "pixelate"` and `"vignette"`. `filterAmount` is 0..1 for all of them (blur radius up to 4 px, glow radius up to 8 px, outline thickness 1-4 px in white, pixel blocks 1-16 px, vignette strength). Spatial filters sample neighbouring texels of the texture being drawn, so they are meant for whole textures: use them as `RenderGroup` effects (`new RenderGroup({ width, height, effects: [{ filter: "outline", amount: 0.5 }, { filter: "glow", amount: 0.6 }] })`) or on sprites with their own texture; on atlas frames, neighbouring frames can bleed in. RenderGroup targets are cleared to transparent, so a group only covers what its children draw.
 
 `Point` `{ x, y }`, `ClipRect` `{ x, y, width, height }`, and `MAX_WORLD_COORDINATE` expresses the finite world-coordinate limit. All significant numeric values must be finite and bounded.
 

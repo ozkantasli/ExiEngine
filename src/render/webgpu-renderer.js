@@ -4,7 +4,7 @@ import { GPU_SOURCE_STRIDE, INSTANCE_STRIDE } from "./instanced.js";
 import { clearColorChannels, DEFAULT_CLEAR_COLOR, normalizeClearAlpha, normalizeClearColor } from "./clear.js";
 import { filterMode } from "../core/node.js";
 import { Texture } from "../assets/texture.js";
-import { renderGroupWithPostProcess } from "./post-process.js";
+import { renderGroupWithPostProcess, TRANSPARENT_CLEAR, TRANSPARENT_RGBA } from "./post-process.js";
 
 const shaderSource = `
 struct Frame { values: vec4f, };
@@ -46,9 +46,54 @@ fn instancedVertexMain(@builtin(vertex_index) vertexIndex: u32, @location(0) ori
   return output;
 }
 
+// Spatial filters (modes 7-10) sample neighbouring texels; see the WebGL2 shader.
+fn gaussian(uv: vec2f, texel: vec2f, radius: f32) -> vec4f {
+  var sum = vec4f(0.0);
+  var total = 0.0;
+  for (var y = -2; y <= 2; y++) {
+    for (var x = -2; x <= 2; x++) {
+      let weight = exp(-f32(x * x + y * y) / 4.0);
+      sum += textureSampleLevel(spriteTexture, spriteSampler, uv + vec2f(f32(x), f32(y)) * texel * radius, 0.0) * weight;
+      total += weight;
+    }
+  }
+  return sum / total;
+}
+
+fn spatialFilter(uv: vec2f, mode: f32, amount: f32) -> vec4f {
+  let texel = 1.0 / vec2f(textureDimensions(spriteTexture));
+  if (mode < 7.5) { return gaussian(uv, texel, amount * 4.0); }
+  let base = textureSampleLevel(spriteTexture, spriteSampler, uv, 0.0);
+  if (mode < 8.5) {
+    let glow = gaussian(uv, texel, 2.0 + amount * 6.0);
+    let premultiplied = base.rgb * base.a + glow.rgb * glow.a * amount * (1.0 - 0.7 * base.a);
+    let alpha = min(1.0, base.a + glow.a * amount * 1.5 * (1.0 - base.a));
+    if (alpha <= 0.0) { return vec4f(0.0); }
+    return vec4f(min(premultiplied / alpha, vec3f(1.0)), alpha);
+  }
+  if (mode < 9.5) {
+    let thickness = 1.0 + amount * 3.0;
+    var edge = 0.0;
+    for (var index = 0; index < 8; index++) {
+      let angle = f32(index) * 0.785398;
+      edge = max(edge, textureSampleLevel(spriteTexture, spriteSampler, uv + vec2f(cos(angle), sin(angle)) * texel * thickness, 0.0).a);
+    }
+    let outline = edge * (1.0 - base.a);
+    let alpha = base.a + outline;
+    if (alpha <= 0.0) { return vec4f(0.0); }
+    return vec4f((base.rgb * base.a + vec3f(outline)) / alpha, alpha);
+  }
+  let size = 1.0 + floor(amount * 15.0);
+  let cell = (floor(uv / (texel * size)) * size + floor(size * 0.5) + 0.5) * texel;
+  return textureSampleLevel(spriteTexture, spriteSampler, cell, 0.0);
+}
+
 @fragment
 fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
-  var color = textureSample(spriteTexture, spriteSampler, input.uv) * input.color;
+  let mode = filterParams.values.x;
+  let sampled = textureSample(spriteTexture, spriteSampler, input.uv);
+  var color = sampled * input.color;
+  if (mode > 6.5 && mode < 10.5) { color = spatialFilter(input.uv, mode, filterParams.values.y) * input.color; }
   if (filterParams.values.x > 0.5 && filterParams.values.x < 1.5) {
     let luminance = dot(color.rgb, vec3f(0.2126, 0.7152, 0.0722));
     color = vec4f(mix(color.rgb, vec3f(luminance), filterParams.values.y), color.a);
@@ -65,9 +110,11 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
     color = vec4f(mix(color.rgb, sepia, filterParams.values.y), color.a);
   } else if (filterParams.values.x > 4.5 && filterParams.values.x < 5.5) {
     color = vec4f(clamp((color.rgb - vec3f(0.5)) * (1.0 + filterParams.values.y) + vec3f(0.5), vec3f(0.0), vec3f(1.0)), color.a);
-  } else if (filterParams.values.x > 5.5) {
+  } else if (filterParams.values.x > 5.5 && filterParams.values.x < 6.5) {
     let luminance = dot(color.rgb, vec3f(0.2126, 0.7152, 0.0722));
     color = vec4f(clamp(vec3f(luminance) + (color.rgb - vec3f(luminance)) * (1.0 + filterParams.values.y), vec3f(0.0), vec3f(1.0)), color.a);
+  } else if (filterParams.values.x > 10.5 && filterParams.values.x < 11.5) {
+    color = vec4f(color.rgb * (1.0 - filterParams.values.y * smoothstep(0.35, 0.95, length(input.uv - vec2f(0.5)) * 1.41421)), color.a);
   }
   if (filterParams.maskRect.z > 0.0 && filterParams.maskRect.w > 0.0) {
     let maskUv = (input.position.xy - filterParams.maskRect.xy) / filterParams.maskRect.zw;
@@ -876,7 +923,7 @@ export class WebGPURenderer {
       if (usesFilters) this.ensureFilterBuffer(queue.batches.length);
       const encoder = this.device.createCommandEncoder();
       for (const batch of queue.batches) if (batch.gpuCulling) batch.gpuResource = this.encodeGpuCull(encoder, batch, camera, renderWidth, renderHeight);
-      const pass = encoder.beginRenderPass({ colorAttachments: [{ view: targetEntry?.view || this.context.getCurrentTexture().createView(), clearValue: this.clearRGBA, loadOp: clear ? "clear" : "load", storeOp: "store" }] });
+      const pass = encoder.beginRenderPass({ colorAttachments: [{ view: targetEntry?.view || this.context.getCurrentTexture().createView(), clearValue: clear === TRANSPARENT_CLEAR ? TRANSPARENT_RGBA : this.clearRGBA, loadOp: clear ? "clear" : "load", storeOp: "store" }] });
       pass.setPipeline(this.getRenderPipeline(false, "normal"));
       pass.setBindGroup(0, this.frameBindGroup);
       let byteOffset = 0;

@@ -1,7 +1,7 @@
 import { buildRenderBatches, collectRenderGroups, createRenderBatchState } from "./batch.js";
 import { getScissorRect } from "./scissor.js";
 import { INSTANCE_STRIDE } from "./instanced.js";
-import { renderGroupWithPostProcess } from "./post-process.js";
+import { renderGroupWithPostProcess, TRANSPARENT_CLEAR, TRANSPARENT_RGBA } from "./post-process.js";
 import { filterMode } from "../core/node.js";
 import { clearColorChannels, DEFAULT_CLEAR_COLOR, normalizeClearAlpha, normalizeClearColor } from "./clear.js";
 
@@ -32,8 +32,52 @@ in vec2 v_uv;
 in vec4 v_color;
 out vec4 out_color;
 
+// Spatial filters (modes 7-10) sample neighbouring texels of the bound texture.
+// They are meant for whole textures such as RenderGroup targets; on atlas
+// frames neighbours can come from adjacent frames.
+vec4 gaussian(vec2 texel, float radius) {
+  vec4 sum = vec4(0.0);
+  float total = 0.0;
+  for (int y = -2; y <= 2; y++) {
+    for (int x = -2; x <= 2; x++) {
+      float weight = exp(-float(x * x + y * y) / 4.0);
+      sum += texture(u_texture, v_uv + vec2(float(x), float(y)) * texel * radius) * weight;
+      total += weight;
+    }
+  }
+  return sum / total;
+}
+
+vec4 spatialFilter(float mode, float amount) {
+  vec2 texel = 1.0 / vec2(textureSize(u_texture, 0));
+  if (mode < 7.5) return gaussian(texel, amount * 4.0);
+  vec4 base = texture(u_texture, v_uv);
+  if (mode < 8.5) {
+    vec4 glow = gaussian(texel, 2.0 + amount * 6.0);
+    vec3 premultiplied = base.rgb * base.a + glow.rgb * glow.a * amount * (1.0 - 0.7 * base.a);
+    float alpha = min(1.0, base.a + glow.a * amount * 1.5 * (1.0 - base.a));
+    return alpha > 0.0 ? vec4(min(premultiplied / alpha, vec3(1.0)), alpha) : vec4(0.0);
+  }
+  if (mode < 9.5) {
+    float thickness = 1.0 + amount * 3.0;
+    float edge = 0.0;
+    for (int index = 0; index < 8; index++) {
+      float angle = float(index) * 0.785398;
+      edge = max(edge, texture(u_texture, v_uv + vec2(cos(angle), sin(angle)) * texel * thickness).a);
+    }
+    float outline = edge * (1.0 - base.a);
+    float alpha = base.a + outline;
+    return alpha > 0.0 ? vec4((base.rgb * base.a + vec3(outline)) / alpha, alpha) : vec4(0.0);
+  }
+  float size = 1.0 + floor(amount * 15.0);
+  // Snap to one texel near the block center so no transparent texel is blended in.
+  vec2 cell = (floor(v_uv / (texel * size)) * size + floor(size * 0.5) + 0.5) * texel;
+  return texture(u_texture, cell);
+}
+
 void main() {
-  vec4 color = texture(u_texture, v_uv) * v_color;
+  float mode = u_filter.x;
+  vec4 color = (mode > 6.5 && mode < 10.5 ? spatialFilter(mode, u_filter.y) : texture(u_texture, v_uv)) * v_color;
   if (u_filter.x > 0.5 && u_filter.x < 1.5) {
     float luminance = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
     color.rgb = mix(color.rgb, vec3(luminance), u_filter.y);
@@ -49,9 +93,11 @@ void main() {
     ), u_filter.y);
   } else if (u_filter.x > 4.5 && u_filter.x < 5.5) {
     color.rgb = clamp((color.rgb - vec3(0.5)) * (1.0 + u_filter.y) + vec3(0.5), vec3(0.0), vec3(1.0));
-  } else if (u_filter.x > 5.5) {
+  } else if (u_filter.x > 5.5 && u_filter.x < 6.5) {
     float luminance = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
     color.rgb = clamp(vec3(luminance) + (color.rgb - vec3(luminance)) * (1.0 + u_filter.y), vec3(0.0), vec3(1.0));
+  } else if (u_filter.x > 10.5 && u_filter.x < 11.5) {
+    color.rgb *= 1.0 - u_filter.y * smoothstep(0.35, 0.95, length(v_uv - vec2(0.5)) * 1.41421);
   }
   if (u_mask_rect.z > 0.0 && u_mask_rect.w > 0.0) {
     vec2 screen = vec2(gl_FragCoord.x, u_resolution.y - gl_FragCoord.y);
@@ -726,7 +772,10 @@ export class WebGL2Renderer {
       gl.bindFramebuffer?.(gl.FRAMEBUFFER, targetEntry?.framebuffer || null);
       gl.viewport(0, 0, renderWidth, renderHeight);
       if (clear) {
-        gl.clearColor(this.clearRGBA.r, this.clearRGBA.g, this.clearRGBA.b, this.clearRGBA.a);
+        // clear === TRANSPARENT_CLEAR: RenderGroup targets start fully transparent
+        // so empty areas of a group never cover the scene behind it.
+        const color = clear === TRANSPARENT_CLEAR ? TRANSPARENT_RGBA : this.clearRGBA;
+        gl.clearColor(color.r, color.g, color.b, color.a);
         gl.clear(gl.COLOR_BUFFER_BIT);
       }
       gl.enable(gl.BLEND);
