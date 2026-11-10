@@ -102,8 +102,8 @@ test("engine: resize contain/cover ve logical size", () => {
   assert.deepEqual({ x: camera.viewportX, y: camera.viewportY, width: camera.viewportWidth, height: camera.viewportHeight, pixelRatio: camera.pixelRatio }, { x: 100, y: 0, width: 200, height: 200, pixelRatio: 1 });
   assert.deepEqual(camera.worldToScreen(0, 0), { x: 200, y: 100 });
   assert.equal(engine.getInfo().resizeMode, "contain");
-  assert.throws(() => engine.setLogicalSize(0, 100), /mantıksal boyutu/);
-  assert.throws(() => engine.setLogicalSize(100, Infinity), /mantıksal boyutu/);
+  assert.throws(() => engine.setLogicalSize(0, 100), /logical size/);
+  assert.throws(() => engine.setLogicalSize(100, Infinity), /logical size/);
   assert.equal(engine.setResizeMode("cover"), engine);
   assert.deepEqual({ x: camera.viewportX, y: camera.viewportY, width: camera.viewportWidth, height: camera.viewportHeight, pixelRatio: camera.pixelRatio }, { x: 0, y: -100, width: 400, height: 400, pixelRatio: 2 });
   assert.throws(() => engine.setResizeMode("stretch"), /resize/);
@@ -132,7 +132,7 @@ test("engine: manual step ve running kısıtı", () => {
   assert.equal(engine.step(1 / 30), engine);
   assert.equal(updates, 2);
   assert.equal(renders, 1);
-  assert.throws(() => { engine.running = true; engine.step(0); }, /çalışırken/);
+  assert.throws(() => { engine.running = true; engine.step(0); }, /while running/);
   engine.running = false;
   engine.destroy();
 });
@@ -243,7 +243,7 @@ test("engine: late initialization failure releases partial resources", async (t)
   assert.equal(getEventListeners(canvas, "pointerdown").length, 0);
   assert.equal(getEventListeners(engine.eventTarget, "resize").length, 0);
   assert.equal(getEventListeners(engine.eventTarget, "pagehide").length, 0);
-  await assert.rejects(engine.init(), /yok edilmiş/);
+  await assert.rejects(engine.init(), /destroyed/);
 });
 
 test("engine: create cleans renderer when input configuration is invalid", async (t) => {
@@ -262,7 +262,7 @@ test("engine: late-init destroy yarışı", async () => {
   const init = engine.init();
   await Promise.resolve();
   engine.destroy();
-  await assert.rejects(init, /yok edilmiş/);
+  await assert.rejects(init, /destroyed/);
   WebGL2Renderer.prototype.init = previousInit;
 });
 
@@ -374,7 +374,7 @@ test("engine: renderToTexture eşleşme", () => {
   assert.equal(engine.renderToTexture(rt), rt);
   assert.equal(calls.length, 1);
   assert.equal(calls[0][3], rt);
-  assert.throws(() => engine.renderToTexture(new RenderTexture({ width: 16, height: 16 })), /eşleşmiyor/);
+  assert.throws(() => engine.renderToTexture(new RenderTexture({ width: 16, height: 16 })), /does not match/);
   assert.throws(() => engine.renderToTexture(new Texture()), /RenderTexture/);
   engine.destroy();
 });

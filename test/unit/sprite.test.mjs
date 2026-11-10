@@ -129,8 +129,8 @@ test("animatedSprite: limitler ve frame sahipliği", () => {
   assert.deepEqual(owned.frames, [frameOne, frameTwo]);
   const direct = new AnimatedSprite({ frames: [frameOne, frameTwo] });
   direct.frames.length = 4_097;
-  assert.throws(() => direct.gotoFrame(0), /limiti/);
-  assert.throws(() => direct.update(0), /limiti/);
+  assert.throws(() => direct.gotoFrame(0), /limit/);
+  assert.throws(() => direct.update(0), /limit/);
   const bounded = new AnimatedSprite({ frames: [frameOne, frameTwo], frameRate: Infinity });
   bounded.update(Infinity);
   assert.equal(Number.isFinite(bounded.elapsed), true);

@@ -83,7 +83,7 @@ test("webgpu: gpu cull resources büyüme, rollback, stride", () => {
   assert.equal(probe.ensureGpuCullResources({ gpuOwner: owner, instanceData: new Float32Array(16), instanceCount: 1, instanceStride: 16 }), resource);
   assert.equal(probe.getInfo().gpuCullBufferResizes, 1);
   assert.ok(probe.gpuCullResources.has(owner));
-  assert.throws(() => probe.ensureGpuCullResources({ gpuOwner: owner, instanceData: new Float32Array(16), instanceCount: 0, instanceStride: 16 }), /say/);
+  assert.throws(() => probe.ensureGpuCullResources({ gpuOwner: owner, instanceData: new Float32Array(16), instanceCount: 0, instanceStride: 16 }), /count/);
 
   // Bind group failure → rollback (yeni nesneler destroy, mevcut korunur)
   const originalCreateBindGroup = probe.device.createBindGroup;

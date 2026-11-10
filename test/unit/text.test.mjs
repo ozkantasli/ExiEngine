@@ -43,8 +43,8 @@ test("text: temel render ve cache", () => {
   label.setText("GPU CORE");
   assert.notEqual(label.texture, texture);
   assert.equal(texture.destroyed, true);
-  assert.throws(() => label.setText("x".repeat(16_385)), /limiti/);
-  assert.throws(() => label.setText("\n".repeat(16_384)), /limiti/);
+  assert.throws(() => label.setText("x".repeat(16_385)), /limit/);
+  assert.throws(() => label.setText("\n".repeat(16_384)), /limit/);
   assert.throws(() => label.setStyle({ font: "x".repeat(513) }), /font/);
   label.destroy();
 });

@@ -26,7 +26,7 @@ test("collision: firstHit / query / raycast", () => {
   assert.equal(rayWorld.raycast({ x: 0, y: 0 }, { x: 1, y: 0 }, 10), null);
   assert.throws(() => world.query(getAABB(sprite), "invalid"), /filter/);
   assert.throws(() => world.raycast({ x: 0, y: 0 }, { x: NaN, y: 1 }), /finite/);
-  assert.throws(() => world.raycast({ x: 0, y: 0 }, { x: 1, y: 0 }, -1), /negatif/);
+  assert.throws(() => world.raycast({ x: 0, y: 0 }, { x: 1, y: 0 }, -1), /negative/);
 });
 
 test("collision: autoSync spatial index", () => {
@@ -87,7 +87,7 @@ test("collision: yok edilmiş node collider'ı otomatik kaldırılır", () => {
   node.destroy();
   assert.equal(world.firstHit(getAABB(probe)), null);
   assert.equal(world.query(getAABB(probe)).length, 0);
-  assert.throws(() => new Collider(node), /canlı/);
+  assert.throws(() => new Collider(node), /live/);
 });
 
 test("collision: custom hitbox bounds", () => {
@@ -107,7 +107,7 @@ test("collision: custom hitbox bounds", () => {
   collider.setBounds(null);
   assert.equal(collider.bounds.width, 100);
   assert.throws(() => collider.setBounds({ x: 0, y: 0, width: Infinity, height: 10 }), /finite/);
-  assert.throws(() => new Collider(node, { bounds: { x: 0, y: 0, width: 0, height: 10 } }), /dikdörtgen/);
+  assert.throws(() => new Collider(node, { bounds: { x: 0, y: 0, width: 0, height: 10 } }), /rectangle|rectangular/);
 });
 
 test("physics: gravity, grounded, static", () => {
@@ -174,7 +174,7 @@ test("physics: yok edilmiş node otomatik kaldırılır", () => {
   world.step(1 / 60);
   assert.equal(world.bodies.has(body), false);
   assert.equal(body._worlds.has(world), false);
-  assert.throws(() => new PhysicsBody(node), /canlı/);
+  assert.throws(() => new PhysicsBody(node), /live/);
   world.clear();
 });
 
@@ -231,8 +231,8 @@ test("physics: kinematic platform taşıyıcı", () => {
   assert.equal(rider.position.x, 20);
   assert.equal(rider.position.y, 35);
   assert.equal(platformBody.setKinematic(false), platformBody);
-  assert.throws(() => new PhysicsBody(platform, { static: true, kinematic: true }), /aynı anda/);
-  assert.throws(() => new PhysicsBody(platform, { static: true }).setKinematic(true), /Static/);
+  assert.throws(() => new PhysicsBody(platform, { static: true, kinematic: true }), /both static and kinematic/);
+  assert.throws(() => new PhysicsBody(platform, { static: true }).setKinematic(true), /static/);
   world.clear();
 });
 
@@ -378,8 +378,8 @@ test("physics: autoSync, tunnel, hız sınırı, kapasite", () => {
 
   const capacityProbe = new PhysicsWorld();
   for (let index = 0; index < 10_001; index += 1) capacityProbe.bodies.add({});
-  assert.throws(() => capacityProbe.step(1 / 60), /en fazla 10000 body/);
-  assert.throws(() => capacityProbe.syncCollisionIndex(), /en fazla 10000 body/);
-  assert.throws(() => capacityProbe.overlaps(new PhysicsBody(new Node())), /en fazla 10000 body/);
+  assert.throws(() => capacityProbe.step(1 / 60), /at most 10000 bodies/);
+  assert.throws(() => capacityProbe.syncCollisionIndex(), /at most 10000 bodies/);
+  assert.throws(() => capacityProbe.overlaps(new PhysicsBody(new Node())), /at most 10000 bodies/);
   capacityProbe.bodies.clear();
 });

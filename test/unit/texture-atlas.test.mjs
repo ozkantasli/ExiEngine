@@ -47,9 +47,9 @@ test("atlas: pack limitler ve red'ler", () => {
     getContext(type) { return type === "2d" ? { drawImage: (...args) => packedDraws.push(args) } : null; }
   };
   assert.throws(() => TextureAtlas.pack([{ name: "too-large", source: { width: 64, height: 64 } }], { maxWidth: 32, maxHeight: 32 }));
-  assert.throws(() => TextureAtlas.pack([{ name: "unsafe", source: { width: Number.MAX_SAFE_INTEGER, height: 1 } }]), /boyutu/);
+  assert.throws(() => TextureAtlas.pack([{ name: "unsafe", source: { width: Number.MAX_SAFE_INTEGER, height: 1 } }]), /size/);
   assert.throws(() => TextureAtlas.pack([{ name: "same", source: { width: 1, height: 1 } }, { name: "same", source: { width: 1, height: 1 } }]));
-  assert.throws(() => TextureAtlas.pack([{ name: "one", source: { width: 1, height: 1 } }], { maxWidth: Infinity }), /limitleri/);
+  assert.throws(() => TextureAtlas.pack([{ name: "one", source: { width: 1, height: 1 } }], { maxWidth: Infinity }), /limits/);
 });
 
 test("atlas: fromJSON array ve name limitleri", () => {
@@ -61,8 +61,8 @@ test("atlas: fromJSON array ve name limitleri", () => {
   assert.equal(arr.get("hero/run-1.png").u0, 0.5);
   assert.throws(() => TextureAtlas.fromJSON(new Texture({ sourceWidth: 16, sourceHeight: 16 }), { frames: [{ filename: "rotated", frame: { x: 0, y: 0, w: 8, h: 8 }, rotated: true }] }), /rotated/);
   assert.throws(() => TextureAtlas.fromJSON(new Texture({ sourceWidth: 16, sourceHeight: 16 }), { frames: [{ filename: "trimmed", frame: { x: 0, y: 0, w: 8, h: 8 }, trimmed: true }] }), /trimmed/);
-  assert.throws(() => TextureAtlas.fromJSON(new Texture({ sourceWidth: 16, sourceHeight: 16 }), { frames: [{ filename: "same", frame: { x: 0, y: 0, w: 8, h: 8 } }, { filename: "same", frame: { x: 8, y: 0, w: 8, h: 8 } }] }), /tekrar/);
-  assert.throws(() => TextureAtlas.fromJSON(new Texture({ sourceWidth: 16, sourceHeight: 16 }), { frames: { ["x".repeat(257)]: { frame: { x: 0, y: 0, w: 1, h: 1 } } } }), /adı/);
+  assert.throws(() => TextureAtlas.fromJSON(new Texture({ sourceWidth: 16, sourceHeight: 16 }), { frames: [{ filename: "same", frame: { x: 0, y: 0, w: 8, h: 8 } }, { filename: "same", frame: { x: 8, y: 0, w: 8, h: 8 } }] }), /Duplicate/);
+  assert.throws(() => TextureAtlas.fromJSON(new Texture({ sourceWidth: 16, sourceHeight: 16 }), { frames: { ["x".repeat(257)]: { frame: { x: 0, y: 0, w: 1, h: 1 } } } }), /name/);
 });
 
 test("atlas: kapasite ve lifecycle edge'leri", () => {
@@ -73,19 +73,19 @@ test("atlas: kapasite ve lifecycle edge'leri", () => {
   assert.equal(lifecycle.destroyed, true);
   assert.equal(frame.destroyed, true);
   assert.equal(base.destroyed, false);
-  assert.throws(() => lifecycle.get("hero"), /yok edilmiş/);
+  assert.throws(() => lifecycle.get("hero"), /destroyed/);
   const externalBase = new Texture({ id: "external", sourceWidth: 8, sourceHeight: 8 });
   const external = new TextureAtlas(externalBase, { hero: { x: 0, y: 0, width: 4, height: 4 } });
   const externalFrame = external.get("hero");
   externalBase.destroy();
-  assert.throws(() => external.get("hero"), /yok edilmiş/);
+  assert.throws(() => external.get("hero"), /destroyed/);
   assert.equal(external.destroyed, true);
   assert.equal(external.has("hero"), false);
   assert.equal(externalFrame.destroyed, true);
-  assert.throws(() => new TextureAtlas(externalBase, { hero: { x: 0, y: 0, width: 1, height: 1 } }), /yok edilmiş/);
-  assert.throws(() => TextureAtlas.fromJSON(new Texture({ sourceWidth: 16, sourceHeight: 16 }), { frames: {} }, { maxFrames: Infinity }), /limiti/);
-  assert.throws(() => TextureAtlas.fromGrid(new Texture({ sourceWidth: 16, sourceHeight: 16 }), { frameWidth: 16, frameHeight: 16, columns: 1, rows: 1, maxFrames: Infinity }), /limiti/);
-  assert.throws(() => new TextureAtlas(Texture.white, { bad: { x: 0, y: 0, width: 2, height: 2 } }), /sınır/);
-  assert.throws(() => new TextureAtlas(Texture.white, Object.fromEntries(Array.from({ length: 10_001 }, (_, index) => [String(index), { x: 0, y: 0, width: 1, height: 1 }]))), /limiti/);
-  assert.throws(() => TextureAtlas.fromJSON(new Texture({ sourceWidth: 16, sourceHeight: 16 }), { frames: { bad: { frame: { x: 10, y: 10, w: 10, h: 10 } } } }), /sınır dışı/);
+  assert.throws(() => new TextureAtlas(externalBase, { hero: { x: 0, y: 0, width: 1, height: 1 } }), /destroyed/);
+  assert.throws(() => TextureAtlas.fromJSON(new Texture({ sourceWidth: 16, sourceHeight: 16 }), { frames: {} }, { maxFrames: Infinity }), /limit/);
+  assert.throws(() => TextureAtlas.fromGrid(new Texture({ sourceWidth: 16, sourceHeight: 16 }), { frameWidth: 16, frameHeight: 16, columns: 1, rows: 1, maxFrames: Infinity }), /limit/);
+  assert.throws(() => new TextureAtlas(Texture.white, { bad: { x: 0, y: 0, width: 2, height: 2 } }), /bound|limit/);
+  assert.throws(() => new TextureAtlas(Texture.white, Object.fromEntries(Array.from({ length: 10_001 }, (_, index) => [String(index), { x: 0, y: 0, width: 1, height: 1 }]))), /limit/);
+  assert.throws(() => TextureAtlas.fromJSON(new Texture({ sourceWidth: 16, sourceHeight: 16 }), { frames: { bad: { frame: { x: 10, y: 10, w: 10, h: 10 } } } }), /out of bounds/);
 });

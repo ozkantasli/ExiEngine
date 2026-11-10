@@ -161,7 +161,7 @@ test("input: binding snapshot izolasyonu ve setBindings", () => {
   input.setBindings({ actions: { confirm: "Enter" }, axes: { move: { type: "key-axis", positive: "ArrowRight", negative: "ArrowLeft", scale: 0.75 } } });
   assert.equal(input.getBindings().actions.confirm[0].code, "Enter");
   assert.equal(input.getBindings().axes.move[0].scale, 0.75);
-  assert.throws(() => input.setBindings({ actions: { safe: "KeyA" }, axes: { safe: { type: "key-axis", positive: "KeyD", negative: "KeyA" } } }), /zaten kullanılıyor/);
+  assert.throws(() => input.setBindings({ actions: { safe: "KeyA" }, axes: { safe: { type: "key-axis", positive: "KeyD", negative: "KeyA" } } }), /already in use/);
   assert.throws(() => input.setBindings({ actions: { invalid: { type: "unknown" } } }), /binding/);
   input.destroy();
 });
@@ -178,7 +178,7 @@ test("input: unbind ve inject", () => {
   assert.equal(input.isKeyDown("KeyZ"), true);
   assert.equal(input.wasKeyPressed("KeyZ"), true);
   assert.equal(input.getPointer(4)?.x, 20);
-  assert.throws(() => input.inject([{ type: "keydown", code: "KeyA" }, { type: "invalid" }]), /event type|event nesne/);
+  assert.throws(() => input.inject([{ type: "keydown", code: "KeyA" }, { type: "invalid" }]), /event type|event must be an object/);
   assert.throws(() => input.inject(Array.from({ length: 129 }, () => ({ type: "keyup", code: "KeyD" }))), /128/);
   input.destroy();
 });
@@ -191,10 +191,10 @@ test("input: limitler ve doğrudan mutasyon koruması", () => {
   assert.equal(input.getPointer(9999), null);
   input.endFrame();
   for (let index = 0; index < 33; index += 1) input.pointers.set(2_000 + index, { pointerId: 2_000 + index, type: "touch", x: 0, y: 0, buttons: 0, pressed: 0, released: 0, cancelled: 0, moved: false, wheelX: 0, wheelY: 0, button: 0 });
-  assert.throws(() => input.getPointers(), /pointer limiti/);
+  assert.throws(() => input.getPointers(), /pointer limit/);
   input.pointers.clear();
   input.gamepads.set(16, { index: 16, axes: [], buttons: [], pressed: [], released: [] });
-  assert.throws(() => input.beginFrame(), /gamepad.*limiti/);
+  assert.throws(() => input.beginFrame(), /gamepad.*limit/);
   input.gamepads.delete(16);
   input.destroy();
 });

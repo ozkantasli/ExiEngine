@@ -28,11 +28,11 @@ export class Texture {
   }
 
   constructor({ id = `texture-${nextTextureId++}`, source = null, width = 1, height = 1, sourceWidth = source?.width || width, sourceHeight = source?.height || height, baseTexture = null, u0 = 0, v0 = 0, u1 = 1, v1 = 1, filter = "linear" } = {}) {
-    if (baseTexture !== null && !(baseTexture instanceof Texture)) throw new TypeError("Texture baseTexture bekleniyor.");
+    if (baseTexture !== null && !(baseTexture instanceof Texture)) throw new TypeError("Texture baseTexture expected.");
     if (source) {
       const actualWidth = Number(source.width); const actualHeight = Number(source.height);
-      if (!Number.isSafeInteger(actualWidth) || !Number.isSafeInteger(actualHeight) || actualWidth <= 0 || actualHeight <= 0 || actualWidth > MAX_TEXTURE_DIMENSION || actualHeight > MAX_TEXTURE_DIMENSION) throw new RangeError("Texture kaynak boyutu limiti aşıldı.");
-      if (Number(sourceWidth) !== actualWidth || Number(sourceHeight) !== actualHeight) throw new RangeError("Texture kaynak boyutu ile metadata eşleşmiyor.");
+      if (!Number.isSafeInteger(actualWidth) || !Number.isSafeInteger(actualHeight) || actualWidth <= 0 || actualHeight <= 0 || actualWidth > MAX_TEXTURE_DIMENSION || actualHeight > MAX_TEXTURE_DIMENSION) throw new RangeError("Texture source size limit exceeded.");
+      if (Number(sourceWidth) !== actualWidth || Number(sourceHeight) !== actualHeight) throw new RangeError("Texture source size does not match the metadata.");
     }
     this.id = id;
     this.source = source;
@@ -43,7 +43,7 @@ export class Texture {
     this.baseTexture = baseTexture || this;
     this.filter = textureFilter(filter);
     this.u0 = uv(u0, 0); this.v0 = uv(v0, 0); this.u1 = uv(u1, 1); this.v1 = uv(v1, 1);
-    if (this.u1 < this.u0 || this.v1 < this.v0) throw new RangeError("Texture UV sırası geçersiz.");
+    if (this.u1 < this.u0 || this.v1 < this.v0) throw new RangeError("Texture UV order is invalid.");
     this.version = 0;
     this.destroyed = false;
   }
@@ -53,11 +53,11 @@ export class Texture {
   }
 
   subTexture({ x, y, width, height, id } = {}) {
-    if (this.destroyed || this.baseTexture?.destroyed) throw new Error("Texture yok edilmiş.");
+    if (this.destroyed || this.baseTexture?.destroyed) throw new Error("Texture has been destroyed.");
     const frameX = Number(x); const frameY = Number(y); const frameWidth = Number(width); const frameHeight = Number(height);
     const regionWidth = (this.u1 - this.u0) * this.sourceWidth;
     const regionHeight = (this.v1 - this.v0) * this.sourceHeight;
-    if (![frameX, frameY, frameWidth, frameHeight, regionWidth, regionHeight].every(Number.isFinite) || frameX < 0 || frameY < 0 || frameWidth <= 0 || frameHeight <= 0 || frameX + frameWidth > regionWidth || frameY + frameHeight > regionHeight) throw new RangeError("Texture frame sınırları geçersiz.");
+    if (![frameX, frameY, frameWidth, frameHeight, regionWidth, regionHeight].every(Number.isFinite) || frameX < 0 || frameY < 0 || frameWidth <= 0 || frameHeight <= 0 || frameX + frameWidth > regionWidth || frameY + frameHeight > regionHeight) throw new RangeError("Texture frame bounds are invalid.");
     return new Texture({
       id: id || `${this.id}:${frameX},${frameY},${frameWidth},${frameHeight}`,
       source: this.source,
@@ -75,23 +75,23 @@ export class Texture {
   }
 
   setFilter(filter) {
-    if (this.destroyed || this.baseTexture?.destroyed) throw new Error("Texture yok edilmiş.");
+    if (this.destroyed || this.baseTexture?.destroyed) throw new Error("Texture has been destroyed.");
     this.filter = filter;
     return this;
   }
 
   markDirty() {
     const base = this.baseTexture === this ? this : this.baseTexture;
-    if (base.source && (Number(base.source.width) !== base.sourceWidth || Number(base.source.height) !== base.sourceHeight)) throw new RangeError("Texture kaynak boyutu değiştirilemez.");
-    if (base.destroyed) throw new Error("Texture yok edilmiş.");
+    if (base.source && (Number(base.source.width) !== base.sourceWidth || Number(base.source.height) !== base.sourceHeight)) throw new RangeError("Texture source size cannot be changed.");
+    if (base.destroyed) throw new Error("Texture has been destroyed.");
     base.version += 1;
     return this;
   }
 
   updateSource(source) {
     const base = this.baseTexture === this ? this : this.baseTexture;
-    if (base.destroyed) throw new Error("Texture yok edilmiş.");
-    if (!source || source.width !== base.sourceWidth || source.height !== base.sourceHeight) throw new RangeError("Texture kaynak boyutu değiştirilemez.");
+    if (base.destroyed) throw new Error("Texture has been destroyed.");
+    if (!source || source.width !== base.sourceWidth || source.height !== base.sourceHeight) throw new RangeError("Texture source size cannot be changed.");
     base.source = source;
     base.version += 1;
     return this;

@@ -91,7 +91,7 @@ const MAX_INSTANCE_BUFFER_BYTES = 64 * 1024 * 1024;
 
 function assertLiveTexture(texture) {
   if (!texture || texture.destroyed || texture.baseTexture?.destroyed) {
-    const error = new TypeError("Canlı Texture gerekli.");
+    const error = new TypeError("A live Texture is required.");
     error.code = "EXI_TEXTURE_INPUT";
     throw error;
   }
@@ -100,13 +100,13 @@ function assertLiveTexture(texture) {
 
 function compileShader(gl, type, source) {
   const shader = gl.createShader(type);
-  if (!shader) throw new Error("WebGL shader oluşturulamadı.");
+  if (!shader) throw new Error("WebGL shader could not be created.");
   try {
     gl.shaderSource(shader, source);
     gl.compileShader(shader);
     if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-      const log = gl.getShaderInfoLog(shader) || "bilinmeyen shader hatası";
-      throw new Error(`WebGL shader derlenemedi: ${log}`);
+      const log = gl.getShaderInfoLog(shader) || "unknown shader error";
+      throw new Error(`WebGL shader could not be compiled: ${log}`);
     }
     return shader;
   } catch (error) {
@@ -123,13 +123,13 @@ function createProgram(gl, vertex = vertexSource, fragment = fragmentSource) {
     vertexShader = compileShader(gl, gl.VERTEX_SHADER, vertex);
     fragmentShader = compileShader(gl, gl.FRAGMENT_SHADER, fragment);
     program = gl.createProgram();
-    if (!program) throw new Error("WebGL program oluşturulamadı.");
+    if (!program) throw new Error("WebGL program could not be created.");
     gl.attachShader(program, vertexShader);
     gl.attachShader(program, fragmentShader);
     gl.linkProgram(program);
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-      const log = gl.getProgramInfoLog(program) || "bilinmeyen program hatası";
-      throw new Error(`WebGL program bağlanamadı: ${log}`);
+      const log = gl.getProgramInfoLog(program) || "unknown program error";
+      throw new Error(`WebGL program could not be linked: ${log}`);
     }
     return program;
   } catch (error) {
@@ -181,8 +181,8 @@ export class WebGL2Renderer {
     this.renderTargets = new Map();
     this.textureVersions = new Map();
     this.textureFilters = new Map();
-    if (!Number.isSafeInteger(maxTextureBytes) || maxTextureBytes <= 0 || maxTextureBytes > MAX_TEXTURE_BYTES) throw new RangeError("WebGL texture byte bütçesi geçersiz.");
-    if (!Number.isSafeInteger(maxTextureCount) || maxTextureCount <= 0 || maxTextureCount > MAX_TEXTURE_COUNT) throw new RangeError("WebGL texture sayısı bütçesi geçersiz.");
+    if (!Number.isSafeInteger(maxTextureBytes) || maxTextureBytes <= 0 || maxTextureBytes > MAX_TEXTURE_BYTES) throw new RangeError("WebGL texture byte budget is invalid.");
+    if (!Number.isSafeInteger(maxTextureCount) || maxTextureCount <= 0 || maxTextureCount > MAX_TEXTURE_COUNT) throw new RangeError("WebGL texture count budget is invalid.");
     this.maxTextureBytes = maxTextureBytes;
     this.maxTextureCount = maxTextureCount;
     this.textureBytes = 0;
@@ -211,7 +211,7 @@ export class WebGL2Renderer {
       event.preventDefault();
       this.lost = true;
       this.onStatus({ type: "context-lost", backend: "webgl2" });
-      const error = new Error("WebGL context kaybedildi.");
+      const error = new Error("WebGL context lost.");
       error.backend = "webgl2";
       error.recoverable = true;
       this.onLost(error);
@@ -234,9 +234,9 @@ export class WebGL2Renderer {
 
   init() {
     try {
-    if (!this.canvas || typeof this.canvas.getContext !== "function") throw new Error("Geçerli bir canvas gerekli.");
+    if (!this.canvas || typeof this.canvas.getContext !== "function") throw new Error("A valid canvas is required.");
     this.gl = this.canvas.getContext("webgl2", { alpha: this.clearAlpha < 1, antialias: false, depth: false, powerPreference: "high-performance", preserveDrawingBuffer: !this.clearBeforeRender, stencil: false });
-    if (!this.gl) throw new Error("WebGL2 bu tarayıcıda kullanılamıyor.");
+    if (!this.gl) throw new Error("WebGL2 is not available in this browser.");
     this.canvas.addEventListener("webglcontextlost", this.handleContextLost, false);
     this.canvas.addEventListener("webglcontextrestored", this.handleContextRestored, false);
     this.buildResources();
@@ -260,8 +260,8 @@ export class WebGL2Renderer {
       instancedProgram = createProgram(gl, instancedVertexSource, fragmentSource);
       buffer = gl.createBuffer();
       instanceBuffer = gl.createBuffer();
-      if (!buffer) throw new Error("WebGL vertex buffer oluşturulamadı.");
-      if (!instanceBuffer) throw new Error("WebGL instanced vertex buffer oluşturulamadı.");
+      if (!buffer) throw new Error("WebGL vertex buffer could not be created.");
+      if (!instanceBuffer) throw new Error("WebGL instanced vertex buffer could not be created.");
       const positionLocation = gl.getAttribLocation(program, "a_position");
       const uvLocation = gl.getAttribLocation(program, "a_uv");
       const colorLocation = gl.getAttribLocation(program, "a_color");
@@ -280,8 +280,8 @@ export class WebGL2Renderer {
       const instanceFilterLocation = gl.getUniformLocation(instancedProgram, "u_filter");
       const instanceMaskLocation = gl.getUniformLocation(instancedProgram, "u_mask");
       const instanceMaskRectLocation = gl.getUniformLocation(instancedProgram, "u_mask_rect");
-      if (positionLocation < 0 || uvLocation < 0 || colorLocation < 0 || !resolutionLocation || !textureLocation || !filterLocation || !maskLocation || !maskRectLocation) throw new Error("WebGL shader konumları alınamadı.");
-      if (instanceOriginLocation < 0 || instanceAxisXLocation < 0 || instanceAxisYLocation < 0 || instanceUvRectLocation < 0 || instanceColorLocation < 0 || !instanceResolutionLocation || !instanceTextureLocation || !instanceFilterLocation || !instanceMaskLocation || !instanceMaskRectLocation) throw new Error("WebGL instanced shader konumları alınamadı.");
+      if (positionLocation < 0 || uvLocation < 0 || colorLocation < 0 || !resolutionLocation || !textureLocation || !filterLocation || !maskLocation || !maskRectLocation) throw new Error("WebGL shader locations could not be resolved.");
+      if (instanceOriginLocation < 0 || instanceAxisXLocation < 0 || instanceAxisYLocation < 0 || instanceUvRectLocation < 0 || instanceColorLocation < 0 || !instanceResolutionLocation || !instanceTextureLocation || !instanceFilterLocation || !instanceMaskLocation || !instanceMaskRectLocation) throw new Error("WebGL instanced shader locations could not be resolved.");
       this.positionLocation = positionLocation;
       this.uvLocation = uvLocation;
       this.colorLocation = colorLocation;
@@ -348,10 +348,10 @@ export class WebGL2Renderer {
     const allocationWidth = hasSource ? width : 1;
     const allocationHeight = hasSource ? height : 1;
     const allocationBytes = allocationWidth * allocationHeight * 4;
-    if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width <= 0 || height <= 0 || allocationWidth > maxSize || allocationHeight > maxSize || allocationWidth * allocationHeight > this.maxTexturePixels) throw new RangeError("WebGL texture boyutu/pixel limiti aşıldı.");
+    if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width <= 0 || height <= 0 || allocationWidth > maxSize || allocationHeight > maxSize || allocationWidth * allocationHeight > this.maxTexturePixels) throw new RangeError("WebGL texture size/pixel limit exceeded.");
     this.assertTextureBudget(allocationBytes);
     const gpuTexture = gl.createTexture();
-    if (!gpuTexture) throw new Error("WebGL texture oluşturulamadı.");
+    if (!gpuTexture) throw new Error("WebGL texture could not be created.");
     try {
       gl.bindTexture(gl.TEXTURE_2D, gpuTexture);
       gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
@@ -411,7 +411,7 @@ export class WebGL2Renderer {
       this.maxTexturePixels !== this._maxTexturePixelsCapacity ||
       (this._maxTextureSizeSnapshot !== null && this.maxTextureSize !== this._maxTextureSizeSnapshot)
     ) {
-      const error = new RangeError("WebGL GPU bütçe ayarları doğrudan değiştirilemez.");
+      const error = new RangeError("WebGL GPU budget settings cannot be changed directly.");
       error.code = "EXI_RENDER_CONFIG";
       throw error;
     }
@@ -422,7 +422,7 @@ export class WebGL2Renderer {
     const projectedBytes = this.textureBytes - replaceBytes + addBytes;
     const projectedCount = this.textures.size + this.renderTargets.size - replaceCount + 1;
     if (!Number.isSafeInteger(projectedBytes) || projectedBytes > this.maxTextureBytes || projectedCount > this.maxTextureCount) {
-      const error = new RangeError("WebGL toplam texture bütçesi aşıldı.");
+      const error = new RangeError("WebGL total texture budget exceeded.");
       error.code = "EXI_TEXTURE_BUDGET";
       throw error;
     }
@@ -495,22 +495,22 @@ export class WebGL2Renderer {
 
   ensureRenderTarget(target) {
     this.assertResourceBudget();
-    if (!target?.renderTarget || target.destroyed) throw new TypeError("Geçerli bir RenderTexture gerekli.");
+    if (!target?.renderTarget || target.destroyed) throw new TypeError("A valid RenderTexture is required.");
     const gl = this.gl;
     const width = Number(target.width); const height = Number(target.height);
     const maxSize = this.maxTextureSize || (Number(gl.getParameter(gl.MAX_TEXTURE_SIZE)) || Infinity);
-    if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width <= 0 || height <= 0 || width > maxSize || height > maxSize || width * height > this.maxTexturePixels) throw new RangeError("WebGL RenderTexture boyutu/pixel limiti aşıldı.");
+    if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width <= 0 || height <= 0 || width > maxSize || height > maxSize || width * height > this.maxTexturePixels) throw new RangeError("WebGL RenderTexture size/pixel limit exceeded.");
     const current = this.renderTargets.get(target);
     if (current && current.width === width && current.height === height) return current;
     const currentBytes = current ? (this.textureByteSizes.get(target) || current.width * current.height * 4) : 0;
     const allocationBytes = width * height * 4;
     this.assertTextureBudget(allocationBytes, currentBytes, current ? 1 : 0);
-    if (typeof gl.createFramebuffer !== "function" || typeof gl.framebufferTexture2D !== "function" || typeof gl.checkFramebufferStatus !== "function") throw new Error("WebGL RenderTexture framebuffer desteği eksik.");
+    if (typeof gl.createFramebuffer !== "function" || typeof gl.framebufferTexture2D !== "function" || typeof gl.checkFramebufferStatus !== "function") throw new Error("WebGL RenderTexture framebuffer support is missing.");
     let texture = null; let framebuffer = null;
     try {
       texture = gl.createTexture();
       framebuffer = gl.createFramebuffer();
-      if (!texture || !framebuffer) throw new Error("WebGL RenderTexture kaynağı oluşturulamadı.");
+      if (!texture || !framebuffer) throw new Error("WebGL RenderTexture resource could not be created.");
       gl.bindTexture(gl.TEXTURE_2D, texture);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, target.filter === "nearest" ? gl.NEAREST : gl.LINEAR);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, target.filter === "nearest" ? gl.NEAREST : gl.LINEAR);
@@ -519,7 +519,7 @@ export class WebGL2Renderer {
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
       gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
       gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
-      if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) throw new Error("WebGL RenderTexture framebuffer tamamlanamadı.");
+      if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) throw new Error("WebGL RenderTexture framebuffer is incomplete.");
       const entry = { texture, framebuffer, width, height };
       if (current) {
         gl.deleteFramebuffer?.(current.framebuffer);
@@ -551,14 +551,14 @@ export class WebGL2Renderer {
   }
 
   ensureVertexBuffer(bytes) {
-    if (!Number.isSafeInteger(bytes) || bytes < 0) throw new RangeError("WebGL vertex buffer limiti aşıldı.");
+    if (!Number.isSafeInteger(bytes) || bytes < 0) throw new RangeError("WebGL vertex buffer limit exceeded.");
     if (bytes <= this.bufferSize) return;
-    if (bytes > MAX_VERTEX_BUFFER_BYTES) throw new RangeError("WebGL vertex buffer limiti aşıldı.");
+    if (bytes > MAX_VERTEX_BUFFER_BYTES) throw new RangeError("WebGL vertex buffer limit exceeded.");
     const size = Math.max(4096, 2 ** Math.ceil(Math.log2(bytes)));
-    if (size > MAX_VERTEX_BUFFER_BYTES) throw new RangeError("WebGL vertex buffer limiti aşıldı.");
+    if (size > MAX_VERTEX_BUFFER_BYTES) throw new RangeError("WebGL vertex buffer limit exceeded.");
     const previousBuffer = this.buffer;
     const nextBuffer = this.gl.createBuffer();
-    if (!nextBuffer) throw new Error("WebGL vertex buffer oluşturulamadı.");
+    if (!nextBuffer) throw new Error("WebGL vertex buffer could not be created.");
     try {
       this.gl.bindBuffer(this.gl.ARRAY_BUFFER, nextBuffer);
       this.gl.bufferData(this.gl.ARRAY_BUFFER, size, this.gl.DYNAMIC_DRAW);
@@ -574,13 +574,13 @@ export class WebGL2Renderer {
   }
 
   ensureInstanceBuffer(bytes) {
-    if (!Number.isSafeInteger(bytes) || bytes < 0) throw new RangeError("WebGL instanced batch buffer limiti aşıldı.");
+    if (!Number.isSafeInteger(bytes) || bytes < 0) throw new RangeError("WebGL instanced batch buffer limit exceeded.");
     if (bytes <= this.instanceBufferSize) return;
-    if (bytes > MAX_INSTANCE_BUFFER_BYTES) throw new RangeError("WebGL instanced batch buffer limiti aşıldı.");
+    if (bytes > MAX_INSTANCE_BUFFER_BYTES) throw new RangeError("WebGL instanced batch buffer limit exceeded.");
     const size = Math.max(4096, 2 ** Math.ceil(Math.log2(bytes)));
     const previousBuffer = this.instanceBuffer;
     const nextBuffer = this.gl.createBuffer();
-    if (!nextBuffer) throw new Error("WebGL instanced vertex buffer oluşturulamadı.");
+    if (!nextBuffer) throw new Error("WebGL instanced vertex buffer could not be created.");
     try {
       this.gl.bindBuffer(this.gl.ARRAY_BUFFER, nextBuffer);
       this.gl.bufferData(this.gl.ARRAY_BUFFER, size, this.gl.DYNAMIC_DRAW);
@@ -596,14 +596,14 @@ export class WebGL2Renderer {
   }
 
   ensureStaticBuffer(batch) {
-    if (!Number.isSafeInteger(batch.data?.byteLength) || batch.data.byteLength > MAX_VERTEX_BUFFER_BYTES) throw new RangeError("WebGL static vertex buffer limiti aşıldı.");
+    if (!Number.isSafeInteger(batch.data?.byteLength) || batch.data.byteLength > MAX_VERTEX_BUFFER_BYTES) throw new RangeError("WebGL static vertex buffer limit exceeded.");
     let entry = this.staticBuffers.get(batch.staticOwner);
     const needsResize = !entry || batch.data.byteLength > entry.size;
     if (needsResize) {
       const size = Math.max(4096, 2 ** Math.ceil(Math.log2(batch.data.byteLength)));
-      if (size > MAX_VERTEX_BUFFER_BYTES) throw new RangeError("WebGL static vertex buffer limiti aşıldı.");
+      if (size > MAX_VERTEX_BUFFER_BYTES) throw new RangeError("WebGL static vertex buffer limit exceeded.");
       const nextBuffer = this.gl.createBuffer();
-      if (!nextBuffer) throw new Error("WebGL static vertex buffer oluşturulamadı.");
+      if (!nextBuffer) throw new Error("WebGL static vertex buffer could not be created.");
       try {
         this.gl.bindBuffer(this.gl.ARRAY_BUFFER, nextBuffer);
         this.gl.bufferData(this.gl.ARRAY_BUFFER, size, this.gl.DYNAMIC_DRAW);
@@ -698,7 +698,7 @@ export class WebGL2Renderer {
     this.pruneDestroyedTextures();
     this.pruneStaticBuffers();
     const queue = buildRenderBatches(scene, camera, renderWidth, renderHeight, { state: this.batchState, offscreenRoot });
-      if (target && queue.batches.some((batch) => batch.texture === target || batch.maskTexture === target)) throw new Error("RenderTexture aynı render pass içinde örneklenemez (feedback loop).");
+      if (target && queue.batches.some((batch) => batch.texture === target || batch.maskTexture === target)) throw new Error("RenderTexture cannot be sampled in the same render pass (feedback loop).");
     const metrics = this.metrics;
     let vertexCount = 0; let instanceCount = 0; let instancedBatchCount = 0; let instanceDataBytes = 0; let regularBytes = 0; let instanceBytes = 0;
     for (const batch of queue.batches) {
@@ -793,10 +793,10 @@ export class WebGL2Renderer {
   }
 
   readRenderTarget(target) {
-    if (this.destroyed || this.lost || !this.gl) throw new Error("WebGL readback kullanılamıyor.");
+    if (this.destroyed || this.lost || !this.gl) throw new Error("WebGL readback is not available.");
     const entry = this.ensureRenderTarget(target);
     if (typeof this.gl.readPixels !== "function") {
-      const error = new Error("WebGL readPixels desteği yok.");
+      const error = new Error("WebGL readPixels is not supported.");
       error.code = "EXI_RENDER_OBSERVE_UNAVAILABLE";
       throw error;
     }

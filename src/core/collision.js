@@ -60,19 +60,19 @@ function boundedPhysics(value, fallback, minimum, maximum) {
 
 function normalizeCollisionBits(value, label) {
   const number = Number(value);
-  if (!Number.isSafeInteger(number) || number < 0 || number > MAX_COLLISION_BITS) throw new RangeError(`Collider ${label} 32-bit unsigned integer olmalı.`);
+  if (!Number.isSafeInteger(number) || number < 0 || number > MAX_COLLISION_BITS) throw new RangeError(`Collider ${label} must be a 32-bit unsigned integer.`);
   return number >>> 0;
 }
 
 function normalizeOneWay(value) {
   if (value === null || value === undefined) return null;
   if (value === "up" || value === "down" || value === "left" || value === "right") return value;
-  throw new TypeError("Collider oneWay up, down, left veya right olmalı.");
+  throw new TypeError("Collider oneWay must be up, down, left or right.");
 }
 
 function normalizeContactHandler(value, label) {
   if (value === null || value === undefined) return null;
-  if (typeof value !== "function") throw new TypeError(`${label} callback fonksiyonu gerekli.`);
+  if (typeof value !== "function") throw new TypeError(`${label} callback function is required.`);
   return value;
 }
 
@@ -109,9 +109,9 @@ function writePhysicsContact(body, other, phase) {
 
 function normalizeColliderBounds(value) {
   if (value === null || value === undefined) return null;
-  if (!value || typeof value !== "object" || Array.isArray(value)) throw new TypeError("Collider bounds nesnesi gerekli.");
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new TypeError("Collider bounds object is required.");
   const x = Number(value.x); const y = Number(value.y); const width = Number(value.width); const height = Number(value.height);
-  if (![x, y, width, height].every(Number.isFinite) || Math.abs(x) > MAX_WORLD_COORDINATE || Math.abs(y) > MAX_WORLD_COORDINATE || width <= 0 || height <= 0 || width > MAX_WORLD_COORDINATE || height > MAX_WORLD_COORDINATE) throw new RangeError("Collider bounds finite ve sınırlı bir dikdörtgen olmalı.");
+  if (![x, y, width, height].every(Number.isFinite) || Math.abs(x) > MAX_WORLD_COORDINATE || Math.abs(y) > MAX_WORLD_COORDINATE || width <= 0 || height <= 0 || width > MAX_WORLD_COORDINATE || height > MAX_WORLD_COORDINATE) throw new RangeError("Collider bounds must be a finite, bounded rectangle.");
   return { x: worldValue(x), y: worldValue(y), width, height };
 }
 
@@ -153,7 +153,7 @@ function intersectRayAABB(originX, originY, directionX, directionY, maxDistance,
 }
 
 function validateCellSize(value) {
-  if (!Number.isFinite(value) || value < MIN_COLLISION_CELL_SIZE || value > MAX_COLLISION_CELL_SIZE) throw new RangeError(`CollisionWorld cellSize ${MIN_COLLISION_CELL_SIZE}-${MAX_COLLISION_CELL_SIZE} arasında olmalı.`);
+  if (!Number.isFinite(value) || value < MIN_COLLISION_CELL_SIZE || value > MAX_COLLISION_CELL_SIZE) throw new RangeError(`CollisionWorld cellSize must be between ${MIN_COLLISION_CELL_SIZE} and ${MAX_COLLISION_CELL_SIZE}.`);
   return value;
 }
 
@@ -192,7 +192,7 @@ export function containsAABB(parent, child) {
 
 export class Collider {
   constructor(node, { tag = "default", isTrigger = false, oneWay = null, layer = 1, mask = MAX_COLLISION_BITS, bounds = null } = {}) {
-    if (!node || node.destroyed === true) throw new TypeError("Collider canlı bir Node ister.");
+    if (!node || node.destroyed === true) throw new TypeError("Collider requires a live Node.");
     this.node = node;
     this.tag = tag;
     this.isTrigger = isTrigger;
@@ -254,7 +254,7 @@ export class Collider {
 
 export class CollisionWorld {
   constructor(options = {}) {
-    if (options === null || typeof options !== "object") throw new TypeError("CollisionWorld seçenekleri nesne olmalı.");
+    if (options === null || typeof options !== "object") throw new TypeError("CollisionWorld options must be an object.");
     this.colliders = new Set();
     this.spatial = Boolean(options.spatial);
     this.autoSync = options.autoSync === true;
@@ -276,8 +276,8 @@ export class CollisionWorld {
   }
 
   add(collider) {
-    if (!(collider instanceof Collider)) throw new TypeError("Collider bekleniyor.");
-    if (collider.node?.destroyed === true) throw new TypeError("Collider yok edilmiş Node’a bağlı olamaz.");
+    if (!(collider instanceof Collider)) throw new TypeError("Collider expected.");
+    if (collider.node?.destroyed === true) throw new TypeError("Collider cannot be attached to a destroyed Node.");
     if (this.colliders.has(collider)) return collider;
     this.colliders.add(collider);
     collider._worlds.add(this);
@@ -431,8 +431,8 @@ export class CollisionWorld {
   }
 
   query(bounds, filter = acceptCollider, out = []) {
-    if (typeof filter !== "function") throw new TypeError("CollisionWorld filter fonksiyonu gerekli.");
-    if (!Array.isArray(out)) throw new TypeError("CollisionWorld output dizisi gerekli.");
+    if (typeof filter !== "function") throw new TypeError("CollisionWorld filter function is required.");
+    if (!Array.isArray(out)) throw new TypeError("CollisionWorld output array is required.");
     out.length = 0;
     if (!this.spatial) {
       for (const collider of this.colliders) if (collider.node?.destroyed !== true && collider.enabled && filter(collider) && intersectsAABB(bounds, collider.bounds)) out.push(collider);
@@ -443,7 +443,7 @@ export class CollisionWorld {
   }
 
   firstHit(bounds, filter = acceptCollider) {
-    if (typeof filter !== "function") throw new TypeError("CollisionWorld filter fonksiyonu gerekli.");
+    if (typeof filter !== "function") throw new TypeError("CollisionWorld filter function is required.");
     if (this.spatial) {
       return this._visitSpatial(bounds, filter);
     }
@@ -452,13 +452,13 @@ export class CollisionWorld {
   }
 
   raycast(origin, direction, maxDistance = Infinity, filter = acceptCollider, out = null) {
-    if (typeof filter !== "function") throw new TypeError("CollisionWorld filter fonksiyonu gerekli.");
+    if (typeof filter !== "function") throw new TypeError("CollisionWorld filter function is required.");
     const originX = Number(origin?.x); const originY = Number(origin?.y);
     const rawDirectionX = Number(direction?.x); const rawDirectionY = Number(direction?.y);
     const requestedDistance = Number(maxDistance);
-    if (![originX, originY, rawDirectionX, rawDirectionY].every(Number.isFinite) || (!Number.isFinite(requestedDistance) && requestedDistance !== Infinity)) throw new RangeError("CollisionWorld ray girdisi finite olmalı.");
-    if (requestedDistance < 0) throw new RangeError("CollisionWorld ray mesafesi negatif olamaz.");
-    if (out !== null && (!out || typeof out !== "object" || !out.point || !out.normal)) throw new TypeError("CollisionWorld ray output nesnesi gerekli.");
+    if (![originX, originY, rawDirectionX, rawDirectionY].every(Number.isFinite) || (!Number.isFinite(requestedDistance) && requestedDistance !== Infinity)) throw new RangeError("CollisionWorld ray input must be finite.");
+    if (requestedDistance < 0) throw new RangeError("CollisionWorld ray distance cannot be negative.");
+    if (out !== null && (!out || typeof out !== "object" || !out.point || !out.normal)) throw new TypeError("CollisionWorld ray output object is required.");
     const directionLength = Math.hypot(rawDirectionX, rawDirectionY);
     const distanceLimit = Math.min(MAX_RAY_DISTANCE, requestedDistance === Infinity ? MAX_RAY_DISTANCE : requestedDistance);
     if (distanceLimit <= 0 || !Number.isFinite(directionLength) || directionLength <= RAY_DIRECTION_EPSILON) return null;
@@ -498,12 +498,12 @@ export class CollisionWorld {
   }
 
   overlapCircle(centerX, centerY, radius, filter = acceptCollider, out = []) {
-    if (typeof filter !== "function") throw new TypeError("CollisionWorld filter fonksiyonu gerekli.");
-    if (!Array.isArray(out)) throw new TypeError("CollisionWorld overlap output dizisi gerekli.");
+    if (typeof filter !== "function") throw new TypeError("CollisionWorld filter function is required.");
+    if (!Array.isArray(out)) throw new TypeError("CollisionWorld overlap output array is required.");
     const cx = Number(centerX);
     const cy = Number(centerY);
     const r = Number(radius);
-    if (![cx, cy, r].every(Number.isFinite) || r < 0) throw new RangeError("CollisionWorld overlapCircle parametreleri finite olmalı.");
+    if (![cx, cy, r].every(Number.isFinite) || r < 0) throw new RangeError("CollisionWorld overlapCircle parameters must be finite.");
     const r2 = r * r;
     const bounds = this.circleBounds;
     bounds.left = cx - r;
@@ -550,11 +550,11 @@ export class CollisionWorld {
 
 export class PhysicsBody {
   constructor(node, { static: isStatic = false, kinematic = false, isTrigger = false, oneWay = null, tag = "physics", layer = 1, mask = MAX_COLLISION_BITS, bounds = null, velocityX = 0, velocityY = 0, gravityScale = 1, maxSpeed = MAX_PHYSICS_SPEED } = {}) {
-    if (!node || node.destroyed === true || !node.position || typeof node.updateWorldMatrix !== "function") throw new TypeError("PhysicsBody canlı ve geçerli bir Node ister.");
+    if (!node || node.destroyed === true || !node.position || typeof node.updateWorldMatrix !== "function") throw new TypeError("PhysicsBody requires a live, valid Node.");
     this.node = node;
     this._isStatic = Boolean(isStatic);
     this._isKinematic = Boolean(kinematic);
-    if (this._isStatic && this._isKinematic) throw new TypeError("PhysicsBody static ve kinematic aynı anda olamaz.");
+    if (this._isStatic && this._isKinematic) throw new TypeError("PhysicsBody cannot be both static and kinematic.");
     this.gravityScale = boundedPhysics(gravityScale, 1, -MAX_PHYSICS_GRAVITY_SCALE, MAX_PHYSICS_GRAVITY_SCALE);
     this.maxSpeed = boundedPhysics(maxSpeed, MAX_PHYSICS_SPEED, 1, MAX_PHYSICS_SPEED);
     this.velocity = new Vec2(
@@ -573,9 +573,9 @@ export class PhysicsBody {
   // Direct field writes would otherwise silently produce the invalid static+kinematic combo;
   // the accessors enforce the exclusivity invariant for every write path.
   get isStatic() { return this._isStatic; }
-  set isStatic(value) { const next = Boolean(value); if (next && this._isKinematic) throw new TypeError("PhysicsBody static ve kinematic aynı anda olamaz."); this._isStatic = next; }
+  set isStatic(value) { const next = Boolean(value); if (next && this._isKinematic) throw new TypeError("PhysicsBody cannot be both static and kinematic."); this._isStatic = next; }
   get isKinematic() { return this._isKinematic; }
-  set isKinematic(value) { const next = Boolean(value); if (next && this._isStatic) throw new TypeError("PhysicsBody static ve kinematic aynı anda olamaz."); this._isKinematic = next; }
+  set isKinematic(value) { const next = Boolean(value); if (next && this._isStatic) throw new TypeError("PhysicsBody cannot be both static and kinematic."); this._isKinematic = next; }
 
   setVelocity(x, y = 0) {
     this.velocity.x = boundedPhysics(x, 0, -this.maxSpeed, this.maxSpeed);
@@ -586,7 +586,7 @@ export class PhysicsBody {
   setStatic(value) {
     const next = Boolean(value);
     if (next === this.isStatic) return this;
-    if (next && this.isKinematic) throw new Error("Kinematic PhysicsBody static yapılamaz.");
+    if (next && this.isKinematic) throw new Error("A kinematic PhysicsBody cannot be made static.");
     this.isStatic = next;
     for (const world of this._worlds) world.collisionWorld.spatialDirty = true;
     return this;
@@ -595,7 +595,7 @@ export class PhysicsBody {
   setKinematic(value) {
     const next = Boolean(value);
     if (next === this.isKinematic) return this;
-    if (next && this.isStatic) throw new Error("Static PhysicsBody kinematic yapılamaz.");
+    if (next && this.isStatic) throw new Error("A static PhysicsBody cannot be made kinematic.");
     this.isKinematic = next;
     this.grounded = false;
     this._wasGrounded = false;
@@ -608,7 +608,7 @@ export class PhysicsBody {
 
 export class PhysicsWorld {
   constructor({ scene = null, gravityX = 0, gravityY = 980, autoSync = false, onBeginContact = null, onStayContact = null, onEndContact = null } = {}) {
-    if (scene !== null && (!scene || typeof scene.updateWorldMatrix !== "function")) throw new TypeError("PhysicsWorld scene geçerli olmalı.");
+    if (scene !== null && (!scene || typeof scene.updateWorldMatrix !== "function")) throw new TypeError("PhysicsWorld scene must be valid.");
     this.onBeginContact = normalizeContactHandler(onBeginContact, "PhysicsWorld onBeginContact");
     this.onStayContact = normalizeContactHandler(onStayContact, "PhysicsWorld onStayContact");
     this.onEndContact = normalizeContactHandler(onEndContact, "PhysicsWorld onEndContact");
@@ -673,14 +673,14 @@ export class PhysicsWorld {
   }
 
   assertBodyLimit() {
-    if (this.bodies.size > MAX_PHYSICS_BODIES) throw new RangeError(`PhysicsWorld en fazla ${MAX_PHYSICS_BODIES} body destekler.`);
+    if (this.bodies.size > MAX_PHYSICS_BODIES) throw new RangeError(`PhysicsWorld supports at most ${MAX_PHYSICS_BODIES} bodies.`);
   }
 
   add(body) {
-    if (!(body instanceof PhysicsBody)) throw new TypeError("PhysicsBody bekleniyor.");
-    if (body.node?.destroyed === true) throw new TypeError("PhysicsBody yok edilmiş Node’a bağlı olamaz.");
+    if (!(body instanceof PhysicsBody)) throw new TypeError("PhysicsBody expected.");
+    if (body.node?.destroyed === true) throw new TypeError("PhysicsBody cannot be attached to a destroyed Node.");
     if (this.bodies.has(body)) return body;
-    if (this.bodies.size >= MAX_PHYSICS_BODIES) throw new RangeError(`PhysicsWorld en fazla ${MAX_PHYSICS_BODIES} body destekler.`);
+    if (this.bodies.size >= MAX_PHYSICS_BODIES) throw new RangeError(`PhysicsWorld supports at most ${MAX_PHYSICS_BODIES} bodies.`);
     this.bodies.add(body);
     body._worlds.add(this);
     this.collisionWorld.add(body.collider);
@@ -802,19 +802,19 @@ export class PhysicsWorld {
 
   overlaps(body, filter = acceptPhysicsBody, out = this.overlapCandidates) {
     this.assertBodyLimit();
-    if (!(body instanceof PhysicsBody)) throw new TypeError("PhysicsBody bekleniyor.");
-    if (typeof filter !== "function") throw new TypeError("PhysicsWorld overlap filter fonksiyonu gerekli.");
-    if (!Array.isArray(out)) throw new TypeError("PhysicsWorld overlap output dizisi gerekli.");
-    if (out === this.overlapColliderCandidates) throw new TypeError("PhysicsWorld overlap output scratch dizisinden farklı olmalı.");
+    if (!(body instanceof PhysicsBody)) throw new TypeError("PhysicsBody expected.");
+    if (typeof filter !== "function") throw new TypeError("PhysicsWorld overlap filter function is required.");
+    if (!Array.isArray(out)) throw new TypeError("PhysicsWorld overlap output array is required.");
+    if (out === this.overlapColliderCandidates) throw new TypeError("PhysicsWorld overlap output must differ from the scratch array.");
     if (body.node.destroyed === true) { this.remove(body); out.length = 0; return out; }
     return this._overlaps(body, filter, out, true);
   }
 
   overlapCircle(centerX, centerY, radius, filter = acceptPhysicsBody, out = this.overlapCandidates) {
     this.assertBodyLimit();
-    if (typeof filter !== "function") throw new TypeError("PhysicsWorld overlap filter fonksiyonu gerekli.");
-    if (!Array.isArray(out)) throw new TypeError("PhysicsWorld overlap output dizisi gerekli.");
-    if (out === this.overlapColliderCandidates) throw new TypeError("PhysicsWorld overlap output scratch dizisinden farklı olmalı.");
+    if (typeof filter !== "function") throw new TypeError("PhysicsWorld overlap filter function is required.");
+    if (!Array.isArray(out)) throw new TypeError("PhysicsWorld overlap output array is required.");
+    if (out === this.overlapColliderCandidates) throw new TypeError("PhysicsWorld overlap output must differ from the scratch array.");
     const candidates = this.overlapColliderCandidates;
     candidates.length = 0;
     try {

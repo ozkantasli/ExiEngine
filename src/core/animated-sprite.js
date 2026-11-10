@@ -8,16 +8,16 @@ const MAX_ANIMATION_DELTA = 5;
 const MAX_ANIMATION_STEPS = 4_096;
 
 function validateFrames(frames) {
-  if (!Array.isArray(frames) || frames.length === 0 || frames.length > MAX_ANIMATION_FRAMES || frames.some((frame) => !(frame instanceof Texture))) throw new TypeError("AnimatedSprite frames Texture dizisi geçersiz veya limit dışı.");
+  if (!Array.isArray(frames) || frames.length === 0 || frames.length > MAX_ANIMATION_FRAMES || frames.some((frame) => !(frame instanceof Texture))) throw new TypeError("AnimatedSprite frames Texture array is invalid or out of limits.");
   return frames.slice();
 }
 
 export class AnimatedSprite extends Sprite {
   constructor({ frames = [], frameRate = 12, loop = true, pingPong = false, playing = true, onComplete = null, onLoop = null, onFrameChange = null, ...options } = {}) {
     const normalizedFrames = validateFrames(frames);
-    if (onComplete !== null && typeof onComplete !== "function") throw new TypeError("AnimatedSprite onComplete fonksiyonu gerekli.");
-    if (onLoop !== null && typeof onLoop !== "function") throw new TypeError("AnimatedSprite onLoop fonksiyonu gerekli.");
-    if (onFrameChange !== null && typeof onFrameChange !== "function") throw new TypeError("AnimatedSprite onFrameChange fonksiyonu gerekli.");
+    if (onComplete !== null && typeof onComplete !== "function") throw new TypeError("AnimatedSprite onComplete function is required.");
+    if (onLoop !== null && typeof onLoop !== "function") throw new TypeError("AnimatedSprite onLoop function is required.");
+    if (onFrameChange !== null && typeof onFrameChange !== "function") throw new TypeError("AnimatedSprite onFrameChange function is required.");
     super({ ...options, texture: normalizedFrames[0] });
     this.frames = normalizedFrames;
     const requestedRate = Number(frameRate);
@@ -66,7 +66,7 @@ export class AnimatedSprite extends Sprite {
   }
 
   assertFrameLimit() {
-    if (!Array.isArray(this.frames) || this.frames.length === 0 || this.frames.length > MAX_ANIMATION_FRAMES) throw new RangeError(`AnimatedSprite frame limiti ${MAX_ANIMATION_FRAMES}.`);
+    if (!Array.isArray(this.frames) || this.frames.length === 0 || this.frames.length > MAX_ANIMATION_FRAMES) throw new RangeError(`AnimatedSprite frame limit is ${MAX_ANIMATION_FRAMES}.`);
   }
 
   gotoFrame(index) {

@@ -54,8 +54,8 @@ const audioLoader = {
 };
 
 test("audio: limitler constructor doğrulaması", () => {
-  assert.throws(() => new AudioManager({ maxBytes: 0 }), /limiti/);
-  assert.throws(() => new AudioManager({ maxBytes: 64 * 1024 * 1024 + 1 }), /limiti/);
+  assert.throws(() => new AudioManager({ maxBytes: 0 }), /limit/);
+  assert.throws(() => new AudioManager({ maxBytes: 64 * 1024 * 1024 + 1 }), /limit/);
   assert.throws(() => new AudioManager({ maxDecodedBytes: 0 }), /limit/);
   assert.throws(() => new AudioManager({ maxDecodedBytes: 512 * 1024 * 1024 + 1 }), /limit/);
   assert.throws(() => new AudioManager({ maxVoices: 0 }), /voice/);
@@ -75,7 +75,7 @@ test("audio: limitler constructor doğrulaması", () => {
 test("audio: load / unload / voice lifecycle", async () => {
   audioLoader.calls = [];
   const audio = new AudioManager({ loader: audioLoader, maxDecodedBytes: 32 });
-  await assert.rejects(() => audio.load("a".repeat(257), "/too-long.ogg"), /limiti/);
+  await assert.rejects(() => audio.load("a".repeat(257), "/too-long.ogg"), /limit/);
   await audio.load("beep", "/beep.ogg", { integrity: "sha256-audio" });
   assert.equal(audioLoader.calls.find(({ url }) => url === "/beep.ogg").integrity, "sha256-audio");
   assert.equal(audio.decodedBytes, 32);
@@ -117,7 +117,7 @@ test("audio: loadMany batch ve progress", async () => {
   assert.deepEqual(progress.map(({ loaded, total }) => [loaded, total]).sort(), [[1, 2], [2, 2]]);
   assert.equal(audioLoader.calls.find(({ url }) => url === "/click.ogg").integrity, "sha256-batch");
   assert.equal(audio.decodedBytes, 64);
-  await assert.rejects(() => audio.loadMany([{ name: "duplicate", url: "/a.ogg" }, { name: "duplicate", url: "/b.ogg" }]), /tekrar/);
+  await assert.rejects(() => audio.loadMany([{ name: "duplicate", url: "/a.ogg" }, { name: "duplicate", url: "/b.ogg" }]), /Duplicate/);
   const abort = new AbortController();
   abort.abort();
   await assert.rejects(() => audio.loadMany([{ name: "cancelled", url: "/cancelled.ogg" }], { signal: abort.signal }), /iptal edildi|aborted/);
@@ -129,7 +129,7 @@ test("audio: voice limiti", () => {
   const buffer = { length: 1, numberOfChannels: 1 };
   const voice = audio.play(buffer);
   assert.equal(audio.voiceCount, 1);
-  assert.throws(() => audio.play(buffer), /voice limiti/);
+  assert.throws(() => audio.play(buffer), /voice limit/);
   assert.equal(audio.stopVoice(voice), true);
   audio.destroy();
 });
@@ -158,7 +158,7 @@ test("audio: destroy sırasında pending decode reddedilir", async () => {
   assert.equal(typeof resolveDecode, "function");
   audio.destroy();
   resolveDecode();
-  await assert.rejects(pending, /yok edilmiş/);
+  await assert.rejects(pending, /destroyed/);
   assert.equal(audio.buffers.size, 0);
   globalThis.AudioContext = FakeAudioContext;
 });
@@ -205,7 +205,7 @@ test("audio: shared load dedupe ve abort", async () => {
   abort.abort();
   await assert.rejects(aborted, /AbortError/);
   // Pending load varken farklı URL ile aynı isim → "zaten yükleniyor" (rejected promise)
-  await assert.rejects(audio.load("shared", "/other.ogg"), /zaten yükleniyor/);
+  await assert.rejects(audio.load("shared", "/other.ogg"), /already loading/);
   resolveBytes();
   await surviving;
   assert.equal(loadCalls, 1);
@@ -244,8 +244,8 @@ test("audio: custom bus ve limitler", () => {
   audio.ensureContext();
   assert.equal(audio.getBusVolume("voice"), 0.5);
   assert.equal(audio.getBusVolume("master"), 1);
-  assert.throws(() => audio.createBus("b".repeat(65)), /geçersiz/);
+  assert.throws(() => audio.createBus("b".repeat(65)), /invalid/);
   for (let index = 0; index < 60; index += 1) audio.createBus(`bus-${index}`);
-  assert.throws(() => audio.createBus("bus-overflow"), /limiti/);
+  assert.throws(() => audio.createBus("bus-overflow"), /limit/);
   audio.destroy();
 });

@@ -14,7 +14,7 @@ function createCanvas(width = 1, height = 1) {
   let canvas;
   if (typeof globalThis.OffscreenCanvas === "function") canvas = new globalThis.OffscreenCanvas(width, height);
   else if (typeof globalThis.document?.createElement === "function") canvas = globalThis.document.createElement("canvas");
-  else throw new Error("Text için Canvas 2D gerekli.");
+  else throw new Error("Text requires Canvas 2D.");
   canvas.width = width;
   canvas.height = height;
   return canvas;
@@ -62,7 +62,7 @@ function validateAtlasPadding(value) {
 
 function createGlyphContext(canvas) {
   const context = canvas.getContext?.("2d");
-  if (!context?.measureText || !context.clearRect || !context.fillText || !context.drawImage) throw new Error("Glyph atlas için Canvas 2D context gerekli.");
+  if (!context?.measureText || !context.clearRect || !context.fillText || !context.drawImage) throw new Error("Glyph atlas requires a Canvas 2D context.");
   return context;
 }
 
@@ -171,7 +171,7 @@ export class TextCache {
 
   assertBudget() {
     if (this.maxEntries !== this._maxEntriesCapacity || this.maxPixels !== this._maxPixelsCapacity) {
-      const error = new RangeError("Text cache bütçesi doğrudan değiştirilemez.");
+      const error = new RangeError("Text cache budget cannot be changed directly.");
       error.code = "EXI_TEXT_CONFIG";
       throw error;
     }
@@ -268,7 +268,7 @@ export class GlyphAtlas {
 
   assertBudget() {
     if (this.width !== this._widthSnapshot || this.height !== this._heightSnapshot || this.maxEntries !== this._maxEntriesCapacity || this.maxPixels !== this._maxPixelsCapacity || this.padding !== this._paddingSnapshot) {
-      const error = new RangeError("Glyph atlas bütçesi doğrudan değiştirilemez.");
+      const error = new RangeError("Glyph atlas budget cannot be changed directly.");
       error.code = "EXI_TEXT_CONFIG";
       throw error;
     }
@@ -378,7 +378,7 @@ export class Text extends Sprite {
   constructor({ text = "", font = "16px sans-serif", fill = "#ffffff", stroke = null, strokeWidth = 0, align = "left", baseline = "top", lineHeight = 0, padding = 0, resolution = 1, maxWidth = 0, wordWrap = false, cache = null, glyphAtlas = null, ...options } = {}) {
     const canvas = createCanvas();
     const context = canvas.getContext?.("2d");
-    if (!context?.measureText) throw new Error("Text için Canvas 2D context gerekli.");
+    if (!context?.measureText) throw new Error("Text requires a Canvas 2D context.");
     const texture = new Texture({ id: `text-${nextTextId++}`, source: canvas, width: 1, height: 1, sourceWidth: 1, sourceHeight: 1 });
     super({ ...options, texture, width: 1, height: 1 });
     this.canvas = canvas;
@@ -405,7 +405,7 @@ export class Text extends Sprite {
 
   setText(value) {
     const next = String(value ?? "");
-    if (next.length > MAX_TEXT_LENGTH) throw new RangeError("Text karakter limiti aşıldı.");
+    if (next.length > MAX_TEXT_LENGTH) throw new RangeError("Text character limit exceeded.");
     if (next === this.text) return this;
     this.text = next;
     this.redraw();
@@ -460,7 +460,7 @@ export class Text extends Sprite {
     const logicalHeight = Math.max(1, Math.ceil(lines.length * this.lineHeight + outerPadding * 2));
     const pixelWidth = Math.max(1, Math.ceil(logicalWidth * this.resolution));
     const pixelHeight = Math.max(1, Math.ceil(logicalHeight * this.resolution));
-    if (pixelWidth > MAX_TEXT_DIMENSION || pixelHeight > MAX_TEXT_DIMENSION || pixelWidth * pixelHeight > MAX_TEXT_PIXELS) throw new RangeError("Text canvas limiti aşıldı.");
+    if (pixelWidth > MAX_TEXT_DIMENSION || pixelHeight > MAX_TEXT_DIMENSION || pixelWidth * pixelHeight > MAX_TEXT_PIXELS) throw new RangeError("Text canvas limit exceeded.");
     const key = this.cache ? textCacheKey(this.text, this.font, this.fill, this.stroke, this.strokeWidth, this.align, this.baseline, this.lineHeight, this.padding, this.resolution, this.maxWidth, this.wordWrap, logicalWidth, logicalHeight, pixelWidth, pixelHeight, this.glyphAtlas ? "glyph" : "canvas") : null;
     if (this.cache && this.cacheEntry && this.cacheKey === key) return this;
 
@@ -469,7 +469,7 @@ export class Text extends Sprite {
       const entry = this.cache.acquire(key, () => {
         const canvas = createCanvas();
         const context = canvas.getContext?.("2d");
-        if (!context?.measureText) throw new Error("Text için Canvas 2D context gerekli.");
+        if (!context?.measureText) throw new Error("Text requires a Canvas 2D context.");
         return renderText(canvas, context, lines, { font: this.font, fill: this.fill, stroke: this.stroke, strokeWidth: this.strokeWidth, align: this.align, baseline: this.baseline, resolution: this.resolution, logicalWidth, logicalHeight, sourceWidth: pixelWidth, sourceHeight: pixelHeight, outerPadding, lineHeight: this.lineHeight, measureContext, glyphAtlas: this.glyphAtlas });
       });
       if (entry) {

@@ -7,7 +7,7 @@ const MAX_SAVE_DEPTH = 64;
 
 function normalizeSegment(value, maximum, label) {
   const segment = String(value ?? "").replace(/[^a-z0-9_-]/gi, "_");
-  if (!segment || segment.length > maximum) throw new RangeError(`${label} limiti geçersiz.`);
+  if (!segment || segment.length > maximum) throw new RangeError(`${label} limit is invalid.`);
   return segment;
 }
 
@@ -32,24 +32,24 @@ function validateJSONBudget(encoded) {
       nodes += 1;
     } else if (character === "}" || character === "]") {
       depth -= 1;
-      if (depth < 0) throw new RangeError("Save JSON yapısı geçersiz.");
+      if (depth < 0) throw new RangeError("Save JSON structure is invalid.");
     } else if (character === "," || character === ":") nodes += 1;
-    if (maxDepth > MAX_SAVE_DEPTH || nodes > MAX_SAVE_NODES) throw new RangeError("Save JSON limiti aşıldı.");
+    if (maxDepth > MAX_SAVE_DEPTH || nodes > MAX_SAVE_NODES) throw new RangeError("Save JSON limit exceeded.");
   }
-  if (inString || depth !== 0) throw new RangeError("Save JSON yapısı geçersiz.");
+  if (inString || depth !== 0) throw new RangeError("Save JSON structure is invalid.");
 }
 
 export class SaveStore {
   constructor({ namespace = "exi", storage = globalThis.localStorage, maxBytes = 256 * 1024 } = {}) {
     this.namespace = normalizeSegment(namespace, MAX_NAMESPACE_LENGTH, "Save namespace");
     this.storage = storage;
-    if (!Number.isSafeInteger(maxBytes) || maxBytes <= 0 || maxBytes > MAX_SAVE_BYTES) throw new RangeError(`Save byte limiti 1-${MAX_SAVE_BYTES} arasında olmalı.`);
+    if (!Number.isSafeInteger(maxBytes) || maxBytes <= 0 || maxBytes > MAX_SAVE_BYTES) throw new RangeError(`Save byte limit must be between 1 and ${MAX_SAVE_BYTES}.`);
     this._maxBytes = maxBytes;
     this.maxBytes = maxBytes;
   }
 
   assertBudget() {
-    if (this.maxBytes !== this._maxBytes || !Number.isSafeInteger(this.maxBytes) || this.maxBytes <= 0 || this.maxBytes > MAX_SAVE_BYTES) throw new RangeError(`Save byte limiti 1-${MAX_SAVE_BYTES} arasında olmalı.`);
+    if (this.maxBytes !== this._maxBytes || !Number.isSafeInteger(this.maxBytes) || this.maxBytes <= 0 || this.maxBytes > MAX_SAVE_BYTES) throw new RangeError(`Save byte limit must be between 1 and ${MAX_SAVE_BYTES}.`);
   }
 
   key(name) { return `${this.namespace}:${normalizeSegment(name, MAX_KEY_NAME_LENGTH, "Save key")}`; }
@@ -57,8 +57,8 @@ export class SaveStore {
   set(name, value) {
     this.assertBudget();
     const encoded = JSON.stringify(value);
-    if (encoded === undefined || textEncoder.encode(encoded).byteLength > this.maxBytes) throw new Error("Save verisi geçersiz veya çok büyük.");
-    try { validateJSONBudget(encoded); } catch { throw new Error("Save verisi geçersiz veya çok büyük."); }
+    if (encoded === undefined || textEncoder.encode(encoded).byteLength > this.maxBytes) throw new Error("Save data is invalid or too large.");
+    try { validateJSONBudget(encoded); } catch { throw new Error("Save data is invalid or too large."); }
     this.storage.setItem(this.key(name), encoded);
   }
 

@@ -12,18 +12,18 @@ const safePan = (value) => Math.max(-1, Math.min(1, Number(value) || 0));
 
 function normalizeAudioKey(value) {
   const key = String(value);
-  if (!key || key.length > MAX_AUDIO_KEY_LENGTH) throw new RangeError("Audio key limiti geçersiz.");
+  if (!key || key.length > MAX_AUDIO_KEY_LENGTH) throw new RangeError("Audio key limit is invalid.");
   return key;
 }
 
 function normalizeBusName(value) {
   const id = String(value).trim();
-  if (!id || id.length > MAX_AUDIO_BUS_NAME_LENGTH || /[^a-zA-Z0-9_-]/.test(id)) throw new Error("Audio bus adı geçersiz.");
+  if (!id || id.length > MAX_AUDIO_BUS_NAME_LENGTH || /[^a-zA-Z0-9_-]/.test(id)) throw new Error("Audio bus name is invalid.");
   return id;
 }
 
 function abortReason(signal) {
-  return signal?.reason || Object.assign(new Error("Audio yükleme iptal edildi."), { name: "AbortError" });
+  return signal?.reason || Object.assign(new Error("Audio loading was aborted."), { name: "AbortError" });
 }
 
 function waitForAbort(promise, signal) {
@@ -46,9 +46,9 @@ function audioTime(context) {
 export class AudioManager {
   constructor({ loader = null, maxBytes = 16 * 1024 * 1024, maxDecodedBytes = 128 * 1024 * 1024, maxVoices = 64 } = {}) {
     this.loader = loader;
-    if (!Number.isSafeInteger(maxBytes) || maxBytes <= 0 || maxBytes > MAX_AUDIO_BYTES) throw new RangeError("Audio byte limiti geçersiz.");
+    if (!Number.isSafeInteger(maxBytes) || maxBytes <= 0 || maxBytes > MAX_AUDIO_BYTES) throw new RangeError("Audio byte limit is invalid.");
     if (!Number.isSafeInteger(maxDecodedBytes) || maxDecodedBytes <= 0 || maxDecodedBytes > MAX_AUDIO_DECODED_BYTES) throw new RangeError("Audio decoded byte limit invalid.");
-    if (!Number.isSafeInteger(maxVoices) || maxVoices <= 0 || maxVoices > MAX_AUDIO_VOICES) throw new RangeError("Audio voice limiti geçersiz.");
+    if (!Number.isSafeInteger(maxVoices) || maxVoices <= 0 || maxVoices > MAX_AUDIO_VOICES) throw new RangeError("Audio voice limit is invalid.");
     this.maxBytes = maxBytes;
     this.maxDecodedBytes = maxDecodedBytes;
     this.maxVoices = maxVoices;
@@ -73,13 +73,13 @@ export class AudioManager {
   }
 
   ensureActive() {
-    if (this.destroyed) throw new Error("AudioManager yok edilmiş.");
+    if (this.destroyed) throw new Error("AudioManager has been destroyed.");
     this.assertBudget();
   }
 
   assertBudget() {
     if (this.maxBytes !== this._maxBytesCapacity || this.maxDecodedBytes !== this._maxDecodedBytesCapacity || this.maxVoices !== this._maxVoicesCapacity) {
-      const error = new RangeError("Audio bütçe ayarları doğrudan değiştirilemez.");
+      const error = new RangeError("Audio budget settings cannot be changed directly.");
       error.code = "EXI_AUDIO_CONFIG";
       throw error;
     }
@@ -97,13 +97,13 @@ export class AudioManager {
   createBus(name, { volume = 1, parent = "master" } = {}) {
     const id = normalizeBusName(name);
     if (this.buses.has(id)) return this.buses.get(id);
-    if (this.buses.size >= MAX_AUDIO_BUS_COUNT) throw new RangeError(`Audio bus limiti ${MAX_AUDIO_BUS_COUNT}.`);
+    if (this.buses.size >= MAX_AUDIO_BUS_COUNT) throw new RangeError(`Audio bus limit is ${MAX_AUDIO_BUS_COUNT}.`);
     if (!this.context || (id !== "master" && !this.buses.has("master"))) this.ensureContext();
     if (this.buses.has(id)) return this.buses.get(id);
     const context = this.ensureContextWithoutBuses();
-    if (parent && parent === id) throw new Error("Audio bus kendisine bağlanamaz.");
+    if (parent && parent === id) throw new Error("Audio bus cannot connect to itself.");
     const parentBus = parent ? this.buses.get(parent) : null;
-    if (parent && !parentBus) throw new Error(`Audio parent bus bulunamadı: ${parent}`);
+    if (parent && !parentBus) throw new Error(`Audio parent bus not found: ${parent}`);
     const gain = context.createGain();
     const normalizedVolume = safeVolume(volume);
     gain.gain.value = normalizedVolume;
@@ -117,7 +117,7 @@ export class AudioManager {
     this.ensureActive();
     if (this.context) return this.context;
     const AudioContextClass = globalThis.AudioContext || globalThis.webkitAudioContext;
-    if (!AudioContextClass) throw new Error("Web Audio API kullanılamıyor.");
+    if (!AudioContextClass) throw new Error("Web Audio API is not available.");
     this.context = new AudioContextClass();
     return this.context;
   }
@@ -125,7 +125,7 @@ export class AudioManager {
   getBus(name = "master") { this.ensureContext(); return this.buses.get(name) || null; }
   setBusVolume(name, volume) {
     const bus = this.getBus(name);
-    if (!bus) throw new Error(`Audio bus bulunamadı: ${name}`);
+    if (!bus) throw new Error(`Audio bus not found: ${name}`);
     bus.gain.gain.cancelScheduledValues?.(audioTime(this.context));
     bus.volume = safeVolume(volume);
     if (!bus.muted) bus.gain.gain.value = bus.volume;
@@ -134,7 +134,7 @@ export class AudioManager {
   getBusVolume(name) { const bus = this.getBus(name); return bus?.volume ?? 0; }
   setBusMuted(name, muted = true) {
     const bus = this.getBus(name);
-    if (!bus) throw new Error(`Audio bus bulunamadı: ${name}`);
+    if (!bus) throw new Error(`Audio bus not found: ${name}`);
     bus.gain.gain.cancelScheduledValues?.(audioTime(this.context));
     bus.muted = Boolean(muted);
     bus.gain.gain.value = bus.muted ? 0 : bus.volume;
@@ -143,7 +143,7 @@ export class AudioManager {
   isBusMuted(name) { return this.getBus(name)?.muted ?? false; }
   fadeBus(name, volume, duration = 0.25) {
     const bus = this.getBus(name);
-    if (!bus) throw new Error(`Audio bus bulunamadı: ${name}`);
+    if (!bus) throw new Error(`Audio bus not found: ${name}`);
     const requestedDuration = Number(duration);
     const fadeDuration = Number.isFinite(requestedDuration) ? Math.max(0, Math.min(MAX_AUDIO_FADE_DURATION, requestedDuration)) : 0;
     const target = safeVolume(volume);
@@ -260,7 +260,7 @@ export class AudioManager {
     }
     if (!panner) {
       panner = typeof this.context?.createStereoPanner === "function" ? this.context.createStereoPanner() : null;
-      if (!panner) throw new Error("StereoPannerNode kullanılamıyor.");
+      if (!panner) throw new Error("StereoPannerNode is not available.");
       try {
         panner.pan.value = requestedPan;
         gain.disconnect?.();
@@ -296,13 +296,13 @@ export class AudioManager {
 
   async load(name, url, { signal = null, integrity = null } = {}) {
     this.ensureActive();
-    if (!this.loader) throw new Error("AudioManager için AssetLoader gerekli.");
+    if (!this.loader) throw new Error("AudioManager requires an AssetLoader.");
     const key = normalizeAudioKey(name);
     const requestURL = String(url);
     if (signal?.aborted) throw abortReason(signal);
     const pending = this.pendingLoads.get(key);
     if (pending) {
-      if (this.pendingLoadURLs.get(key) !== requestURL || this.pendingLoadIntegrities.get(key) !== integrity) throw new Error(`Audio adı zaten yükleniyor: ${key}`);
+      if (this.pendingLoadURLs.get(key) !== requestURL || this.pendingLoadIntegrities.get(key) !== integrity) throw new Error(`Audio name is already loading: ${key}`);
       return waitForAbort(pending, signal);
     }
     const generation = this.generation;
@@ -310,12 +310,12 @@ export class AudioManager {
     const controller = typeof AbortController === "function" ? new AbortController() : null;
     const promise = (async () => {
       const bytes = await this.loader.loadBytes(requestURL, { maxBytes: this.maxBytes, signal: null, requestSignal: controller?.signal, integrity });
-      if (this.destroyed || generation !== this.generation) throw new Error("AudioManager yok edilmiş.");
-      if (keyGeneration !== (this.keyGenerations.get(key) || 0)) throw new Error("Audio load geçersiz kılındı.");
+      if (this.destroyed || generation !== this.generation) throw new Error("AudioManager has been destroyed.");
+      if (keyGeneration !== (this.keyGenerations.get(key) || 0)) throw new Error("Audio load was invalidated.");
       const exactBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
       const buffer = await this.ensureContext().decodeAudioData(exactBuffer);
-      if (this.destroyed || generation !== this.generation) throw new Error("AudioManager yok edilmiş.");
-      if (keyGeneration !== (this.keyGenerations.get(key) || 0)) throw new Error("Audio load geçersiz kılındı.");
+      if (this.destroyed || generation !== this.generation) throw new Error("AudioManager has been destroyed.");
+      if (keyGeneration !== (this.keyGenerations.get(key) || 0)) throw new Error("Audio load was invalidated.");
       this.assertBudget();
       const decodedBytes = Number(buffer?.length) * Number(buffer?.numberOfChannels) * Float32Array.BYTES_PER_ELEMENT;
       if (!Number.isSafeInteger(decodedBytes) || decodedBytes <= 0 || decodedBytes > this.maxDecodedBytes) throw new RangeError("Audio decoded byte limit exceeded.");
@@ -345,9 +345,9 @@ export class AudioManager {
 
   async loadMany(entries, { onProgress = () => {}, signal = null, stopOnError = true, maxConcurrent = 4 } = {}) {
     this.ensureActive();
-    if (!Array.isArray(entries)) throw new TypeError("Audio listesi dizi olmalı.");
-    if (entries.length > MAX_AUDIO_BATCH_ENTRIES) throw new RangeError(`Audio batch limiti ${MAX_AUDIO_BATCH_ENTRIES}.`);
-    if (typeof onProgress !== "function") throw new TypeError("Audio progress callback fonksiyonu gerekli.");
+    if (!Array.isArray(entries)) throw new TypeError("Audio list must be an array.");
+    if (entries.length > MAX_AUDIO_BATCH_ENTRIES) throw new RangeError(`Audio batch limit is ${MAX_AUDIO_BATCH_ENTRIES}.`);
+    if (typeof onProgress !== "function") throw new TypeError("Audio progress callback function is required.");
     const total = entries.length;
     const results = new Map();
     const errors = new Map();
@@ -357,9 +357,9 @@ export class AudioManager {
     const workerCount = Math.max(1, Math.min(total || 1, MAX_AUDIO_BATCH_CONCURRENCY, Math.floor(maxConcurrent) || 1));
 
     const loadEntry = async (entry) => {
-      if (!entry || typeof entry.name !== "string" || !entry.name || entry.name.length > MAX_AUDIO_KEY_LENGTH || typeof entry.url !== "string" || !entry.url) throw new TypeError("Audio adı veya URL geçersiz.");
+      if (!entry || typeof entry.name !== "string" || !entry.name || entry.name.length > MAX_AUDIO_KEY_LENGTH || typeof entry.url !== "string" || !entry.url) throw new TypeError("Audio name or URL is invalid.");
       const name = normalizeAudioKey(entry.name);
-      if (seen.has(name)) throw new Error(`Audio adı tekrar ediyor: ${name}`);
+      if (seen.has(name)) throw new Error(`Duplicate audio name: ${name}`);
       seen.add(name);
       return this.load(name, entry.url, { signal, integrity: entry.integrity ?? null });
     };
@@ -390,15 +390,15 @@ export class AudioManager {
   play(nameOrBuffer, { volume = 1, loop = false, bus = "sfx", pan = 0 } = {}) {
     this.ensureActive();
     const buffer = typeof nameOrBuffer === "string" ? this.buffers.get(normalizeAudioKey(nameOrBuffer)) : nameOrBuffer;
-    if (!buffer) throw new Error("Audio buffer bulunamadı.");
-    if (this.voices.size >= this.maxVoices) throw new RangeError(`Audio voice limiti ${this.maxVoices}.`);
+    if (!buffer) throw new Error("Audio buffer not found.");
+    if (this.voices.size >= this.maxVoices) throw new RangeError(`Audio voice limit is ${this.maxVoices}.`);
     const context = this.ensureContext();
     const output = this.getBus(bus) || this.getBus("master");
     const source = context.createBufferSource();
     const gain = context.createGain();
     const requestedPan = safePan(pan);
     const panner = requestedPan === 0 ? null : context.createStereoPanner?.();
-    if (requestedPan !== 0 && !panner) throw new Error("StereoPannerNode kullanılamıyor.");
+    if (requestedPan !== 0 && !panner) throw new Error("StereoPannerNode is not available.");
     source.buffer = buffer;
     source.loop = loop;
     gain.gain.value = safeVolume(volume);

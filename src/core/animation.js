@@ -58,9 +58,9 @@ export const easing = {
 
 export class Tween {
   constructor(target, property, to, duration, { from = target[property], ease = easing.smooth, loop = 0, yoyo = false, onComplete = null } = {}) {
-    if (!target || typeof property !== "string") throw new TypeError("Tween hedefi ve property gerekli.");
-    if (typeof ease !== "function") throw new TypeError("Tween easing fonksiyonu gerekli.");
-    if (onComplete !== null && typeof onComplete !== "function") throw new TypeError("Tween onComplete fonksiyonu gerekli.");
+    if (!target || typeof property !== "string") throw new TypeError("Tween target and property are required.");
+    if (typeof ease !== "function") throw new TypeError("Tween easing function is required.");
+    if (onComplete !== null && typeof onComplete !== "function") throw new TypeError("Tween onComplete function is required.");
     this.target = target;
     this.property = property;
     const requestedFrom = Number(from); const requestedTo = Number(to); const requestedDuration = Number(duration);
@@ -105,18 +105,18 @@ export class Tween {
 export class Animator {
   constructor({ maxTweens = 4_096 } = {}) {
     const requestedLimit = Number(maxTweens);
-    if (!Number.isSafeInteger(requestedLimit) || requestedLimit <= 0 || requestedLimit > MAX_ANIMATOR_TWEENS) throw new RangeError(`Animator tween limiti 1-${MAX_ANIMATOR_TWEENS} arasında olmalı.`);
+    if (!Number.isSafeInteger(requestedLimit) || requestedLimit <= 0 || requestedLimit > MAX_ANIMATOR_TWEENS) throw new RangeError(`Animator tween limit must be between 1 and ${MAX_ANIMATOR_TWEENS}.`);
     this._tweenCapacity = requestedLimit;
     this.maxTweens = requestedLimit;
     this.tweens = new Set();
   }
   assertTweenLimit() {
-    if (this.maxTweens !== this._tweenCapacity || this.tweens.size > this._tweenCapacity) throw new RangeError(`Animator tween limiti ${this._tweenCapacity}.`);
+    if (this.maxTweens !== this._tweenCapacity || this.tweens.size > this._tweenCapacity) throw new RangeError(`Animator tween limit is ${this._tweenCapacity}.`);
   }
   add(tween) {
-    if (!(tween instanceof Tween)) throw new TypeError("Tween bekleniyor.");
+    if (!(tween instanceof Tween)) throw new TypeError("Tween expected.");
     this.assertTweenLimit();
-    if (!this.tweens.has(tween) && this.tweens.size >= this._tweenCapacity) throw new RangeError(`Animator en fazla ${this._tweenCapacity} tween destekler.`);
+    if (!this.tweens.has(tween) && this.tweens.size >= this._tweenCapacity) throw new RangeError(`Animator supports at most ${this._tweenCapacity} tweens.`);
     this.tweens.add(tween);
     return tween;
   }

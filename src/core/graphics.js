@@ -27,7 +27,7 @@ function triangulatePolygon(points) {
     const next = (index + 1) % pointCount;
     area += points[index * 2] * points[next * 2 + 1] - points[next * 2] * points[index * 2 + 1];
   }
-  if (!Number.isFinite(area) || area === 0) throw new RangeError("Graphics polygon alanı geçersiz.");
+  if (!Number.isFinite(area) || area === 0) throw new RangeError("Graphics polygon area is invalid.");
   const indices = Array.from({ length: pointCount }, (_, index) => index);
   if (area < 0) indices.reverse();
   const positions = [];
@@ -55,7 +55,7 @@ function triangulatePolygon(points) {
       break;
     }
     guard += 1;
-    if (!earFound || guard > pointCount * pointCount) throw new RangeError("Graphics polygon üçgenlenemedi.");
+    if (!earFound || guard > pointCount * pointCount) throw new RangeError("Graphics polygon could not be triangulated.");
   }
   positions.push(
     points[indices[0] * 2], points[indices[0] * 2 + 1],
@@ -106,7 +106,7 @@ export class Graphics extends Node {
 
   rect(x, y, width, height, { fill = 0xffffff, alpha = 1 } = {}) {
     const left = finite(x); const top = finite(y); const rectWidth = finite(width); const rectHeight = finite(height);
-    if (rectWidth <= 0 || rectHeight <= 0 || this.commands.length >= MAX_GRAPHICS_COMMANDS) { if (this.commands.length >= MAX_GRAPHICS_COMMANDS) throw new RangeError(`Graphics komut limiti ${MAX_GRAPHICS_COMMANDS}.`); return this; }
+    if (rectWidth <= 0 || rectHeight <= 0 || this.commands.length >= MAX_GRAPHICS_COMMANDS) { if (this.commands.length >= MAX_GRAPHICS_COMMANDS) throw new RangeError(`Graphics command limit is ${MAX_GRAPHICS_COMMANDS}.`); return this; }
     this.commands.push({ type: "rect", x: left, y: top, width: rectWidth, height: rectHeight, tint: fill, alpha: alphaValue(alpha) });
     this._invalidate();
     return this;
@@ -114,7 +114,7 @@ export class Graphics extends Node {
 
   circle(x, y, radius, { fill = 0xffffff, alpha = 1, segments = 24 } = {}) {
     const centerX = finite(x); const centerY = finite(y); const circleRadius = finite(radius);
-    if (circleRadius <= 0 || this.commands.length >= MAX_GRAPHICS_COMMANDS) { if (this.commands.length >= MAX_GRAPHICS_COMMANDS) throw new RangeError(`Graphics komut limiti ${MAX_GRAPHICS_COMMANDS}.`); return this; }
+    if (circleRadius <= 0 || this.commands.length >= MAX_GRAPHICS_COMMANDS) { if (this.commands.length >= MAX_GRAPHICS_COMMANDS) throw new RangeError(`Graphics command limit is ${MAX_GRAPHICS_COMMANDS}.`); return this; }
     this.commands.push({ type: "circle", x: centerX, y: centerY, radius: circleRadius, tint: fill, alpha: alphaValue(alpha), segments: clampSegments(segments) });
     this._invalidate();
     return this;
@@ -122,7 +122,7 @@ export class Graphics extends Node {
 
   line(x1, y1, x2, y2, width = 1, { fill = 0xffffff, alpha = 1 } = {}) {
     const startX = finite(x1); const startY = finite(y1); const endX = finite(x2); const endY = finite(y2); const lineWidth = finite(width);
-    if (lineWidth <= 0 || this.commands.length >= MAX_GRAPHICS_COMMANDS) { if (this.commands.length >= MAX_GRAPHICS_COMMANDS) throw new RangeError(`Graphics komut limiti ${MAX_GRAPHICS_COMMANDS}.`); return this; }
+    if (lineWidth <= 0 || this.commands.length >= MAX_GRAPHICS_COMMANDS) { if (this.commands.length >= MAX_GRAPHICS_COMMANDS) throw new RangeError(`Graphics command limit is ${MAX_GRAPHICS_COMMANDS}.`); return this; }
     this.commands.push({ type: "line", x1: startX, y1: startY, x2: endX, y2: endY, width: lineWidth, tint: fill, alpha: alphaValue(alpha) });
     this._invalidate();
     return this;
@@ -132,7 +132,7 @@ export class Graphics extends Node {
     const p1x = finite(x1); const p1y = finite(y1);
     const p2x = finite(x2); const p2y = finite(y2);
     const p3x = finite(x3); const p3y = finite(y3);
-    if (this.commands.length >= MAX_GRAPHICS_COMMANDS) throw new RangeError(`Graphics komut limiti ${MAX_GRAPHICS_COMMANDS}.`);
+    if (this.commands.length >= MAX_GRAPHICS_COMMANDS) throw new RangeError(`Graphics command limit is ${MAX_GRAPHICS_COMMANDS}.`);
     this.commands.push({ type: "triangle", x1: p1x, y1: p1y, x2: p2x, y2: p2y, x3: p3x, y3: p3y, tint: fill, alpha: alphaValue(alpha) });
     this._invalidate();
     return this;
@@ -142,7 +142,7 @@ export class Graphics extends Node {
     const centerX = finite(x); const centerY = finite(y);
     const rx = finite(radiusX); const ry = finite(radiusY);
     if (rx <= 0 || ry <= 0 || this.commands.length >= MAX_GRAPHICS_COMMANDS) {
-      if (this.commands.length >= MAX_GRAPHICS_COMMANDS) throw new RangeError(`Graphics komut limiti ${MAX_GRAPHICS_COMMANDS}.`);
+      if (this.commands.length >= MAX_GRAPHICS_COMMANDS) throw new RangeError(`Graphics command limit is ${MAX_GRAPHICS_COMMANDS}.`);
       return this;
     }
     this.commands.push({ type: "ellipse", x: centerX, y: centerY, radiusX: rx, radiusY: ry, tint: fill, alpha: alphaValue(alpha), segments: clampSegments(segments) });
@@ -200,10 +200,10 @@ export class Graphics extends Node {
 
   polygon(points, { fill = 0xffffff, alpha = 1 } = {}) {
     const length = Number(points?.length);
-    if (!Number.isSafeInteger(length) || length < 6 || length % 2 !== 0) throw new TypeError("Graphics polygon points çift sayıda ve en az üç nokta olmalı.");
+    if (!Number.isSafeInteger(length) || length < 6 || length % 2 !== 0) throw new TypeError("Graphics polygon points must have an even count and at least three points.");
     const pointCount = length / 2;
-    if (pointCount > MAX_GRAPHICS_POLYGON_POINTS) throw new RangeError(`Graphics polygon nokta limiti ${MAX_GRAPHICS_POLYGON_POINTS}.`);
-    if (this.commands.length >= MAX_GRAPHICS_COMMANDS) throw new RangeError(`Graphics komut limiti ${MAX_GRAPHICS_COMMANDS}.`);
+    if (pointCount > MAX_GRAPHICS_POLYGON_POINTS) throw new RangeError(`Graphics polygon point limit is ${MAX_GRAPHICS_POLYGON_POINTS}.`);
+    if (this.commands.length >= MAX_GRAPHICS_COMMANDS) throw new RangeError(`Graphics command limit is ${MAX_GRAPHICS_COMMANDS}.`);
     const normalized = new Array(length);
     for (let index = 0; index < length; index += 1) normalized[index] = finite(points[index]);
     this.commands.push({ type: "polygon", positions: triangulatePolygon(normalized), bounds: polygonBounds(normalized), tint: fill, alpha: alphaValue(alpha) });
@@ -212,7 +212,7 @@ export class Graphics extends Node {
   }
 
   getRenderItems() {
-    if (this.commands.length > MAX_GRAPHICS_COMMANDS) throw new RangeError(`Graphics komut limiti ${MAX_GRAPHICS_COMMANDS}.`);
+    if (this.commands.length > MAX_GRAPHICS_COMMANDS) throw new RangeError(`Graphics command limit is ${MAX_GRAPHICS_COMMANDS}.`);
     if (!this.itemsDirty) return this.renderItems;
     const renderItems = this.renderItems;
     let itemIndex = 0;
@@ -280,7 +280,7 @@ export class Graphics extends Node {
   }
 
   getLocalBounds() {
-    if (this.commands.length > MAX_GRAPHICS_COMMANDS) throw new RangeError(`Graphics komut limiti ${MAX_GRAPHICS_COMMANDS}.`);
+    if (this.commands.length > MAX_GRAPHICS_COMMANDS) throw new RangeError(`Graphics command limit is ${MAX_GRAPHICS_COMMANDS}.`);
     if (this.boundsCache) return this.boundsCache;
     const items = this.getRenderItems();
     let left = Infinity; let top = Infinity; let right = -Infinity; let bottom = -Infinity;

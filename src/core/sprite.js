@@ -8,7 +8,7 @@ export class Sprite extends Node {
     super({ name: "sprite", ...options });
     this.isRenderable = true;
     const selectedTexture = texture || Texture.white;
-    if (!(selectedTexture instanceof Texture)) throw new TypeError("Sprite texture bekleniyor.");
+    if (!(selectedTexture instanceof Texture)) throw new TypeError("Sprite texture expected.");
     this.texture = selectedTexture;
     const requestedWidth = Number(width); const requestedHeight = Number(height);
     const requestedAnchorX = Number(anchorX); const requestedAnchorY = Number(anchorY);
@@ -40,7 +40,7 @@ export class Sprite extends Node {
   }
 
   setTexture(texture, { width = this.width, height = this.height } = {}) {
-    if (!(texture instanceof Texture)) throw new TypeError("Texture bekleniyor.");
+    if (!(texture instanceof Texture)) throw new TypeError("Texture expected.");
     this.texture = texture;
     const requestedWidth = Number(width); const requestedHeight = Number(height);
     this.width = Number.isFinite(requestedWidth) ? Math.max(0, worldValue(requestedWidth)) : 0;

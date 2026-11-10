@@ -420,7 +420,7 @@ try {
   assert.equal(toolResult(await request("tools/call", { name: "exi_function", arguments: { name: "intersectsAABB", args: [{ left: 0, top: 0, right: 2, bottom: 2 }, { left: 1, top: 1, right: 3, bottom: 3 }] } })), true);
   const invalidKTX2 = await request("tools/call", { name: "exi_function", arguments: { name: "inspectKTX2", args: [{ $bytes: [0, 1] }] } });
   assert.equal(invalidKTX2.result.isError, true);
-  assert.match(invalidKTX2.result.content[0].text, /header eksik/);
+  assert.match(invalidKTX2.result.content[0].text, /header is incomplete/);
   toolResult(await request("tools/call", { name: "exi_release", arguments: { handle: callableNode.$handle } }));
 
   const callbackNode = new engineExports.Node({ onUpdate: () => "application callback" });
@@ -432,7 +432,7 @@ try {
   assert.ok(callbackInspection.methods.includes("setAlpha"));
   assert.ok(!callbackInspection.methods.includes("onUpdate"));
   assert.deepEqual(callbackInspection.callbacks, ["visit"]);
-  await assert.rejects(callbackRuntime.execute({ operation: "call", handle: "callbackNode", method: "onUpdate", args: [] }), /Runtime method bulunamadı/);
+  await assert.rejects(callbackRuntime.execute({ operation: "call", handle: "callbackNode", method: "onUpdate", args: [] }), /Runtime method not found/);
   assert.equal(await callbackRuntime.execute({ operation: "call", handle: "callbackNode", method: "traverse", args: [{ $callback: "visit" }] }), null);
   assert.equal(callbackVisits, 2);
   await assert.rejects(callbackRuntime.execute({ operation: "call", handle: "callbackNode", method: "find", args: [{ $callback: "missing" }] }), (error) => error?.code === "EXI_RUNTIME_CALLBACK");

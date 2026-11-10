@@ -19,7 +19,7 @@
 //   machine.send("finish"); // throws InvalidStateTransitionError
 export class InvalidStateTransitionError extends Error {
   constructor(name, from, event) {
-    super(`${name}: '${event}' geçişi '${from}' durumunda geçersiz.`);
+    super(`${name}: transition '${event}' is invalid in state '${from}'.`);
     this.name = "InvalidStateTransitionError";
     this.code = "EXI_INVALID_STATE_TRANSITION";
     this.machine = name;
@@ -29,21 +29,21 @@ export class InvalidStateTransitionError extends Error {
 }
 
 function validateDefinition(name, initial, states) {
-  if (typeof name !== "string" || name.length === 0) throw new TypeError("StateMachine name boş olamaz.");
-  if (states === null || typeof states !== "object" || Array.isArray(states)) throw new TypeError("StateMachine states nesnesi gerekli.");
+  if (typeof name !== "string" || name.length === 0) throw new TypeError("StateMachine name cannot be empty.");
+  if (states === null || typeof states !== "object" || Array.isArray(states)) throw new TypeError("StateMachine states object is required.");
   const names = Object.keys(states);
-  if (names.length === 0) throw new RangeError("StateMachine en az bir durum tanımlamalı.");
-  if (!Object.prototype.hasOwnProperty.call(states, initial)) throw new RangeError(`StateMachine ilk durumu '${initial}' tanımlı değil.`);
+  if (names.length === 0) throw new RangeError("StateMachine must define at least one state.");
+  if (!Object.prototype.hasOwnProperty.call(states, initial)) throw new RangeError(`StateMachine initial state '${initial}' is not defined.`);
   const cleaned = {};
   for (const stateName of names) {
     const entry = states[stateName];
-    if (entry === null || typeof entry !== "object" || Array.isArray(entry)) throw new TypeError(`StateMachine durumu '${stateName}' nesne olmalı.`);
+    if (entry === null || typeof entry !== "object" || Array.isArray(entry)) throw new TypeError(`StateMachine state '${stateName}' must be an object.`);
     const on = entry.on ?? {};
-    if (on === null || typeof on !== "object" || Array.isArray(on)) throw new TypeError(`StateMachine '${stateName}' üzerindeki on tablosu nesne olmalı.`);
+    if (on === null || typeof on !== "object" || Array.isArray(on)) throw new TypeError(`StateMachine 'on' table of '${stateName}' must be an object.`);
     const transitions = {};
     for (const [event, target] of Object.entries(on)) {
-      if (typeof event !== "string" || event.length === 0) throw new TypeError(`StateMachine '${stateName}' üzerinde boş event adı.`);
-      if (!Object.prototype.hasOwnProperty.call(states, target)) throw new RangeError(`StateMachine '${stateName}' için '${event}' hedef durumu '${target}' tanımlı değil.`);
+      if (typeof event !== "string" || event.length === 0) throw new TypeError(`StateMachine '${stateName}' has an empty event name.`);
+      if (!Object.prototype.hasOwnProperty.call(states, target)) throw new RangeError(`StateMachine '${stateName}': target state '${target}' of '${event}' is not defined.`);
       transitions[event] = target;
     }
     cleaned[stateName] = Object.freeze({ on: Object.freeze(transitions) });
@@ -74,12 +74,12 @@ export class StateMachine {
     return Object.freeze(list);
   }
   onTransition(listener) {
-    if (typeof listener !== "function") throw new TypeError("StateMachine listener fonksiyon olmalı.");
+    if (typeof listener !== "function") throw new TypeError("StateMachine listener must be a function.");
     this._listeners.add(listener);
     return () => this._listeners.delete(listener);
   }
   send(event) {
-    if (typeof event !== "string" || event.length === 0) throw new TypeError("StateMachine event adı string olmalı.");
+    if (typeof event !== "string" || event.length === 0) throw new TypeError("StateMachine event name must be a string.");
     const entry = this.states[this._state];
     const target = entry.on[event];
     if (target === undefined) throw new InvalidStateTransitionError(this.name, this._state, event);

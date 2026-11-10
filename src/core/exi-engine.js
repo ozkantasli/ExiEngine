@@ -46,18 +46,18 @@ export class ExiEngine {
   }
 
   constructor({ canvas, renderer = "auto", width = 960, height = 540, resizeMode = "resize", maxPixelRatio = 2, maxTextureBytes = 128 * 1024 * 1024, maxTextureCount = 4_096, backgroundColor = DEFAULT_CLEAR_COLOR, backgroundAlpha = 1, clearBeforeRender = true, scene = new Scene(), camera = new Camera(), overlayScene = null, overlayCamera = null, animator = null, physics = null, fixedStep = 1 / 60, maxFrameDelta = 0.25, timeScale = 1, interpolate = false, pauseOnHidden = true, pauseAudio = true, inputActions = null, inputAxes = null, onGamepadConnected = null, onGamepadDisconnected = null, onStatus = () => {}, onUpdate = () => {}, onRender = () => {} } = {}) {
-    if (!canvas || typeof canvas.getContext !== "function") throw new Error("ExiEngine bir canvas ister.");
-    if (!allowedRendererKinds.has(renderer)) throw new Error(`Bilinmeyen renderer seçimi: ${renderer}`);
-    if (!allowedResizeModes.has(resizeMode)) throw new Error(`Bilinmeyen resize seçimi: ${resizeMode}`);
-    if (resizeMode !== "resize" && typeof camera?.setScreenViewport !== "function") throw new TypeError("ExiEngine contain/cover için Camera setScreenViewport gerekli.");
-    if (scene?.destroyed === true) throw new TypeError("ExiEngine scene yok edilmiş olamaz.");
-    if (overlayScene !== null && (!overlayScene || overlayScene.destroyed === true || typeof overlayScene.update !== "function" || typeof overlayScene.collectRenderables !== "function")) throw new TypeError("ExiEngine overlayScene için Scene benzeri nesne gerekli.");
-    if (overlayCamera !== null && (!overlayCamera || typeof overlayCamera.worldToScreen !== "function" || typeof overlayCamera.screenToWorld !== "function" || typeof overlayCamera.setViewport !== "function")) throw new TypeError("ExiEngine overlayCamera için Camera benzeri nesne gerekli.");
-    if (resizeMode !== "resize" && overlayCamera !== null && typeof overlayCamera.setScreenViewport !== "function") throw new TypeError("ExiEngine contain/cover için overlayCamera setScreenViewport gerekli.");
-    if (overlayScene === null && overlayCamera !== null) throw new TypeError("ExiEngine overlayCamera için overlayScene de gerekli.");
-    if (animator !== null && (!animator || typeof animator.update !== "function")) throw new TypeError("ExiEngine animator için Animator benzeri nesne gerekli.");
-    if (physics !== null && (!physics || typeof physics.step !== "function")) throw new TypeError("ExiEngine physics için PhysicsWorld benzeri nesne gerekli.");
-    if (![onStatus, onUpdate, onRender].every((callback) => typeof callback === "function") || [onGamepadConnected, onGamepadDisconnected].some((callback) => callback !== null && typeof callback !== "function")) throw new TypeError("ExiEngine callback fonksiyonu gerekli.");
+    if (!canvas || typeof canvas.getContext !== "function") throw new Error("ExiEngine requires a canvas.");
+    if (!allowedRendererKinds.has(renderer)) throw new Error(`Unknown renderer selection: ${renderer}`);
+    if (!allowedResizeModes.has(resizeMode)) throw new Error(`Unknown resize selection: ${resizeMode}`);
+    if (resizeMode !== "resize" && typeof camera?.setScreenViewport !== "function") throw new TypeError("ExiEngine contain/cover requires Camera setScreenViewport.");
+    if (scene?.destroyed === true) throw new TypeError("ExiEngine scene cannot be a destroyed scene.");
+    if (overlayScene !== null && (!overlayScene || overlayScene.destroyed === true || typeof overlayScene.update !== "function" || typeof overlayScene.collectRenderables !== "function")) throw new TypeError("ExiEngine overlayScene requires a Scene-like object.");
+    if (overlayCamera !== null && (!overlayCamera || typeof overlayCamera.worldToScreen !== "function" || typeof overlayCamera.screenToWorld !== "function" || typeof overlayCamera.setViewport !== "function")) throw new TypeError("ExiEngine overlayCamera requires a Camera-like object.");
+    if (resizeMode !== "resize" && overlayCamera !== null && typeof overlayCamera.setScreenViewport !== "function") throw new TypeError("ExiEngine contain/cover requires overlayCamera setScreenViewport.");
+    if (overlayScene === null && overlayCamera !== null) throw new TypeError("ExiEngine overlayCamera also requires overlayScene.");
+    if (animator !== null && (!animator || typeof animator.update !== "function")) throw new TypeError("ExiEngine animator requires an Animator-like object.");
+    if (physics !== null && (!physics || typeof physics.step !== "function")) throw new TypeError("ExiEngine physics requires a PhysicsWorld-like object.");
+    if (![onStatus, onUpdate, onRender].every((callback) => typeof callback === "function") || [onGamepadConnected, onGamepadDisconnected].some((callback) => callback !== null && typeof callback !== "function")) throw new TypeError("ExiEngine callback function is required.");
     this.canvas = canvas;
     this.eventTarget = globalThis.window || globalThis;
     this.preference = renderer;
@@ -248,7 +248,7 @@ export class ExiEngine {
 
   _assertConfiguration() {
     if (this.width !== this._widthSnapshot || this.height !== this._heightSnapshot || this.resizeMode !== this._resizeModeSnapshot || this.maxPixelRatio !== this._maxPixelRatioSnapshot || this.maxTextureBytes !== this._maxTextureBytesSnapshot || this.maxTextureCount !== this._maxTextureCountSnapshot || this.fixedStep !== this._fixedStepSnapshot || this.maxFrameDelta !== this._maxFrameDeltaSnapshot) {
-      const error = new RangeError("ExiEngine çalışma konfigürasyonu doğrudan değiştirilemez.");
+      const error = new RangeError("ExiEngine runtime configuration cannot be changed directly.");
       error.code = "EXI_ENGINE_CONFIG";
       throw error;
     }
@@ -267,11 +267,11 @@ export class ExiEngine {
   }
 
   async init() {
-    if (this.destroyed) throw new Error("ExiEngine yok edilmiş.");
+    if (this.destroyed) throw new Error("ExiEngine has been destroyed.");
     if (this.initialized) return this;
     if (this._initPromise) return this._initPromise;
     this._initPromise = Promise.resolve().then(async () => {
-      if (this.destroyed) throw new Error("ExiEngine yok edilmiş.");
+      if (this.destroyed) throw new Error("ExiEngine has been destroyed.");
       this._assertConfiguration();
       this.detectCanvasSizing();
       this.resize();
@@ -280,13 +280,13 @@ export class ExiEngine {
       else {
         try { await this.selectBackend("webgpu"); }
         catch (webgpuError) {
-          if (this.destroyed) throw new Error("ExiEngine yok edilmiş.");
+          if (this.destroyed) throw new Error("ExiEngine has been destroyed.");
           this.fallbackUsed = true;
           this.emitStatus({ type: "fallback", from: "webgpu", to: "webgl2", message: webgpuError.message });
           await this.selectBackend("webgl2");
         }
       }
-      if (this.destroyed) throw new Error("ExiEngine yok edilmiş.");
+      if (this.destroyed) throw new Error("ExiEngine has been destroyed.");
       this.input = new Input(this.canvas, { actions: this.inputActions, axes: this.inputAxes, onKeyDown: this.handleKeyDown, onGamepadConnected: this.onGamepadConnected, onGamepadDisconnected: this.onGamepadDisconnected });
       this.resize();
       this.eventTarget.addEventListener?.("resize", this.handleResize, { passive: true });
@@ -326,7 +326,7 @@ export class ExiEngine {
       : new WebGL2Renderer({ canvas: this.canvas, onLost: this.handleRendererLost, onStatus: this.handleRendererStatus, clearColor: this.backgroundColor, clearAlpha: this.backgroundAlpha, clearBeforeRender: this.clearBeforeRender, maxTextureBytes: this.maxTextureBytes, maxTextureCount: this.maxTextureCount });
     try { await next.init(); }
     catch (error) { next.destroy(); if (kind === "webgpu" && !this.destroyed) this.replaceCanvas(); throw error; }
-    if (this.destroyed) { next.destroy(); throw new Error("ExiEngine yok edilmiş."); }
+    if (this.destroyed) { next.destroy(); throw new Error("ExiEngine has been destroyed."); }
     this.renderer?.destroy();
     this.renderer = next;
     this.prepared = false;
@@ -410,9 +410,9 @@ export class ExiEngine {
   }
 
   setLogicalSize(width, height) {
-    if (this.destroyed) throw new Error("ExiEngine yok edilmiş.");
+    if (this.destroyed) throw new Error("ExiEngine has been destroyed.");
     const requestedWidth = Number(width); const requestedHeight = Number(height);
-    if (!Number.isFinite(requestedWidth) || requestedWidth <= 0 || !Number.isFinite(requestedHeight) || requestedHeight <= 0) throw new RangeError("ExiEngine mantıksal boyutu finite ve pozitif olmalı.");
+    if (!Number.isFinite(requestedWidth) || requestedWidth <= 0 || !Number.isFinite(requestedHeight) || requestedHeight <= 0) throw new RangeError("ExiEngine logical size must be finite and positive.");
     this.width = Math.min(MAX_VIEWPORT_SIZE, requestedWidth);
     this.height = Math.min(MAX_VIEWPORT_SIZE, requestedHeight);
     this._widthSnapshot = this.width;
@@ -421,9 +421,9 @@ export class ExiEngine {
   }
 
   setResizeMode(mode) {
-    if (!allowedResizeModes.has(mode)) throw new Error(`Bilinmeyen resize seçimi: ${mode}`);
-    if (mode !== "resize" && typeof this.camera?.setScreenViewport !== "function") throw new TypeError("ExiEngine contain/cover için Camera setScreenViewport gerekli.");
-    if (mode !== "resize" && this.overlayCamera && typeof this.overlayCamera.setScreenViewport !== "function") throw new TypeError("ExiEngine contain/cover için overlayCamera setScreenViewport gerekli.");
+    if (!allowedResizeModes.has(mode)) throw new Error(`Unknown resize selection: ${mode}`);
+    if (mode !== "resize" && typeof this.camera?.setScreenViewport !== "function") throw new TypeError("ExiEngine contain/cover requires Camera setScreenViewport.");
+    if (mode !== "resize" && this.overlayCamera && typeof this.overlayCamera.setScreenViewport !== "function") throw new TypeError("ExiEngine contain/cover requires overlayCamera setScreenViewport.");
     this.resizeMode = mode;
     this._resizeModeSnapshot = this.resizeMode;
     this.resize();
@@ -443,10 +443,10 @@ export class ExiEngine {
   }
 
   setScene(scene, camera = this.camera) {
-    if (this.destroyed) throw new Error("ExiEngine yok edilmiş.");
-    if (!scene || scene.destroyed === true || typeof scene.update !== "function" || typeof scene.collectRenderables !== "function") throw new TypeError("ExiEngine scene için Scene benzeri nesne gerekli.");
-    if (!camera || typeof camera.worldToScreen !== "function" || typeof camera.screenToWorld !== "function" || typeof camera.setViewport !== "function") throw new TypeError("ExiEngine camera için Camera benzeri nesne gerekli.");
-    if (this.resizeMode !== "resize" && typeof camera.setScreenViewport !== "function") throw new TypeError("ExiEngine contain/cover için Camera setScreenViewport gerekli.");
+    if (this.destroyed) throw new Error("ExiEngine has been destroyed.");
+    if (!scene || scene.destroyed === true || typeof scene.update !== "function" || typeof scene.collectRenderables !== "function") throw new TypeError("ExiEngine scene requires a Scene-like object.");
+    if (!camera || typeof camera.worldToScreen !== "function" || typeof camera.screenToWorld !== "function" || typeof camera.setViewport !== "function") throw new TypeError("ExiEngine camera requires a Camera-like object.");
+    if (this.resizeMode !== "resize" && typeof camera.setScreenViewport !== "function") throw new TypeError("ExiEngine contain/cover requires Camera setScreenViewport.");
     this.blur();
     this.interpolationRoots.length = 0;
     const previousScene = this.scene;
@@ -469,18 +469,18 @@ export class ExiEngine {
   }
 
   setOverlay(scene = null, camera = null) {
-    if (this.destroyed) throw new Error("ExiEngine yok edilmiş.");
+    if (this.destroyed) throw new Error("ExiEngine has been destroyed.");
     if (scene === null) {
-      if (camera !== null) throw new TypeError("ExiEngine overlayCamera için overlayScene de gerekli.");
+      if (camera !== null) throw new TypeError("ExiEngine overlayCamera also requires overlayScene.");
       this.blur();
       this.interpolationRoots.length = 0;
       this.overlayScene = null;
       this.overlayCamera = null;
       this.overlayCameraAutoCenter = false;
     } else {
-      if (!scene || scene.destroyed === true || typeof scene.update !== "function" || typeof scene.collectRenderables !== "function") throw new TypeError("ExiEngine overlayScene için Scene benzeri nesne gerekli.");
-      if (camera !== null && (!camera || typeof camera.worldToScreen !== "function" || typeof camera.screenToWorld !== "function" || typeof camera.setViewport !== "function")) throw new TypeError("ExiEngine overlayCamera için Camera benzeri nesne gerekli.");
-      if (this.resizeMode !== "resize" && camera !== null && typeof camera.setScreenViewport !== "function") throw new TypeError("ExiEngine contain/cover için overlayCamera setScreenViewport gerekli.");
+      if (!scene || scene.destroyed === true || typeof scene.update !== "function" || typeof scene.collectRenderables !== "function") throw new TypeError("ExiEngine overlayScene requires a Scene-like object.");
+      if (camera !== null && (!camera || typeof camera.worldToScreen !== "function" || typeof camera.screenToWorld !== "function" || typeof camera.setViewport !== "function")) throw new TypeError("ExiEngine overlayCamera requires a Camera-like object.");
+      if (this.resizeMode !== "resize" && camera !== null && typeof camera.setScreenViewport !== "function") throw new TypeError("ExiEngine contain/cover requires overlayCamera setScreenViewport.");
       this.blur();
       this.interpolationRoots.length = 0;
       this.overlayScene = scene;
@@ -503,25 +503,25 @@ export class ExiEngine {
   }
 
   renderToTexture(target, scene = this.scene, camera = this.camera, time = globalThis.performance?.now?.() || 0) {
-    if (this.destroyed) throw new Error("ExiEngine yok edilmiş.");
-    if (!this.renderer) throw new Error("ExiEngine başlatılmadan önce init() gerekli.");
-    if (!(target instanceof RenderTexture)) throw new TypeError("renderToTexture bir RenderTexture ister.");
-    if (!scene || !camera) throw new TypeError("renderToTexture scene ve camera ister.");
-    if (camera.width !== target.width || camera.height !== target.height) throw new RangeError("RenderTexture boyutu camera viewport ile eşleşmiyor.");
+    if (this.destroyed) throw new Error("ExiEngine has been destroyed.");
+    if (!this.renderer) throw new Error("ExiEngine requires init() before starting.");
+    if (!(target instanceof RenderTexture)) throw new TypeError("renderToTexture requires a RenderTexture.");
+    if (!scene || !camera) throw new TypeError("renderToTexture requires a scene and a camera.");
+    if (camera.width !== target.width || camera.height !== target.height) throw new RangeError("RenderTexture size does not match the camera viewport.");
     this.renderer.render(time, scene, camera, target);
     return target;
   }
 
   async captureFrame({ columns = 32, rows = 18 } = {}) {
-    if (this.destroyed) throw new Error("ExiEngine yok edilmiş.");
-    if (!this.renderer) throw new Error("ExiEngine başlatılmadan önce init() gerekli.");
+    if (this.destroyed) throw new Error("ExiEngine has been destroyed.");
+    if (!this.renderer) throw new Error("ExiEngine requires init() before starting.");
     if (!Number.isSafeInteger(columns) || columns < 1 || columns > MAX_CAPTURE_COLUMNS || !Number.isSafeInteger(rows) || rows < 1 || rows > MAX_CAPTURE_ROWS || columns * rows > MAX_CAPTURE_CELLS) {
-      const error = new RangeError("ExiEngine captureFrame grid sınırları dışında.");
+      const error = new RangeError("ExiEngine captureFrame is outside the grid bounds.");
       error.code = "EXI_RENDER_OBSERVE_LIMIT";
       throw error;
     }
     if (typeof this.renderer.readRenderTarget !== "function") {
-      const error = new Error("Seçili renderer düşük çözünürlüklü frame readback desteklemiyor.");
+      const error = new Error("The selected renderer does not support low-resolution frame readback.");
       error.code = "EXI_RENDER_OBSERVE_UNAVAILABLE";
       throw error;
     }
@@ -639,10 +639,10 @@ export class ExiEngine {
   }
 
   step(delta) {
-    if (this.destroyed) throw new Error("ExiEngine yok edilmiş.");
+    if (this.destroyed) throw new Error("ExiEngine has been destroyed.");
     this._assertConfiguration();
-    if (this.running) throw new Error("ExiEngine çalışırken step() çağrılamaz.");
-    if (!this.renderer) throw new Error("ExiEngine başlatılmadan önce init() gerekli.");
+    if (this.running) throw new Error("ExiEngine step() cannot be called while running.");
+    if (!this.renderer) throw new Error("ExiEngine requires init() before starting.");
     if (!this.prepared) this.prepare();
     return this._advance(delta, globalThis.performance?.now?.() || 0);
   }
@@ -686,7 +686,7 @@ export class ExiEngine {
   _setLifecycle(state) {
     const known = state === "created" || state === "ready" || state === "running" || state === "paused"
       || state === "visibility-paused" || state === "stopped" || state === "destroyed";
-    if (!known) throw new RangeError(`ExiEngine bilinmeyen yaşam döngüsü durumu: ${String(state)}`);
+    if (!known) throw new RangeError(`ExiEngine unknown lifecycle state: ${String(state)}`);
     this._lifecycleMachine.send(state === "destroyed" ? "stopped" : state);
     return this;
   }
@@ -700,10 +700,10 @@ export class ExiEngine {
 
   start() {
     if (this.running) return this;
-    if (this.destroyed) throw new Error("ExiEngine yok edilmiş.");
+    if (this.destroyed) throw new Error("ExiEngine has been destroyed.");
     this._assertConfiguration();
-    if (!this.renderer) throw new Error("ExiEngine başlatılmadan önce init() gerekli.");
-    if (typeof globalThis.requestAnimationFrame !== "function") throw new Error("ExiEngine start() için requestAnimationFrame gerekli; SSR/Worker ortamında step() kullanın.");
+    if (!this.renderer) throw new Error("ExiEngine requires init() before starting.");
+    if (typeof globalThis.requestAnimationFrame !== "function") throw new Error("ExiEngine start() requires requestAnimationFrame; use step() in SSR/Worker environments.");
     this.prepare();
     this.lastTime = 0;
     this.accumulator = 0;
@@ -736,7 +736,7 @@ export class ExiEngine {
 
   resume() {
     if (!this.paused) return this;
-    if (this.destroyed) throw new Error("ExiEngine yok edilmiş.");
+    if (this.destroyed) throw new Error("ExiEngine has been destroyed.");
     if (this.pauseOnHidden && globalThis.document?.visibilityState === "hidden") {
       this._setLifecycle("visibility-paused");
       return this;
@@ -769,7 +769,7 @@ export class ExiEngine {
       return this;
     }
     const ownsNode = (scene) => scene && (scene === node || typeof scene.isAncestorOf === "function" && scene.isAncestorOf(node));
-    if (!node || node.destroyed || !node.visible || node.focusable !== true || (!ownsNode(this.scene) && !ownsNode(this.overlayScene))) throw new TypeError("ExiEngine focus için görünür ve sahneye bağlı focusable Node gerekli.");
+    if (!node || node.destroyed || !node.visible || node.focusable !== true || (!ownsNode(this.scene) && !ownsNode(this.overlayScene))) throw new TypeError("ExiEngine focus requires a visible, focusable Node attached to the scene.");
     if (this.focusedNode === node) return this;
     this.focus(null);
     this.focusedNode = node;
@@ -840,7 +840,7 @@ export class ExiEngine {
 
   add(...nodes) { return this.scene.add(...nodes); }
   pickPointer(predicate = null, pointerId = null) {
-    if (predicate !== null && typeof predicate !== "function") throw new TypeError("ExiEngine pointer pick predicate fonksiyonu gerekli.");
+    if (predicate !== null && typeof predicate !== "function") throw new TypeError("ExiEngine pointer pick predicate function is required.");
     if (!this.input) return null;
     const pointer = pointerId === null || pointerId === undefined ? this.input.pointer : this.input.getPointer?.(pointerId) || this.input.pointer;
     const sceneInViewport = pointerWithinViewport(this.camera, pointer);

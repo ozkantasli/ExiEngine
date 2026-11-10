@@ -14,16 +14,16 @@ test("particles: emit ve update", () => {
 });
 
 test("particles: limitler ve doğrudan mutasyon", () => {
-  assert.throws(() => new ParticleEmitter({ maxParticles: 100_001 }), /limiti/);
+  assert.throws(() => new ParticleEmitter({ maxParticles: 100_001 }), /limit/);
   const probe = new ParticleEmitter({ maxParticles: 1 });
   probe.particles.length = 2;
-  assert.throws(() => probe.emit(), /limiti/);
-  assert.throws(() => probe.update(0), /limiti/);
-  assert.throws(() => probe.getInstanceItems(null), /limiti/);
-  assert.throws(() => probe.getRenderItems(), /limiti/);
+  assert.throws(() => probe.emit(), /limit/);
+  assert.throws(() => probe.update(0), /limit/);
+  assert.throws(() => probe.getInstanceItems(null), /limit/);
+  assert.throws(() => probe.getRenderItems(), /limit/);
   const capacity = new ParticleEmitter({ maxParticles: 1 });
   capacity.maxParticles = 2;
-  assert.throws(() => capacity.emit(), /limiti/);
+  assert.throws(() => capacity.emit(), /limit/);
 });
 
 test("particles: bounded değerler", () => {

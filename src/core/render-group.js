@@ -8,21 +8,21 @@ const MAX_POST_PROCESS_EFFECTS = 4;
 const MAX_POST_PROCESS_PIXELS = 16 * 1024 * 1024;
 
 function normalizeEffect(effect) {
-  if (!effect || typeof effect !== "object") throw new TypeError("RenderGroup effect nesnesi gerekli.");
+  if (!effect || typeof effect !== "object") throw new TypeError("RenderGroup effect object is required.");
   const filter = normalizeFilterType(effect.filter ?? effect.type);
-  if (filter === "none") throw new TypeError("RenderGroup effect filtresi allowlist içinde olmalı.");
+  if (filter === "none") throw new TypeError("RenderGroup effect filter must be on the allowlist.");
   return Object.freeze({ filter, amount: normalizeFilterAmount(effect.amount ?? effect.filterAmount) });
 }
 
 function validateEffectBudget(width, height, effectCount) {
   const scratchCount = effectCount > 1 ? 2 : effectCount;
-  if (width * height * scratchCount > MAX_POST_PROCESS_PIXELS) throw new RangeError("RenderGroup post-process pixel bütçesi aşıldı.");
+  if (width * height * scratchCount > MAX_POST_PROCESS_PIXELS) throw new RangeError("RenderGroup post-process pixel budget exceeded.");
 }
 
 function normalizeEffects(effects, width, height) {
   if (effects === null || effects === undefined) return Object.freeze([]);
-  if (!Array.isArray(effects)) throw new TypeError("RenderGroup effects bir dizi olmalı.");
-  if (effects.length > MAX_POST_PROCESS_EFFECTS) throw new RangeError(`RenderGroup en fazla ${MAX_POST_PROCESS_EFFECTS} effect destekler.`);
+  if (!Array.isArray(effects)) throw new TypeError("RenderGroup effects must be an array.");
+  if (effects.length > MAX_POST_PROCESS_EFFECTS) throw new RangeError(`RenderGroup supports at most ${MAX_POST_PROCESS_EFFECTS} effects.`);
   validateEffectBudget(width, height, effects.length);
   return Object.freeze(effects.map(normalizeEffect));
 }
@@ -30,12 +30,12 @@ function normalizeEffects(effects, width, height) {
 export class RenderGroup extends Node {
   constructor({ width = 256, height = 256, target = null, camera = null, effects = [], ...options } = {}) {
     super({ name: "render-group", ...options });
-    if (target !== null && !(target instanceof RenderTexture)) throw new TypeError("RenderGroup target RenderTexture olmalı.");
+    if (target !== null && !(target instanceof RenderTexture)) throw new TypeError("RenderGroup target must be a RenderTexture.");
     this.target = target || new RenderTexture({ width, height });
     this.ownsTarget = target === null;
     this.width = this.target.width;
     this.height = this.target.height;
-    if (camera !== null && !(camera instanceof Camera)) throw new TypeError("RenderGroup camera Camera olmalı.");
+    if (camera !== null && !(camera instanceof Camera)) throw new TypeError("RenderGroup camera must be a Camera.");
     this.camera = camera || new Camera({ x: this.width * 0.5, y: this.height * 0.5, width: this.width, height: this.height });
     this.ownsCamera = camera === null;
     this.camera.setViewport(this.width, this.height);

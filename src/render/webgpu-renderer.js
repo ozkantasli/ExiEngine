@@ -163,7 +163,7 @@ function isRenderInputError(error) {
 
 function assertLiveTexture(texture) {
   if (!texture || texture.destroyed || texture.baseTexture?.destroyed) {
-    const error = new TypeError("Canlı Texture gerekli.");
+    const error = new TypeError("A live Texture is required.");
     error.code = "EXI_TEXTURE_INPUT";
     throw error;
   }
@@ -210,8 +210,8 @@ export class WebGPURenderer {
     this.samplers = { linear: null, nearest: null };
     this.textureBinds = new Map();
     this.renderTargets = new Map();
-    if (!Number.isSafeInteger(maxTextureBytes) || maxTextureBytes <= 0 || maxTextureBytes > MAX_TEXTURE_BYTES) throw new RangeError("WebGPU texture byte bütçesi geçersiz.");
-    if (!Number.isSafeInteger(maxTextureCount) || maxTextureCount <= 0 || maxTextureCount > MAX_TEXTURE_COUNT) throw new RangeError("WebGPU texture sayısı bütçesi geçersiz.");
+    if (!Number.isSafeInteger(maxTextureBytes) || maxTextureBytes <= 0 || maxTextureBytes > MAX_TEXTURE_BYTES) throw new RangeError("WebGPU texture byte budget is invalid.");
+    if (!Number.isSafeInteger(maxTextureCount) || maxTextureCount <= 0 || maxTextureCount > MAX_TEXTURE_COUNT) throw new RangeError("WebGPU texture count budget is invalid.");
     this.maxTextureBytes = maxTextureBytes;
     this.maxTextureCount = maxTextureCount;
     this.textureBytes = 0;
@@ -249,7 +249,7 @@ export class WebGPURenderer {
       this.releaseGpuResources();
       const reason = info.message || info.reason || "unknown";
       this.onStatus({ type: "device-lost", backend: "webgpu", reason });
-      const error = new Error(`WebGPU device kaybedildi: ${reason}`);
+      const error = new Error(`WebGPU device lost: ${reason}`);
       error.backend = "webgpu";
       error.recoverable = false;
       error.reason = reason;
@@ -257,28 +257,28 @@ export class WebGPURenderer {
     };
     this.handleUncapturedError = (event) => {
       if (this.destroyed) return;
-      this.onStatus({ type: "device-error", backend: "webgpu", message: event.error?.message || "GPU hatası" });
+      this.onStatus({ type: "device-error", backend: "webgpu", message: event.error?.message || "GPU error" });
     };
   }
 
   async init() {
     try {
-    if (this.destroyed) throw new Error("WebGPU renderer yok edilmiş.");
-    if (!globalThis.navigator?.gpu) throw new Error("WebGPU bu tarayıcıda kullanılamıyor.");
+    if (this.destroyed) throw new Error("WebGPU renderer has been destroyed.");
+    if (!globalThis.navigator?.gpu) throw new Error("WebGPU is not available in this browser.");
     this.adapter = await navigator.gpu.requestAdapter({ powerPreference: "high-performance" });
-    if (this.destroyed) throw new Error("WebGPU renderer yok edilmiş.");
-    if (!this.adapter) throw new Error("WebGPU adapter bulunamadı.");
+    if (this.destroyed) throw new Error("WebGPU renderer has been destroyed.");
+    if (!this.adapter) throw new Error("WebGPU adapter not found.");
     this.device = await this.adapter.requestDevice();
-    if (this.destroyed) throw new Error("WebGPU renderer yok edilmiş.");
+    if (this.destroyed) throw new Error("WebGPU renderer has been destroyed.");
     this.refreshDeviceLimits();
     this.device.addEventListener("uncapturederror", this.handleUncapturedError);
     this.device.lost.then(this.handleDeviceLost);
     this.context = this.canvas.getContext("webgpu");
-    if (!this.context) throw new Error("WebGPU canvas context oluşturulamadı.");
+    if (!this.context) throw new Error("WebGPU canvas context could not be created.");
     this.format = navigator.gpu.getPreferredCanvasFormat();
     this.configure();
     await this.buildResources();
-    if (this.destroyed) throw new Error("WebGPU renderer yok edilmiş.");
+    if (this.destroyed) throw new Error("WebGPU renderer has been destroyed.");
     this.onStatus({ type: "backend-ready", backend: "webgpu" });
     } catch (error) {
       this.destroy();
@@ -374,7 +374,7 @@ export class WebGPURenderer {
     this.sampler = this.samplers.linear;
     const error = await this.device.popErrorScope();
     errorScopeOpen = false;
-    if (error) throw new Error(`WebGPU pipeline doğrulanamadı: ${error.message}`);
+    if (error) throw new Error(`WebGPU pipeline validation failed: ${error.message}`);
     } catch (error) {
       if (errorScopeOpen) {
         try { await this.device.popErrorScope(); } catch {}
@@ -428,7 +428,7 @@ export class WebGPURenderer {
     if (bytes > this.maxVertexBufferBytes) throw new RangeError("WebGPU vertex buffer device limit exceeded.");
     const size = Math.min(this.maxVertexBufferBytes, Math.max(4096, 2 ** Math.ceil(Math.log2(bytes))));
     if (size > this.maxVertexBufferBytes) throw new RangeError("WebGPU vertex buffer device limit exceeded.");
-    if (size < bytes) throw new Error("WebGPU batch buffer limiti aşıldı.");
+    if (size < bytes) throw new Error("WebGPU batch buffer limit exceeded.");
     const nextBuffer = this.device.createBuffer({ size, usage: bufferUsage.VERTEX | bufferUsage.COPY_DST });
     this.vertexBuffer?.destroy();
     this.vertexBuffer = nextBuffer;
@@ -440,11 +440,11 @@ export class WebGPURenderer {
     this.assertResourceBudget();
     if (!Number.isSafeInteger(bytes) || bytes < 0) throw new RangeError("WebGPU instanced batch device limit exceeded.");
     if (bytes <= this.instanceBufferSize) return;
-    if (bytes > MAX_INSTANCE_BUFFER_BYTES) throw new RangeError("WebGPU instanced batch buffer limiti aşıldı.");
+    if (bytes > MAX_INSTANCE_BUFFER_BYTES) throw new RangeError("WebGPU instanced batch buffer limit exceeded.");
     if (bytes > this.maxInstanceBufferBytes) throw new RangeError("WebGPU instanced batch device limit exceeded.");
     const size = Math.min(this.maxInstanceBufferBytes, Math.max(4096, 2 ** Math.ceil(Math.log2(bytes))));
     if (size > this.maxInstanceBufferBytes) throw new RangeError("WebGPU instanced batch device limit exceeded.");
-    if (size < bytes) throw new Error("WebGPU instanced batch buffer limiti aşıldı.");
+    if (size < bytes) throw new Error("WebGPU instanced batch buffer limit exceeded.");
     const nextBuffer = this.device.createBuffer({ size, usage: bufferUsage.VERTEX | bufferUsage.COPY_DST });
     this.instanceBuffer?.destroy();
     this.instanceBuffer = nextBuffer;
@@ -454,14 +454,14 @@ export class WebGPURenderer {
 
   ensureFilterBuffer(batchCount) {
     this.assertResourceBudget();
-    if (!Number.isSafeInteger(batchCount) || batchCount < 0) throw new RangeError("WebGPU filter batch sayısı geçersiz.");
+    if (!Number.isSafeInteger(batchCount) || batchCount < 0) throw new RangeError("WebGPU filter batch count is invalid.");
     const required = batchCount * FILTER_UNIFORM_STRIDE;
     if (required === 0) return;
     const maxBytes = Math.min(MAX_FILTER_BUFFER_BYTES, this.maxBufferSize);
-    if (!Number.isSafeInteger(required) || required > maxBytes) throw new RangeError("WebGPU filter buffer limiti aşıldı.");
+    if (!Number.isSafeInteger(required) || required > maxBytes) throw new RangeError("WebGPU filter buffer limit exceeded.");
     if (required <= this.filterBufferSize && this.filterBindGroup) return;
     const size = Math.min(maxBytes, Math.max(FILTER_UNIFORM_STRIDE, 2 ** Math.ceil(Math.log2(required))));
-    if (size < required) throw new RangeError("WebGPU filter buffer limiti aşıldı.");
+    if (size < required) throw new RangeError("WebGPU filter buffer limit exceeded.");
     let nextBuffer = null;
     let nextBindGroup = null;
     try {
@@ -532,7 +532,7 @@ export class WebGPURenderer {
 
   ensureGpuCullResources(batch) {
     this.assertResourceBudget();
-    if (!Number.isSafeInteger(batch.instanceCount) || batch.instanceCount <= 0) throw new RangeError("WebGPU GPU culling instance sayısı geçersiz.");
+    if (!Number.isSafeInteger(batch.instanceCount) || batch.instanceCount <= 0) throw new RangeError("WebGPU GPU culling instance count is invalid.");
     const owner = batch.gpuOwner || batch;
     if (!(batch.instanceData instanceof Float32Array)) throw new TypeError("WebGPU GPU culling instance data must be Float32Array.");
     const sourceStride = batch.instanceStride === undefined ? GPU_SOURCE_STRIDE / Float32Array.BYTES_PER_ELEMENT : batch.instanceStride;
@@ -547,14 +547,14 @@ export class WebGPURenderer {
     if (!resource) {
       resource = { input: null, output: null, counter: null, arguments: null, params: null, inputSize: 0, outputSize: 0, cullBindGroup: null, indirectBindGroup: null };
     }
-    if (sourceBytes !== batch.instanceData.byteLength) throw new RangeError("WebGPU GPU culling instance stride geçersiz.");
-    if (sourceBytes > this.maxGpuCullBufferBytes || outputBytes > this.maxGpuCullBufferBytes) throw new RangeError("WebGPU GPU culling device limiti aşıldı.");
+    if (sourceBytes !== batch.instanceData.byteLength) throw new RangeError("WebGPU GPU culling instance stride is invalid.");
+    if (sourceBytes > this.maxGpuCullBufferBytes || outputBytes > this.maxGpuCullBufferBytes) throw new RangeError("WebGPU GPU culling device limit exceeded.");
     const needsNewBuffers = sourceBytes > resource.inputSize || outputBytes > resource.outputSize;
     const inputSize = needsNewBuffers ? Math.min(this.maxGpuCullBufferBytes, Math.max(4096, 2 ** Math.ceil(Math.log2(sourceBytes)))) : resource.inputSize;
     const outputSize = needsNewBuffers ? Math.min(this.maxGpuCullBufferBytes, Math.max(4096, 2 ** Math.ceil(Math.log2(outputBytes)))) : resource.outputSize;
     if (inputSize < sourceBytes || outputSize < outputBytes) throw new RangeError("WebGPU GPU culling device limit exceeded.");
     const projectedBytes = this.gpuCullBytes - resource.inputSize - resource.outputSize + inputSize + outputSize;
-    if (projectedBytes > this.maxGpuCullMemoryBytes) throw new RangeError("WebGPU toplam GPU culling bellek limiti aşıldı.");
+    if (projectedBytes > this.maxGpuCullMemoryBytes) throw new RangeError("WebGPU total GPU culling memory limit exceeded.");
     const previousInput = resource.input;
     const previousOutput = resource.output;
     const previousCounter = resource.counter;
@@ -643,7 +643,7 @@ export class WebGPURenderer {
     if (!entry.buffer || bytes > entry.size) {
       const size = Math.min(this.maxVertexBufferBytes, Math.max(4096, 2 ** Math.ceil(Math.log2(bytes))));
       if (size > this.maxVertexBufferBytes) throw new RangeError("WebGPU static batch buffer device limit exceeded.");
-      if (size < bytes) throw new Error("WebGPU static batch buffer limiti aşıldı.");
+      if (size < bytes) throw new Error("WebGPU static batch buffer limit exceeded.");
       let nextBuffer = null;
       try {
         nextBuffer = this.device.createBuffer({ size, usage: bufferUsage.VERTEX | bufferUsage.COPY_DST });
@@ -678,7 +678,7 @@ export class WebGPURenderer {
     const width = Number(baseTexture.sourceWidth); const height = Number(baseTexture.sourceHeight);
     const maxSize = Number(this.device.limits?.maxTextureDimension2D) || Infinity;
     if (baseTexture.source && (Number(baseTexture.source.width) !== width || Number(baseTexture.source.height) !== height)) throw new RangeError("WebGPU texture source size mismatch.");
-    if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width <= 0 || height <= 0 || width > maxSize || height > maxSize || width * height > this.maxTexturePixels) throw new RangeError("WebGPU texture boyutu/pixel limiti aşıldı.");
+    if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width <= 0 || height <= 0 || width > maxSize || height > maxSize || width * height > this.maxTexturePixels) throw new RangeError("WebGPU texture size/pixel limit exceeded.");
     const hasSource = Boolean(baseTexture.source);
     const allocationBytes = hasSource ? width * height * 4 : 4;
     this.assertTextureBudget(allocationBytes);
@@ -730,7 +730,7 @@ export class WebGPURenderer {
     const projectedBytes = this.textureBytes - replaceBytes + addBytes;
     const projectedCount = this.textureBinds.size - replaceCount + 1;
     if (!Number.isSafeInteger(projectedBytes) || projectedBytes > this.maxTextureBytes || projectedCount > this.maxTextureCount) {
-      const error = new RangeError("WebGPU toplam texture bütçesi aşıldı.");
+      const error = new RangeError("WebGPU total texture budget exceeded.");
       error.code = "EXI_TEXTURE_BUDGET";
       throw error;
     }
@@ -739,14 +739,14 @@ export class WebGPURenderer {
   ensureRenderTarget(target) {
     this.assertResourceBudget();
     if (!target?.renderTarget || target.destroyed) {
-      const error = new TypeError("Geçerli bir RenderTexture gerekli.");
+      const error = new TypeError("A valid RenderTexture is required.");
       error.code = "EXI_RENDER_TARGET_INPUT";
       throw error;
     }
     const width = Number(target.width); const height = Number(target.height);
     const maxSize = Number(this.device?.limits?.maxTextureDimension2D) || Infinity;
     if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width <= 0 || height <= 0 || width > maxSize || height > maxSize || width * height > this.maxTexturePixels) {
-      const error = new RangeError("WebGPU RenderTexture boyutu/pixel limiti aşıldı.");
+      const error = new RangeError("WebGPU RenderTexture size/pixel limit exceeded.");
       error.code = "EXI_RENDER_TARGET_INPUT";
       throw error;
     }
@@ -839,7 +839,7 @@ export class WebGPURenderer {
       this.pruneGpuCullResources();
       const queue = buildRenderBatches(scene, camera, renderWidth, renderHeight, { gpuCulling: true, state: this.batchState, offscreenRoot });
       if (target && queue.batches.some((batch) => batch.texture === target || batch.maskTexture === target)) {
-        const error = new Error("RenderTexture aynı render pass içinde örneklenemez (feedback loop).");
+        const error = new Error("RenderTexture cannot be sampled in the same render pass (feedback loop).");
         error.code = "EXI_RENDER_TEXTURE_FEEDBACK";
         throw error;
       }
@@ -952,7 +952,7 @@ export class WebGPURenderer {
   }
 
   async readRenderTarget(target) {
-    if (this.destroyed || this.lost || !this.device) throw new Error("WebGPU readback kullanılamıyor.");
+    if (this.destroyed || this.lost || !this.device) throw new Error("WebGPU readback is not available.");
     const entry = this.ensureRenderTarget(target);
     const bytesPerRow = Math.ceil((entry.width * 4) / 256) * 256;
     const size = bytesPerRow * entry.height;
@@ -1018,7 +1018,7 @@ export class WebGPURenderer {
         this.maxGpuCullMemoryBytes !== snapshot.maxGpuCullMemoryBytes
       ))
     ) {
-      const error = new RangeError("WebGPU GPU bütçe ayarları doğrudan değiştirilemez.");
+      const error = new RangeError("WebGPU GPU budget settings cannot be changed directly.");
       error.code = "EXI_RENDER_CONFIG";
       throw error;
     }

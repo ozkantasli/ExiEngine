@@ -37,8 +37,8 @@ test("tilemap: temel setTile/getTile/getFrame", () => {
   assert.equal(uneven.getFrame(1).u0, 0.4);
   assert.equal(uneven.getFrame(2).u0, 0);
   assert.equal(uneven.getFrame(2).v0, 0.5);
-  assert.throws(() => uneven.getFrame(4), /sınır/);
-  assert.throws(() => new TileMap({ texture: Texture.white, tileWidth: 1, tileHeight: 1, columns: 1000, rows: 501 }), /limiti/);
+  assert.throws(() => uneven.getFrame(4), /bound|limit/);
+  assert.throws(() => new TileMap({ texture: Texture.white, tileWidth: 1, tileHeight: 1, columns: 1000, rows: 501 }), /limit/);
 });
 
 test("tilemap: flip flag ve setTile seçenekleri", () => {
@@ -49,7 +49,7 @@ test("tilemap: flip flag ve setTile seçenekleri", () => {
   assert.equal(map.tileFlags[1], 3);
   map.setTile(1, 0, 1);
   assert.equal(map.tileFlags[1], 0);
-  assert.throws(() => map.setTile(0, 0, 0, null), /seçenek/);
+  assert.throws(() => map.setTile(0, 0, 0, null), /options/);
   assert.throws(() => map.setTile(0, 0, 99), /index/);
 });
 
@@ -99,9 +99,9 @@ test("tilemap: setRegion atomik ve culling", () => {
   assert.equal(map.getTile(1, 1), 0);
   assert.equal(map.getTile(2, 1), 1);
   const snapshot = map.tiles.slice();
-  assert.throws(() => map.setRegion(1, 1, 2, 2, [0, 1, 99, 0]), /sınır/);
+  assert.throws(() => map.setRegion(1, 1, 2, 2, [0, 1, 99, 0]), /bound|limit/);
   assert.deepEqual(map.tiles, snapshot);
-  assert.throws(() => map.setRegion(3, 3, 2, 2, [0, 0, 0, 0]), /sınır/);
+  assert.throws(() => map.setRegion(3, 3, 2, 2, [0, 0, 0, 0]), /bound|limit/);
 
   const culled = new TileMap({ texture: new Texture({ sourceWidth: 16, sourceHeight: 16 }), tileWidth: 16, tileHeight: 16, columns: 100, rows: 100, gpuCulling: false });
   culled.setTiles(new Int32Array(100 * 100).fill(0));

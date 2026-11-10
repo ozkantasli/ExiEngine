@@ -54,38 +54,38 @@ function normalizeRumbleMagnitude(value) {
 
 function normalizeInjectionOptions(value) {
   if (value === undefined) return {};
-  if (!value || typeof value !== "object" || Array.isArray(value)) throw new TypeError("Input injection options nesne olmalı.");
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new TypeError("Input injection options must be an object.");
   return value;
 }
 
 function normalizeInjectionKey(code, options = {}) {
   const normalizedCode = normalizeKeyCode(code);
   const key = options.key === undefined ? normalizedCode : options.key;
-  if (typeof key !== "string" || key.length === 0 || key.length > MAX_KEY_CODE_LENGTH) throw new TypeError("Injected keyboard key 1-64 karakter olmalı.");
+  if (typeof key !== "string" || key.length === 0 || key.length > MAX_KEY_CODE_LENGTH) throw new TypeError("Injected keyboard key must be 1-64 characters.");
   for (const property of ["repeat", "shiftKey", "ctrlKey", "altKey", "metaKey"]) {
-    if (options[property] !== undefined && typeof options[property] !== "boolean") throw new TypeError(`Injected keyboard ${property} boolean olmalı.`);
+    if (options[property] !== undefined && typeof options[property] !== "boolean") throw new TypeError(`Injected keyboard ${property} must be a boolean.`);
   }
   return { type: "keydown", code: normalizedCode, key, repeat: options.repeat === true, shiftKey: options.shiftKey === true, ctrlKey: options.ctrlKey === true, altKey: options.altKey === true, metaKey: options.metaKey === true };
 }
 
 function normalizeInjectionPointer(type, options = {}) {
-  if (!["pointermove", "pointerdown", "pointerup", "pointercancel", "wheel"].includes(type)) throw new TypeError("Injected pointer event type geçersiz.");
+  if (!["pointermove", "pointerdown", "pointerup", "pointercancel", "wheel"].includes(type)) throw new TypeError("Injected pointer event type is invalid.");
   const readNumber = (property, fallback, limit = MAX_INJECT_COORDINATE) => {
     const value = options[property] === undefined ? fallback : options[property];
-    if (typeof value !== "number" || !Number.isFinite(value) || Math.abs(value) > limit) throw new RangeError(`Injected pointer ${property} sınırında olmalı.`);
+    if (typeof value !== "number" || !Number.isFinite(value) || Math.abs(value) > limit) throw new RangeError(`Injected pointer ${property} must be within bounds.`);
     return value;
   };
   const pointerId = options.pointerId === undefined ? 0 : options.pointerId;
-  if (!Number.isSafeInteger(pointerId) || pointerId < 0 || pointerId > 0x7fffffff) throw new RangeError("Injected pointerId sınırında olmalı.");
+  if (!Number.isSafeInteger(pointerId) || pointerId < 0 || pointerId > 0x7fffffff) throw new RangeError("Injected pointerId must be within bounds.");
   const button = options.button === undefined ? 0 : options.button;
-  if (!Number.isSafeInteger(button) || button < -1 || button > 30) throw new RangeError("Injected pointer button sınırında olmalı.");
+  if (!Number.isSafeInteger(button) || button < -1 || button > 30) throw new RangeError("Injected pointer button must be within bounds.");
   const pointerType = options.pointerType === undefined ? "mouse" : options.pointerType;
-  if (typeof pointerType !== "string" || pointerType.length === 0 || pointerType.length > 32) throw new TypeError("Injected pointerType geçersiz.");
+  if (typeof pointerType !== "string" || pointerType.length === 0 || pointerType.length > 32) throw new TypeError("Injected pointerType is invalid.");
   return { type, clientX: readNumber("x", 0), clientY: readNumber("y", 0), pointerId, pointerType, button, deltaX: readNumber("deltaX", 0), deltaY: readNumber("deltaY", 0) };
 }
 
 function normalizeInjectionEvent(event) {
-  if (!event || typeof event !== "object" || Array.isArray(event)) throw new TypeError("Input injection event nesne olmalı.");
+  if (!event || typeof event !== "object" || Array.isArray(event)) throw new TypeError("Input injection event must be an object.");
   const options = normalizeInjectionOptions(event);
   if (event.type === "keydown") return normalizeInjectionKey(event.code, options);
   if (event.type === "keyup") return { type: "keyup", code: normalizeKeyCode(event.code) };
@@ -127,12 +127,12 @@ function normalizeAxisBinding(binding) {
 
 function normalizeBindingMap(source, normalizer, label) {
   if (source === null || source === undefined) return new Map();
-  if (!source || typeof source !== "object" || Array.isArray(source)) throw new TypeError(`Input ${label} map nesne olmalı.`);
+  if (!source || typeof source !== "object" || Array.isArray(source)) throw new TypeError(`Input ${label} map must be an object.`);
   const result = new Map();
   for (const name of Object.keys(source)) {
     const normalizedName = normalizeActionName(name);
     const bindings = Array.isArray(source[name]) ? source[name] : [source[name]];
-    if (bindings.length === 0 || bindings.length > MAX_ACTION_BINDINGS) throw new RangeError(`Bir ${label} en fazla ${MAX_ACTION_BINDINGS} binding alabilir.`);
+    if (bindings.length === 0 || bindings.length > MAX_ACTION_BINDINGS) throw new RangeError(`A ${label} can take at most ${MAX_ACTION_BINDINGS} bindings.`);
     const normalized = new Array(bindings.length);
     for (let index = 0; index < bindings.length; index += 1) normalized[index] = normalizer(bindings[index]);
     result.set(normalizedName, normalized);
@@ -141,7 +141,7 @@ function normalizeBindingMap(source, normalizer, label) {
 }
 
 function assertBindingList(bindings, label) {
-  if (!Array.isArray(bindings) || bindings.length === 0 || bindings.length > MAX_ACTION_BINDINGS) throw new RangeError(`Bir ${label} en fazla ${MAX_ACTION_BINDINGS} binding alabilir.`);
+  if (!Array.isArray(bindings) || bindings.length === 0 || bindings.length > MAX_ACTION_BINDINGS) throw new RangeError(`A ${label} can take at most ${MAX_ACTION_BINDINGS} bindings.`);
 }
 
 function copyBindingMap(source, label) {
@@ -151,16 +151,16 @@ function copyBindingMap(source, label) {
 }
 
 function assertBindingCollections(actions, axes) {
-  if (!(actions instanceof Map) || !(axes instanceof Map) || actions.size + axes.size > MAX_ACTIONS) throw new RangeError(`En fazla ${MAX_ACTIONS} Input action/axis desteklenir.`);
+  if (!(actions instanceof Map) || !(axes instanceof Map) || actions.size + axes.size > MAX_ACTIONS) throw new RangeError(`At most ${MAX_ACTIONS} Input actions/axes are supported.`);
 }
 
 function assertInputCollections(input) {
-  if (!(input.keys instanceof Set) || !(input.pressedKeys instanceof Set) || !(input.releasedKeys instanceof Set) || input.keys.size > MAX_KEYS || input.pressedKeys.size > MAX_KEYS || input.releasedKeys.size > MAX_KEYS) throw new RangeError(`Input keyboard state limiti ${MAX_KEYS}.`);
-  if (!(input.pointers instanceof Map) || input.pointers.size > MAX_POINTERS) throw new RangeError(`Input pointer limiti ${MAX_POINTERS}.`);
-  if (!(input.gamepads instanceof Map) || input.gamepads.size > MAX_GAMEPAD_INDEX + 1) throw new RangeError(`Input gamepad limiti ${MAX_GAMEPAD_INDEX + 1}.`);
+  if (!(input.keys instanceof Set) || !(input.pressedKeys instanceof Set) || !(input.releasedKeys instanceof Set) || input.keys.size > MAX_KEYS || input.pressedKeys.size > MAX_KEYS || input.releasedKeys.size > MAX_KEYS) throw new RangeError(`Input keyboard state limit is ${MAX_KEYS}.`);
+  if (!(input.pointers instanceof Map) || input.pointers.size > MAX_POINTERS) throw new RangeError(`Input pointer limit is ${MAX_POINTERS}.`);
+  if (!(input.gamepads instanceof Map) || input.gamepads.size > MAX_GAMEPAD_INDEX + 1) throw new RangeError(`Input gamepad limit is ${MAX_GAMEPAD_INDEX + 1}.`);
   for (const [index, state] of input.gamepads) {
-    if (!Number.isSafeInteger(index) || index < 0 || index > MAX_GAMEPAD_INDEX) throw new RangeError(`Input gamepad index limiti ${MAX_GAMEPAD_INDEX}.`);
-    if (!state || !Array.isArray(state.axes) || !Array.isArray(state.buttons) || !Array.isArray(state.pressed) || !Array.isArray(state.released) || state.axes.length > MAX_GAMEPAD_AXES || state.buttons.length > MAX_GAMEPAD_BUTTONS || state.pressed.length > MAX_GAMEPAD_BUTTONS || state.released.length > MAX_GAMEPAD_BUTTONS) throw new RangeError("Input gamepad snapshot limiti aşıldı.");
+    if (!Number.isSafeInteger(index) || index < 0 || index > MAX_GAMEPAD_INDEX) throw new RangeError(`Input gamepad index limit is ${MAX_GAMEPAD_INDEX}.`);
+    if (!state || !Array.isArray(state.axes) || !Array.isArray(state.buttons) || !Array.isArray(state.pressed) || !Array.isArray(state.released) || state.axes.length > MAX_GAMEPAD_AXES || state.buttons.length > MAX_GAMEPAD_BUTTONS || state.pressed.length > MAX_GAMEPAD_BUTTONS || state.released.length > MAX_GAMEPAD_BUTTONS) throw new RangeError("Input gamepad snapshot limit exceeded.");
   }
   assertBindingCollections(input.actions, input.axes);
 }
@@ -168,7 +168,7 @@ function assertInputCollections(input) {
 export class Input {
   constructor(canvas, { actions = null, axes = null, onKeyDown = null, onGamepadConnected = null, onGamepadDisconnected = null } = {}) {
     this.canvas = canvas;
-    if ([onKeyDown, onGamepadConnected, onGamepadDisconnected].some((callback) => callback !== null && typeof callback !== "function")) throw new TypeError("Input callback fonksiyonu gerekli.");
+    if ([onKeyDown, onGamepadConnected, onGamepadDisconnected].some((callback) => callback !== null && typeof callback !== "function")) throw new TypeError("Input callback function is required.");
     this.onKeyDown = onKeyDown;
     this.onGamepadConnected = onGamepadConnected;
     this.onGamepadDisconnected = onGamepadDisconnected;
@@ -318,7 +318,7 @@ export class Input {
       state.wheelY += Number.isFinite(event.deltaY) ? event.deltaY : 0;
     };
     this.clearTransientState = () => {
-      if (!(this.keys instanceof Set) || !(this.pressedKeys instanceof Set) || !(this.releasedKeys instanceof Set)) throw new TypeError("Input keyboard state koleksiyonu geçersiz.");
+      if (!(this.keys instanceof Set) || !(this.pressedKeys instanceof Set) || !(this.releasedKeys instanceof Set)) throw new TypeError("Input keyboard state collection is invalid.");
       if (this.keys.size > MAX_KEYS || this.pressedKeys.size > MAX_KEYS || this.releasedKeys.size > MAX_KEYS) {
         this.keys.clear();
         this.pressedKeys.clear();
@@ -389,7 +389,7 @@ export class Input {
   }
 
   inject(events) {
-    if (!Array.isArray(events) || events.length > MAX_INJECT_EVENTS) throw new RangeError(`Input injection en fazla ${MAX_INJECT_EVENTS} event alabilir.`);
+    if (!Array.isArray(events) || events.length > MAX_INJECT_EVENTS) throw new RangeError(`Input injection can take at most ${MAX_INJECT_EVENTS} events.`);
     const normalized = events.map(normalizeInjectionEvent);
     for (const event of normalized) {
       if (event.type === "keydown") this.injectKeyDown(event.code, event);
@@ -401,10 +401,10 @@ export class Input {
 
   bindAction(name, bindings) {
     const actionName = normalizeActionName(name);
-    if (this.axes.has(actionName)) throw new Error(`Input action/axis adı zaten kullanılıyor: ${actionName}`);
-    if (!this.actions.has(actionName) && this.actions.size + this.axes.size >= MAX_ACTIONS) throw new RangeError(`En fazla ${MAX_ACTIONS} Input action/axis desteklenir.`);
+    if (this.axes.has(actionName)) throw new Error(`Input action/axis name is already in use: ${actionName}`);
+    if (!this.actions.has(actionName) && this.actions.size + this.axes.size >= MAX_ACTIONS) throw new RangeError(`At most ${MAX_ACTIONS} Input actions/axes are supported.`);
     const source = Array.isArray(bindings) ? bindings : [bindings];
-    if (source.length === 0 || source.length > MAX_ACTION_BINDINGS) throw new RangeError(`Bir action en fazla ${MAX_ACTION_BINDINGS} binding alabilir.`);
+    if (source.length === 0 || source.length > MAX_ACTION_BINDINGS) throw new RangeError(`An action can take at most ${MAX_ACTION_BINDINGS} bindings.`);
     const normalized = new Array(source.length);
     for (let index = 0; index < source.length; index += 1) normalized[index] = normalizeActionBinding(source[index]);
     this.actions.set(actionName, normalized);
@@ -414,10 +414,10 @@ export class Input {
   unbindAction(name) { return this.actions.delete(String(name)); }
   bindAxis(name, bindings) {
     const axisName = normalizeActionName(name);
-    if (this.actions.has(axisName)) throw new Error(`Input action/axis adı zaten kullanılıyor: ${axisName}`);
-    if (!this.axes.has(axisName) && this.actions.size + this.axes.size >= MAX_ACTIONS) throw new RangeError(`En fazla ${MAX_ACTIONS} Input action/axis desteklenir.`);
+    if (this.actions.has(axisName)) throw new Error(`Input action/axis name is already in use: ${axisName}`);
+    if (!this.axes.has(axisName) && this.actions.size + this.axes.size >= MAX_ACTIONS) throw new RangeError(`At most ${MAX_ACTIONS} Input actions/axes are supported.`);
     const source = Array.isArray(bindings) ? bindings : [bindings];
-    if (source.length === 0 || source.length > MAX_ACTION_BINDINGS) throw new RangeError(`Bir axis en fazla ${MAX_ACTION_BINDINGS} binding alabilir.`);
+    if (source.length === 0 || source.length > MAX_ACTION_BINDINGS) throw new RangeError(`An axis can take at most ${MAX_ACTION_BINDINGS} bindings.`);
     const normalized = new Array(source.length);
     for (let index = 0; index < source.length; index += 1) normalized[index] = normalizeAxisBinding(source[index]);
     this.axes.set(axisName, normalized);
@@ -434,8 +434,8 @@ export class Input {
   setBindings({ actions = null, axes = null } = {}) {
     const nextActions = normalizeBindingMap(actions, normalizeActionBinding, "action");
     const nextAxes = normalizeBindingMap(axes, normalizeAxisBinding, "axis");
-    for (const name of nextActions.keys()) if (nextAxes.has(name)) throw new Error(`Input action/axis adı zaten kullanılıyor: ${name}`);
-    if (nextActions.size + nextAxes.size > MAX_ACTIONS) throw new RangeError(`En fazla ${MAX_ACTIONS} Input action/axis desteklenir.`);
+    for (const name of nextActions.keys()) if (nextAxes.has(name)) throw new Error(`Input action/axis name is already in use: ${name}`);
+    if (nextActions.size + nextAxes.size > MAX_ACTIONS) throw new RangeError(`At most ${MAX_ACTIONS} Input actions/axes are supported.`);
     this.actions.clear();
     this.axes.clear();
     for (const [name, bindings] of nextActions) this.actions.set(name, bindings);
@@ -504,7 +504,7 @@ export class Input {
   getPointer(pointerId) { return this.pointers.get(pointerId) || null; }
   getPointers() { assertInputCollections(this); return this.pointers; }
   getPointerWorld(camera, out = this.pointerWorld, pointerId = this.activePointerId) {
-    if (!camera || typeof camera.screenToWorld !== "function") throw new TypeError("Input world pointer için Camera gerekli.");
+    if (!camera || typeof camera.screenToWorld !== "function") throw new TypeError("Input world pointer requires a Camera.");
     const state = pointerId === null || pointerId === undefined ? this.pointer : (this.pointers.get(pointerId) || this.pointer);
     return camera.screenToWorld(state.x, state.y, out);
   }

@@ -51,12 +51,12 @@ test("spriteBatch: markDirty, addSprites, removeSprite, setFrame", () => {
 test("spriteBatch: kapasite limitleri", () => {
   const capped = new SpriteBatch({ texture: Texture.white });
   capped.sprites.length = 100_000;
-  assert.throws(() => capped.addSprite(), /limiti/);
+  assert.throws(() => capped.addSprite(), /limit/);
   const direct = new SpriteBatch({ texture: Texture.white });
   direct.sprites.length = 100_001;
-  assert.throws(() => direct.getRenderItems(), /limiti/);
-  assert.throws(() => direct.getInstanceItems(null, 320, 180), /limiti/);
-  assert.throws(() => direct.getLocalBounds(), /limiti/);
+  assert.throws(() => direct.getRenderItems(), /limit/);
+  assert.throws(() => direct.getInstanceItems(null, 320, 180), /limit/);
+  assert.throws(() => direct.getLocalBounds(), /limit/);
 });
 
 test("spriteBatch: spatial culling ve chunk", () => {

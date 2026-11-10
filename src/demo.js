@@ -96,8 +96,8 @@ function handleStatus(event) {
   runtimeNode.dataset.event = event.type;
   if (event.type === "backend-selected") backendNode.textContent = event.backend.toUpperCase();
   if (event.type === "fallback") showStatus(`Fallback: ${event.to.toUpperCase()}`, "warn");
-  if (event.type === "context-lost" || event.type === "device-lost") showStatus("GPU bağlantısı kaybedildi; fallback deneniyor.", "warn");
-  if (event.type === "renderer-error") showStatus(`Renderer hatası: ${event.message}`, "error");
+  if (event.type === "context-lost" || event.type === "device-lost") showStatus("GPU connection lost; trying fallback.", "warn");
+  if (event.type === "renderer-error") showStatus(`Renderer error: ${event.message}`, "error");
 }
 
 function update(delta, currentEngine) {
@@ -111,7 +111,7 @@ function update(delta, currentEngine) {
   scene.updateWorldMatrix();
   const hit = collisions.firstHit(getAABB(cursor));
   cursor.setTint(hit ? 0xffcf70 : 0x6fffc0);
-  messageNode.textContent = hit ? "Çarpışma algılandı · Space ile zoom" : "Ok tuşlarıyla hareket · Space ile zoom";
+  messageNode.textContent = hit ? "Collision detected · Space to zoom" : "Move with arrow keys · Space to zoom";
 }
 
 function render(currentEngine) {
@@ -140,19 +140,19 @@ async function boot(preference = "auto") {
   canvas.width = previousCanvas.width;
   canvas.height = previousCanvas.height;
   previousCanvas.parentNode.replaceChild(canvas, previousCanvas);
-  backendNode.textContent = "YÜKLENİYOR";
-  showStatus(`${preference.toUpperCase()} başlatılıyor…`);
+  backendNode.textContent = "LOADING";
+  showStatus(`Starting ${preference.toUpperCase()}…`);
   try {
     engine = await ExiEngine.create({ canvas, renderer: preference, scene, camera, onStatus: handleStatus, onUpdate: update, onRender: render });
     engine.start();
     runtimeAgent = new RuntimeAgent({ api: Exi, roots: { engine, scene }, callbacks: runtimeCallbacks, observe: createEngineObserver(engine), token: runtimeToken });
     runtimeAgent.start();
     window.game = { engine, scene, runtimeAgent };
-    showStatus("Çalışıyor", "ok");
+    showStatus("Running", "ok");
   } catch (error) {
     backendNode.textContent = "KULLANILAMIYOR";
     showStatus(error.message, "error");
-    messageNode.textContent = "Bu cihazda seçilen backend yok; Auto seçeneğini deneyin.";
+    messageNode.textContent = "The selected backend is not available on this device; try Auto.";
   }
 }
 

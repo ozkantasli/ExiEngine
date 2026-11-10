@@ -44,8 +44,8 @@ test("webgl2: vertex/instance buffer büyüme, limitler, atomic-fail", () => {
   probe.ensureVertexBuffer(128);
   probe.ensureVertexBuffer(4096);
   probe.ensureVertexBuffer(4097);
-  assert.throws(() => probe.ensureVertexBuffer(64 * 1024 * 1024 + 1), /limiti/);
-  assert.throws(() => probe.ensureVertexBuffer(Infinity), /limiti/);
+  assert.throws(() => probe.ensureVertexBuffer(64 * 1024 * 1024 + 1), /limit/);
+  assert.throws(() => probe.ensureVertexBuffer(Infinity), /limit/);
   assert.deepEqual(calls.map((call) => call[1]), [4096, 8192]);
   const info = probe.getInfo();
   assert.equal(probe.getInfo(), info);
@@ -53,7 +53,7 @@ test("webgl2: vertex/instance buffer büyüme, limitler, atomic-fail", () => {
   assert.equal(info.vertexBufferResizes, 2);
   probe.ensureInstanceBuffer(128);
   assert.equal(probe.getInfo().instanceBufferResizes, 1);
-  assert.throws(() => probe.ensureInstanceBuffer(NaN), /limiti/);
+  assert.throws(() => probe.ensureInstanceBuffer(NaN), /limit/);
 
   // Atomic-fail: başarısız tahsiste mevcut buffer korunur + delete edilir
   let failBufferData = false;

@@ -9,11 +9,11 @@ const MAX_SCENE_DEPTH = 1_024;
 
 function beginTraversal(node, stamp = 0, depth = 0) {
   const safeDepth = Number.isSafeInteger(depth) && depth >= 0 ? depth : 0;
-  if (safeDepth > MAX_SCENE_DEPTH) throw new RangeError(`Scene graph derinlik limiti ${MAX_SCENE_DEPTH}.`);
-  if (!Array.isArray(node.children) || node.children.length > MAX_SCENE_CHILDREN) throw new RangeError(`Bir Node en fazla ${MAX_SCENE_CHILDREN} child taşıyabilir.`);
+  if (safeDepth > MAX_SCENE_DEPTH) throw new RangeError(`Scene graph depth limit is ${MAX_SCENE_DEPTH}.`);
+  if (!Array.isArray(node.children) || node.children.length > MAX_SCENE_CHILDREN) throw new RangeError(`A Node can have at most ${MAX_SCENE_CHILDREN} children.`);
   const traversalStamp = stamp || nextTraversalStamp;
   if (!stamp) nextTraversalStamp = nextTraversalStamp >= Number.MAX_SAFE_INTEGER - 1 ? 1 : nextTraversalStamp + 1;
-  if (node._lastTraversalStamp === traversalStamp) throw new Error("Scene graph cycle veya duplicate child algılandı.");
+  if (node._lastTraversalStamp === traversalStamp) throw new Error("Scene graph cycle or duplicate child detected.");
   node._lastTraversalStamp = traversalStamp;
   return traversalStamp;
 }
@@ -21,9 +21,9 @@ function beginTraversal(node, stamp = 0, depth = 0) {
 function normalizeClip(rect) {
   if (!rect) return null;
   const x = Number(rect.x); const y = Number(rect.y); const width = Number(rect.width); const height = Number(rect.height);
-  if (![x, y, width, height].every(Number.isFinite) || width <= 0 || height <= 0) throw new RangeError("Clip rect boyutu geçersiz.");
+  if (![x, y, width, height].every(Number.isFinite) || width <= 0 || height <= 0) throw new RangeError("Clip rect size is invalid.");
   const safeX = worldValue(x); const safeY = worldValue(y); const safeWidth = worldValue(width); const safeHeight = worldValue(height);
-  if (safeWidth <= 0 || safeHeight <= 0) throw new RangeError("Clip rect boyutu geçersiz.");
+  if (safeWidth <= 0 || safeHeight <= 0) throw new RangeError("Clip rect size is invalid.");
   return { x: safeX, y: safeY, width: safeWidth, height: safeHeight };
 }
 
@@ -49,7 +49,7 @@ const MAX_TAB_INDEX = 32_767;
 function normalizeLayoutValue(value, label) {
   if (value === null || value === undefined) return null;
   const number = Number(value);
-  if (!Number.isFinite(number)) throw new RangeError(`${label} finite olmalı.`);
+  if (!Number.isFinite(number)) throw new RangeError(`${label} must be finite.`);
   return worldValue(Math.max(-MAX_LAYOUT_VALUE, Math.min(MAX_LAYOUT_VALUE, number)));
 }
 
@@ -61,13 +61,13 @@ function normalizeLayoutRatio(value, fallback) {
 function normalizeLayoutSize(value, label) {
   if (value === null || value === undefined) return null;
   const number = Number(value);
-  if (!Number.isFinite(number) || number < 0) throw new RangeError(`${label} sıfır veya pozitif olmalı.`);
+  if (!Number.isFinite(number) || number < 0) throw new RangeError(`${label} must be zero or positive.`);
   return worldValue(Math.min(MAX_LAYOUT_VALUE, number));
 }
 
 function normalizeLayout(value) {
   if (value === null || value === undefined) return null;
-  if (!value || typeof value !== "object" || Array.isArray(value)) throw new TypeError("Node layout nesnesi gerekli.");
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new TypeError("Node layout object is required.");
   return {
     left: normalizeLayoutValue(value.left, "Layout left"), top: normalizeLayoutValue(value.top, "Layout top"),
     right: normalizeLayoutValue(value.right, "Layout right"), bottom: normalizeLayoutValue(value.bottom, "Layout bottom"),
@@ -94,7 +94,7 @@ export function normalizeFilterAmount(value, fallback = 1) {
 
 function normalizeMaskTexture(value) {
   if (value === null || value === undefined) return null;
-  if (!(value instanceof Texture)) throw new TypeError("maskTexture Texture veya RenderTexture olmalı.");
+  if (!(value instanceof Texture)) throw new TypeError("maskTexture must be a Texture or RenderTexture.");
   return value;
 }
 
@@ -123,13 +123,13 @@ function boundsVisible(node, bounds, camera, width, height, scratch) {
 
 function normalizePointerHandler(handler, label) {
   if (handler === null || handler === undefined) return null;
-  if (typeof handler !== "function") throw new TypeError(`${label} callback fonksiyonu gerekli.`);
+  if (typeof handler !== "function") throw new TypeError(`${label} callback function is required.`);
   return handler;
 }
 
 function normalizeFocusHandler(handler, label) {
   if (handler === null || handler === undefined) return null;
-  if (typeof handler !== "function") throw new TypeError(`${label} callback fonksiyonu gerekli.`);
+  if (typeof handler !== "function") throw new TypeError(`${label} callback function is required.`);
   return handler;
 }
 
@@ -241,14 +241,14 @@ export class Node {
   }
 
   add(...nodes) {
-    if (this.destroyed) throw new Error("Node yok edilmiş parent'a eklenemez.");
-    if (!Array.isArray(this.children) || this.children.length > MAX_SCENE_CHILDREN || nodes.length > MAX_SCENE_CHILDREN - this.children.length) throw new RangeError(`Bir Node en fazla ${MAX_SCENE_CHILDREN} child taşıyabilir.`);
+    if (this.destroyed) throw new Error("A Node cannot be added to a destroyed parent.");
+    if (!Array.isArray(this.children) || this.children.length > MAX_SCENE_CHILDREN || nodes.length > MAX_SCENE_CHILDREN - this.children.length) throw new RangeError(`A Node can have at most ${MAX_SCENE_CHILDREN} children.`);
     const seen = new Set();
     for (const node of nodes) {
-      if (!(node instanceof Node)) throw new TypeError("Scene node bekleniyor.");
-      if (node.destroyed) throw new Error("yok edilmiş Node scene graph'a eklenemez.");
-      if (seen.has(node)) throw new Error("Scene node aynı parent'a iki kez eklenemez.");
-      if (node === this || node.isAncestorOf(this)) throw new Error("Node kendisinin altına eklenemez.");
+      if (!(node instanceof Node)) throw new TypeError("Scene node expected.");
+      if (node.destroyed) throw new Error("A destroyed Node cannot be added to the scene graph.");
+      if (seen.has(node)) throw new Error("A scene node cannot be added to the same parent twice.");
+      if (node === this || node.isAncestorOf(this)) throw new Error("A Node cannot be added under itself.");
       seen.add(node);
     }
     for (const node of nodes) {
@@ -273,8 +273,8 @@ export class Node {
   }
 
   _refreshRenderGroupSubtree(depth = 0) {
-    if (!Number.isSafeInteger(depth) || depth > MAX_SCENE_DEPTH) throw new RangeError(`Scene graph parent derinlik limiti ${MAX_SCENE_DEPTH}.`);
-    if (!Array.isArray(this.children) || this.children.length > MAX_SCENE_CHILDREN) throw new RangeError(`Bir Node en fazla ${MAX_SCENE_CHILDREN} child taşıyabilir.`);
+    if (!Number.isSafeInteger(depth) || depth > MAX_SCENE_DEPTH) throw new RangeError(`Scene graph parent depth limit is ${MAX_SCENE_DEPTH}.`);
+    if (!Array.isArray(this.children) || this.children.length > MAX_SCENE_CHILDREN) throw new RangeError(`A Node can have at most ${MAX_SCENE_CHILDREN} children.`);
     let containsRenderGroup = this.isRenderGroup === true;
     if (!containsRenderGroup) {
       for (const child of this.children) {
@@ -305,7 +305,7 @@ export class Node {
   setBlendMode(mode) { this.blendMode = normalizeBlendMode(mode); return this; }
   setInteractive(value) { this.interactive = Boolean(value); return this; }
   setPointerHandlers(options = {}) {
-    if (!options || typeof options !== "object") throw new TypeError("Pointer handler seçenekleri nesne olmalı.");
+    if (!options || typeof options !== "object") throw new TypeError("Pointer handler options must be an object.");
     if ("onPointerDown" in options) this.onPointerDown = normalizePointerHandler(options.onPointerDown, "onPointerDown");
     if ("onPointerUp" in options) this.onPointerUp = normalizePointerHandler(options.onPointerUp, "onPointerUp");
     if ("onPointerCancel" in options) this.onPointerCancel = normalizePointerHandler(options.onPointerCancel, "onPointerCancel");
@@ -320,7 +320,7 @@ export class Node {
   setUpdateHandler(handler = null) { this.onUpdate = normalizePointerHandler(handler, "onUpdate"); return this; }
 
   setFocusHandlers(options = {}) {
-    if (!options || typeof options !== "object") throw new TypeError("Focus handler seçenekleri nesne olmalı.");
+    if (!options || typeof options !== "object") throw new TypeError("Focus handler options must be an object.");
     if ("onFocus" in options) this.onFocus = normalizeFocusHandler(options.onFocus, "onFocus");
     if ("onBlur" in options) this.onBlur = normalizeFocusHandler(options.onBlur, "onBlur");
     if ("onKeyDown" in options) this.onKeyDown = normalizeFocusHandler(options.onKeyDown, "onKeyDown");
@@ -391,7 +391,7 @@ export class Node {
     let current = node;
     let depth = 0;
     while (current) {
-      if (depth++ > MAX_SCENE_DEPTH) throw new RangeError(`Scene graph parent derinlik limiti ${MAX_SCENE_DEPTH}.`);
+      if (depth++ > MAX_SCENE_DEPTH) throw new RangeError(`Scene graph parent depth limit is ${MAX_SCENE_DEPTH}.`);
       if (current === this) return true;
       current = current.parent;
     }
@@ -400,14 +400,14 @@ export class Node {
 
   traverse(callback, stamp = 0, depth = 0) {
     if (this.destroyed) return;
-    if (typeof callback !== "function") throw new TypeError("Node traverse callback fonksiyonu gerekli.");
+    if (typeof callback !== "function") throw new TypeError("Node traverse callback function is required.");
     const traversalStamp = beginTraversal(this, stamp, depth);
     callback(this);
     for (const child of this.children) child.traverse(callback, traversalStamp, depth + 1);
   }
 
   find(predicate) {
-    if (typeof predicate !== "function") throw new TypeError("Node find predicate fonksiyonu gerekli.");
+    if (typeof predicate !== "function") throw new TypeError("Node find predicate function is required.");
     if (this.destroyed) return null;
     if (predicate(this)) return this;
     for (const child of this.children) {
@@ -572,7 +572,7 @@ export class Scene extends Node {
   }
 
   pick(worldX, worldY, predicate = null) {
-    if (predicate !== null && typeof predicate !== "function") throw new TypeError("Scene pick predicate fonksiyonu gerekli.");
+    if (predicate !== null && typeof predicate !== "function") throw new TypeError("Scene pick predicate function is required.");
     const x = Number(worldX); const y = Number(worldY);
     if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
     this.updateWorldMatrix();

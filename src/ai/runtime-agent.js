@@ -45,34 +45,34 @@ function fail(message, code = "EXI_RUNTIME_INPUT") {
 }
 
 function assertPublicName(value, label) {
-  if (typeof value !== "string" || !value || value.length > 256 || value.startsWith("_") || forbiddenKeys.has(value)) fail(`${label} geçersiz.`);
+  if (typeof value !== "string" || !value || value.length > 256 || value.startsWith("_") || forbiddenKeys.has(value)) fail(`${label} is invalid.`);
   return value;
 }
 
 function assertPublicPath(value) {
-  if (typeof value !== "string" || !value || value.length > 512) fail("path geçersiz.");
+  if (typeof value !== "string" || !value || value.length > 512) fail("path is invalid.");
   const segments = value.split(".");
-  if (segments.some((segment) => !segment || segment.startsWith("_") || forbiddenKeys.has(segment) || !/^[A-Za-z][A-Za-z0-9_$]*$/.test(segment))) fail("Public export yolu olmalı.");
+  if (segments.some((segment) => !segment || segment.startsWith("_") || forbiddenKeys.has(segment) || !/^[A-Za-z][A-Za-z0-9_$]*$/.test(segment))) fail("Must be a public export path.");
   return segments;
 }
 
 function assertSafeData(value, depth = 0) {
-  if (depth > MAX_DEPTH) fail("Runtime veri derinliği limiti aşıldı.");
+  if (depth > MAX_DEPTH) fail("Runtime data depth limit exceeded.");
   if (typeof value === "string") {
-    if (value.length > MAX_STRING_LENGTH) fail("Runtime metin limiti aşıldı.");
+    if (value.length > MAX_STRING_LENGTH) fail("Runtime text limit exceeded.");
     return;
   }
   if (value === null || typeof value === "boolean") return;
   if (typeof value === "number") {
-    if (!Number.isFinite(value)) fail("Runtime sayısı sonlu olmalı.");
+    if (!Number.isFinite(value)) fail("Runtime number must be finite.");
     return;
   }
   if (Array.isArray(value)) {
-    if (value.length > MAX_ITEMS) fail("Runtime dizi limiti aşıldı.");
+    if (value.length > MAX_ITEMS) fail("Runtime array limit exceeded.");
     for (const item of value) assertSafeData(item, depth + 1);
     return;
   }
-  if (!value || typeof value !== "object") fail("Runtime yalnızca JSON verisi içerebilir.");
+  if (!value || typeof value !== "object") fail("Runtime may only contain JSON data.");
   const keys = Object.keys(value);
   if (keys.length === 1 && Object.hasOwn(value, "$callback")) {
     assertPublicName(value.$callback, "callback");
@@ -80,13 +80,13 @@ function assertSafeData(value, depth = 0) {
   }
   if (keys.length === 1 && Object.hasOwn(value, "$bytes")) {
     if (Array.isArray(value.$bytes)) {
-      if (value.$bytes.length > MAX_BINARY_BYTES || value.$bytes.some((byte) => !Number.isInteger(byte) || byte < 0 || byte > 255)) fail("Runtime byte verisi geçersiz.");
-    } else if (typeof value.$bytes !== "string" || value.$bytes.length > MAX_BASE64_LENGTH || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value.$bytes)) fail("Runtime base64 byte verisi geçersiz.");
+      if (value.$bytes.length > MAX_BINARY_BYTES || value.$bytes.some((byte) => !Number.isInteger(byte) || byte < 0 || byte > 255)) fail("Runtime byte data is invalid.");
+    } else if (typeof value.$bytes !== "string" || value.$bytes.length > MAX_BASE64_LENGTH || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value.$bytes)) fail("Runtime base64 byte data is invalid.");
     return;
   }
-  if (keys.length > MAX_KEYS) fail("Runtime nesne alanı limiti aşıldı.");
+  if (keys.length > MAX_KEYS) fail("Runtime object field limit exceeded.");
   for (const key of keys) {
-    if (forbiddenKeys.has(key)) fail(`Güvenli olmayan runtime alanı: ${key}`);
+    if (forbiddenKeys.has(key)) fail(`Unsafe runtime field: ${key}`);
     assertSafeData(value[key], depth + 1);
   }
 }
@@ -109,15 +109,15 @@ function encodeBase64(bytes) {
 
 function observeGridSize(value, fallback, label) {
   if (value === undefined) return fallback;
-  if (!Number.isSafeInteger(value) || value < 1 || value > (label === "columns" ? MAX_OBSERVE_COLUMNS : MAX_OBSERVE_ROWS)) fail(`${label} gözlem sınırında olmalı.`);
+  if (!Number.isSafeInteger(value) || value < 1 || value > (label === "columns" ? MAX_OBSERVE_COLUMNS : MAX_OBSERVE_ROWS)) fail(`${label} must be within the observation bounds.`);
   return value;
 }
 
 function observeDefaults(defaults) {
-  if (!defaults || typeof defaults !== "object" || Array.isArray(defaults)) fail("Gözlemci varsayılanları object olmalı.");
+  if (!defaults || typeof defaults !== "object" || Array.isArray(defaults)) fail("Observer defaults must be an object.");
   const columns = observeGridSize(defaults.columns, DEFAULT_OBSERVE_COLUMNS, "columns");
   const rows = observeGridSize(defaults.rows, DEFAULT_OBSERVE_ROWS, "rows");
-  if (columns * rows > MAX_OBSERVE_CELLS) fail("Gözlem grid bütçesi aşıldı.");
+  if (columns * rows > MAX_OBSERVE_CELLS) fail("Observation grid budget exceeded.");
   return { columns, rows };
 }
 
@@ -139,22 +139,22 @@ function objectType(object) {
 
 function snapshotOptions(value) {
   if (value === undefined) return { offset: 0, limit: MAX_SNAPSHOT_NODES };
-  if (!value || typeof value !== "object" || Array.isArray(value)) fail("snapshot options object olmalı.");
-  for (const key of Object.keys(value)) if (key !== "offset" && key !== "limit") fail(`snapshot bilinmeyen option: ${key}`);
+  if (!value || typeof value !== "object" || Array.isArray(value)) fail("snapshot options must be an object.");
+  for (const key of Object.keys(value)) if (key !== "offset" && key !== "limit") fail(`snapshot unknown option: ${key}`);
   const offset = value.offset === undefined ? 0 : value.offset;
   const limit = value.limit === undefined ? MAX_SNAPSHOT_NODES : value.limit;
-  if (!Number.isSafeInteger(offset) || offset < 0 || offset > MAX_SNAPSHOT_OFFSET) fail("snapshot offset sınırında olmalı.");
-  if (!Number.isSafeInteger(limit) || limit < 1 || limit > MAX_SNAPSHOT_NODES) fail("snapshot limit sınırında olmalı.");
+  if (!Number.isSafeInteger(offset) || offset < 0 || offset > MAX_SNAPSHOT_OFFSET) fail("snapshot offset must be within bounds.");
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > MAX_SNAPSHOT_NODES) fail("snapshot limit must be within bounds.");
   return { offset, limit };
 }
 
 function scenarioObserveOptions(value) {
   if (value === undefined || value === false) return null;
   if (value === true) return undefined;
-  if (!value || typeof value !== "object" || Array.isArray(value)) fail("scenario observe options object olmalı.");
-  for (const key of Object.keys(value)) if (key !== "columns" && key !== "rows") fail(`scenario observe bilinmeyen option: ${key}`);
+  if (!value || typeof value !== "object" || Array.isArray(value)) fail("scenario observe options must be an object.");
+  for (const key of Object.keys(value)) if (key !== "columns" && key !== "rows") fail(`scenario observe unknown option: ${key}`);
   const options = observeDefaults(value);
-  if (options.columns * options.rows > MAX_SCENARIO_OBSERVE_CELLS) fail("scenario observe grid bütçesi aşıldı.");
+  if (options.columns * options.rows > MAX_SCENARIO_OBSERVE_CELLS) fail("scenario observe grid budget exceeded.");
   return options;
 }
 
@@ -162,25 +162,25 @@ function scenarioSnapshotOptions(value) {
   if (value === undefined || value === false) return null;
   if (value === true) return { offset: 0, limit: MAX_SCENARIO_SNAPSHOT_NODES };
   const options = snapshotOptions(value);
-  if (options.limit > MAX_SCENARIO_SNAPSHOT_NODES) fail(`scenario snapshot limit ${MAX_SCENARIO_SNAPSHOT_NODES} olmalı.`);
+  if (options.limit > MAX_SCENARIO_SNAPSHOT_NODES) fail(`scenario snapshot limit must be at most ${MAX_SCENARIO_SNAPSHOT_NODES}.`);
   return options;
 }
 
 function scenarioOptions(value) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) fail("scenario options object olmalı.");
-  for (const key of Object.keys(value)) if (key !== "frames" && key !== "resume") fail(`scenario bilinmeyen option: ${key}`);
-  if (!Array.isArray(value.frames) || value.frames.length < 1 || value.frames.length > MAX_SCENARIO_FRAMES) fail(`scenario frames 1 ile ${MAX_SCENARIO_FRAMES} arasında olmalı.`);
-  if (value.resume !== undefined && typeof value.resume !== "boolean") fail("scenario resume boolean olmalı.");
+  if (!value || typeof value !== "object" || Array.isArray(value)) fail("scenario options must be an object.");
+  for (const key of Object.keys(value)) if (key !== "frames" && key !== "resume") fail(`scenario unknown option: ${key}`);
+  if (!Array.isArray(value.frames) || value.frames.length < 1 || value.frames.length > MAX_SCENARIO_FRAMES) fail(`scenario frames must be between 1 and ${MAX_SCENARIO_FRAMES}.`);
+  if (value.resume !== undefined && typeof value.resume !== "boolean") fail("scenario resume must be a boolean.");
   let eventCount = 0;
   const frames = value.frames.map((frame, index) => {
-    if (!frame || typeof frame !== "object" || Array.isArray(frame)) fail(`scenario frame ${index} object olmalı.`);
-    for (const key of Object.keys(frame)) if (key !== "delta" && key !== "input" && key !== "observe" && key !== "snapshot") fail(`scenario frame ${index} bilinmeyen alan: ${key}`);
+    if (!frame || typeof frame !== "object" || Array.isArray(frame)) fail(`scenario frame ${index} must be an object.`);
+    for (const key of Object.keys(frame)) if (key !== "delta" && key !== "input" && key !== "observe" && key !== "snapshot") fail(`scenario frame ${index} unknown field: ${key}`);
     const delta = frame.delta === undefined ? null : frame.delta;
-    if (delta !== null && (typeof delta !== "number" || !Number.isFinite(delta) || delta < 0 || delta > 1)) fail(`scenario frame ${index} delta 0 ile 1 arasında sonlu sayı olmalı.`);
+    if (delta !== null && (typeof delta !== "number" || !Number.isFinite(delta) || delta < 0 || delta > 1)) fail(`scenario frame ${index} delta must be a finite number between 0 and 1.`);
     const input = frame.input === undefined ? [] : frame.input;
-    if (!Array.isArray(input) || input.length > MAX_SCENARIO_FRAME_EVENTS) fail(`scenario frame ${index} input en fazla ${MAX_SCENARIO_FRAME_EVENTS} event alabilir.`);
+    if (!Array.isArray(input) || input.length > MAX_SCENARIO_FRAME_EVENTS) fail(`scenario frame ${index} input can take at most ${MAX_SCENARIO_FRAME_EVENTS} events.`);
     eventCount += input.length;
-    if (eventCount > MAX_SCENARIO_EVENTS) fail(`scenario toplam input en fazla ${MAX_SCENARIO_EVENTS} event alabilir.`);
+    if (eventCount > MAX_SCENARIO_EVENTS) fail(`scenario total input can take at most ${MAX_SCENARIO_EVENTS} events.`);
     return { delta, input, observe: scenarioObserveOptions(frame.observe), snapshot: scenarioSnapshotOptions(frame.snapshot) };
   });
   return { frames, resume: value.resume !== false };
@@ -256,7 +256,7 @@ function sceneSnapshot(agent, root, rootHandle, options) {
 }
 
 function createGridObservation({ width, height, columns, rows, pixels, flipY = false, format = "rgba8", previousHash }) {
-  if (!ArrayBuffer.isView(pixels) || pixels.byteLength < columns * rows * 4) fail("Renderer gözlem readback verisi geçersiz.", "EXI_RUNTIME_OBSERVE_UNAVAILABLE");
+  if (!ArrayBuffer.isView(pixels) || pixels.byteLength < columns * rows * 4) fail("Renderer observation readback data is invalid.", "EXI_RUNTIME_OBSERVE_UNAVAILABLE");
   const data = new Uint8Array(pixels.buffer, pixels.byteOffset, pixels.byteLength);
   const palette = " .:-=+*#%@";
   const isBgra = String(format).toLowerCase().startsWith("bgra");
@@ -306,7 +306,7 @@ function createGridObservation({ width, height, columns, rows, pixels, flipY = f
  * It returns a coarse text grid rather than arbitrary image bytes, so text-only agents can inspect frames safely.
  */
 export function createCanvasObserver(canvas, defaults = {}) {
-  if (!canvas || typeof canvas !== "object" || !Number.isSafeInteger(canvas.width) || !Number.isSafeInteger(canvas.height) || canvas.width < 1 || canvas.height < 1) fail("Canvas gözlemcisi geçerli canvas ister.");
+  if (!canvas || typeof canvas !== "object" || !Number.isSafeInteger(canvas.width) || !Number.isSafeInteger(canvas.height) || canvas.width < 1 || canvas.height < 1) fail("Canvas observer requires a valid canvas.");
   const { columns: defaultColumns, rows: defaultRows } = observeDefaults(defaults);
   let previousHash = null;
   let observeQueue = Promise.resolve();
@@ -317,18 +317,18 @@ export function createCanvasObserver(canvas, defaults = {}) {
   };
 
   async function observeCanvas(options = {}) {
-    if (!options || typeof options !== "object" || Array.isArray(options)) fail("Canvas gözlem options object olmalı.");
+    if (!options || typeof options !== "object" || Array.isArray(options)) fail("Canvas observation options must be an object.");
     const columns = observeGridSize(options.columns, defaultColumns, "columns");
     const rows = observeGridSize(options.rows, defaultRows, "rows");
-    if (columns * rows > MAX_OBSERVE_CELLS) fail("Canvas gözlem grid bütçesi aşıldı.");
+    if (columns * rows > MAX_OBSERVE_CELLS) fail("Canvas observation grid budget exceeded.");
     const surface = typeof globalThis.OffscreenCanvas === "function"
       ? new globalThis.OffscreenCanvas(columns, rows)
       : globalThis.document?.createElement?.("canvas");
-    if (!surface) fail("Canvas gözlemi için 2D yüzey oluşturulamadı.", "EXI_RUNTIME_OBSERVE_UNAVAILABLE");
+    if (!surface) fail("Could not create a 2D surface for canvas observation.", "EXI_RUNTIME_OBSERVE_UNAVAILABLE");
     surface.width = columns;
     surface.height = rows;
     const context = surface.getContext?.("2d", { willReadFrequently: true });
-    if (!context?.drawImage || typeof context.getImageData !== "function") fail("Canvas gözlemi için 2D readback yok.", "EXI_RUNTIME_OBSERVE_UNAVAILABLE");
+    if (!context?.drawImage || typeof context.getImageData !== "function") fail("No 2D readback is available for canvas observation.", "EXI_RUNTIME_OBSERVE_UNAVAILABLE");
     let source = canvas;
     let bitmap = null;
     if (typeof globalThis.createImageBitmap === "function") {
@@ -351,7 +351,7 @@ export function createCanvasObserver(canvas, defaults = {}) {
  * This is the preferred observer for WebGPU/WebGL pages because swapchain canvas readback is not portable.
  */
 export function createEngineObserver(engine, defaults = {}) {
-  if (!engine || typeof engine.captureFrame !== "function") fail("Engine gözlemcisi captureFrame destekleyen ExiEngine ister.", "EXI_RUNTIME_OBSERVE_UNAVAILABLE");
+  if (!engine || typeof engine.captureFrame !== "function") fail("Engine observer requires an ExiEngine that supports captureFrame.", "EXI_RUNTIME_OBSERVE_UNAVAILABLE");
   const { columns: defaultColumns, rows: defaultRows } = observeDefaults(defaults);
   let previousHash = null;
   let observeQueue = Promise.resolve();
@@ -362,10 +362,10 @@ export function createEngineObserver(engine, defaults = {}) {
   };
 
   async function observeEngine(options = {}) {
-    if (!options || typeof options !== "object" || Array.isArray(options)) fail("Engine gözlem options object olmalı.");
+    if (!options || typeof options !== "object" || Array.isArray(options)) fail("Engine observation options must be an object.");
     const columns = observeGridSize(options.columns, defaultColumns, "columns");
     const rows = observeGridSize(options.rows, defaultRows, "rows");
-    if (columns * rows > MAX_OBSERVE_CELLS) fail("Engine gözlem grid bütçesi aşıldı.");
+    if (columns * rows > MAX_OBSERVE_CELLS) fail("Engine observation grid budget exceeded.");
     const frame = await engine.captureFrame({ columns, rows });
     const observation = createGridObservation({
       width: Number(frame?.width) || columns,
@@ -404,21 +404,21 @@ function decodeBytes(value) {
 }
 
 function resolveBatchPath(value, resultPath) {
-  if (typeof resultPath !== "string" || !resultPath || resultPath.length > 128) fail("Runtime batch result path geçersiz.");
+  if (typeof resultPath !== "string" || !resultPath || resultPath.length > 128) fail("Runtime batch result path is invalid.");
   const segments = resultPath.split(".");
-  if (segments.some((segment) => !segment || segment.startsWith("_") || forbiddenKeys.has(segment) || !/^[A-Za-z][A-Za-z0-9_$]*$/.test(segment))) fail("Runtime batch result path güvenli property yolu olmalı.");
+  if (segments.some((segment) => !segment || segment.startsWith("_") || forbiddenKeys.has(segment) || !/^[A-Za-z][A-Za-z0-9_$]*$/.test(segment))) fail("Runtime batch result path must be a safe property path.");
   let current = value;
   for (const segment of segments) {
-    if (current === null || (typeof current !== "object" && typeof current !== "function") || !Object.hasOwn(current, segment)) fail(`Runtime batch result property bulunamadı: ${resultPath}.`);
+    if (current === null || (typeof current !== "object" && typeof current !== "function") || !Object.hasOwn(current, segment)) fail(`Runtime batch result property not found: ${resultPath}.`);
     current = current[segment];
   }
   return current;
 }
 
 function resolveBatchReferences(value, results, depth = 0, key = "") {
-  if (depth > MAX_DEPTH) fail("Runtime batch reference derinliği aşıldı.");
+  if (depth > MAX_DEPTH) fail("Runtime batch reference depth exceeded.");
   if (Array.isArray(value)) {
-    if (value.length > MAX_ITEMS) fail("Runtime batch dizi limiti aşıldı.");
+    if (value.length > MAX_ITEMS) fail("Runtime batch array limit exceeded.");
     return value.map((item) => resolveBatchReferences(item, results, depth + 1));
   }
   if (!value || typeof value !== "object") return value;
@@ -426,15 +426,15 @@ function resolveBatchReferences(value, results, depth = 0, key = "") {
   const hasResultReference = Number.isSafeInteger(value.$result) && (referenceKeys.length === 1 || (referenceKeys.length === 2 && referenceKeys.includes("$path")));
   if (hasResultReference) {
     const reference = results[value.$result];
-    if (!reference || !reference.ok) fail(`Runtime batch result referansı geçersiz: ${value.$result}.`);
+    if (!reference || !reference.ok) fail(`Runtime batch result reference is invalid: ${value.$result}.`);
     const result = Object.hasOwn(value, "$path") ? resolveBatchPath(reference.value, value.$path) : reference.value;
     if (result && typeof result === "object" && typeof result.$handle === "string") return key === "handle" ? result.$handle : { $handle: result.$handle };
     return result;
   }
-  if (referenceKeys.length > MAX_KEYS) fail("Runtime batch nesne alanı limiti aşıldı.");
+  if (referenceKeys.length > MAX_KEYS) fail("Runtime batch object field limit exceeded.");
   const resolved = {};
   for (const property of referenceKeys) {
-    if (forbiddenKeys.has(property)) fail(`Güvenli olmayan runtime batch alanı: ${property}`);
+    if (forbiddenKeys.has(property)) fail(`Unsafe runtime batch field: ${property}`);
     resolved[property] = resolveBatchReferences(value[property], results, depth + 1, property);
   }
   return resolved;
@@ -445,7 +445,7 @@ function raceWithTimeout(promise, timeoutMs) {
   let timer = null;
   const timeout = new Promise((_resolve, reject) => {
     timer = setTimeout(() => {
-      try { fail(`Runtime komut zaman aşımı: ${timeoutMs} ms.`, "EXI_RUNTIME_COMMAND_TIMEOUT"); } catch (error) { reject(error); }
+      try { fail(`Runtime command timed out: ${timeoutMs} ms.`, "EXI_RUNTIME_COMMAND_TIMEOUT"); } catch (error) { reject(error); }
     }, timeoutMs);
   });
   return Promise.race([Promise.resolve(promise), timeout]).finally(() => { clearTimeout(timer); });
@@ -453,10 +453,10 @@ function raceWithTimeout(promise, timeoutMs) {
 
 export class RuntimeAgent {
   constructor({ api, roots = {}, callbacks = {}, observe = null, token = "", baseUrl = "", pollMs = 100, executeTimeoutMs = 10_000, fetchImpl = globalThis.fetch?.bind(globalThis) } = {}) {
-    if (!api || typeof api !== "object") throw new TypeError("RuntimeAgent api nesnesi gerekli.");
-    if (typeof fetchImpl !== "function") throw new TypeError("RuntimeAgent fetch gerekli.");
-    if (!callbacks || typeof callbacks !== "object" || Array.isArray(callbacks)) throw new TypeError("RuntimeAgent callbacks nesnesi gerekli.");
-    if (observe !== null && typeof observe !== "function") throw new TypeError("RuntimeAgent observe fonksiyonu gerekli.");
+    if (!api || typeof api !== "object") throw new TypeError("RuntimeAgent api object is required.");
+    if (typeof fetchImpl !== "function") throw new TypeError("RuntimeAgent fetch is required.");
+    if (!callbacks || typeof callbacks !== "object" || Array.isArray(callbacks)) throw new TypeError("RuntimeAgent callbacks object is required.");
+    if (observe !== null && typeof observe !== "function") throw new TypeError("RuntimeAgent observe function is required.");
     this.api = api;
     this.token = typeof token === "string" ? token : "";
     this.baseUrl = String(baseUrl).replace(/\/+$/, "");
@@ -482,8 +482,8 @@ export class RuntimeAgent {
 
   registerCallback(name, callback) {
     assertPublicName(name, "callback");
-    if (typeof callback !== "function") fail(`Runtime callback fonksiyonu gerekli: ${name}`);
-    if (!this.callbacks.has(name) && this.callbacks.size >= MAX_CALLBACKS) fail("Runtime callback limiti aşıldı.", "EXI_RUNTIME_CALLBACK_LIMIT");
+    if (typeof callback !== "function") fail(`Runtime callback function is required: ${name}`);
+    if (!this.callbacks.has(name) && this.callbacks.size >= MAX_CALLBACKS) fail("Runtime callback limit exceeded.", "EXI_RUNTIME_CALLBACK_LIMIT");
     this.callbacks.set(name, callback);
     return this;
   }
@@ -491,7 +491,7 @@ export class RuntimeAgent {
   requireCallback(name) {
     assertPublicName(name, "callback");
     const callback = this.callbacks.get(name);
-    if (!callback) fail(`Runtime callback bulunamadı: ${name}`, "EXI_RUNTIME_CALLBACK");
+    if (!callback) fail(`Runtime callback not found: ${name}`, "EXI_RUNTIME_CALLBACK");
     return callback;
   }
 
@@ -552,7 +552,7 @@ export class RuntimeAgent {
         let result;
         try { result = { id: command.id, ok: true, value: await raceWithTimeout(this.execute(command), this.executeTimeoutMs) }; }
         catch (error) { result = { id: command?.id, ok: false, error: { message: error instanceof Error ? error.message : String(error), code: error?.code || "EXI_RUNTIME_ERROR" } }; }
-        if (new TextEncoder().encode(JSON.stringify(result)).byteLength > MAX_RESULT_BYTES) result = { id: command?.id, ok: false, error: { message: "Runtime result boyutu limiti aşıldı.", code: "EXI_RUNTIME_OUTPUT_LIMIT" } };
+        if (new TextEncoder().encode(JSON.stringify(result)).byteLength > MAX_RESULT_BYTES) result = { id: command?.id, ok: false, error: { message: "Runtime result size limit exceeded.", code: "EXI_RUNTIME_OUTPUT_LIMIT" } };
         try {
           await this.fetch(this.endpoint("/__exi/runtime-result"), { method: "POST", headers: { "content-type": "application/json", "x-exi-runtime-token": this.token }, body: JSON.stringify(result), keepalive: true, signal });
         } catch { /* the MCP caller will time out if the preview has gone away */ }
@@ -570,9 +570,9 @@ export class RuntimeAgent {
       if (protectedValue) this.protectedHandles.add(existing);
       return existing;
     }
-    if (this.handles.size >= MAX_HANDLES) fail("Aktif runtime handle limiti aşıldı.", "EXI_RUNTIME_HANDLE_LIMIT");
+    if (this.handles.size >= MAX_HANDLES) fail("Active runtime handle limit exceeded.", "EXI_RUNTIME_HANDLE_LIMIT");
     const handle = preferredHandle || `h${this.nextHandleId++}`;
-    if (typeof handle !== "string" || !/^([A-Za-z][A-Za-z0-9_-]{0,127})$/.test(handle) || this.handles.has(handle)) fail("Runtime handle geçersiz.");
+    if (typeof handle !== "string" || !/^([A-Za-z][A-Za-z0-9_-]{0,127})$/.test(handle) || this.handles.has(handle)) fail("Runtime handle is invalid.");
     this.handles.set(handle, value);
     this.objectHandles.set(value, handle);
     if (protectedValue) this.protectedHandles.add(handle);
@@ -580,12 +580,12 @@ export class RuntimeAgent {
   }
 
   requireHandle(handle) {
-    if (typeof handle !== "string" || !/^(?:[A-Za-z][A-Za-z0-9_-]{0,127})$/.test(handle) || !this.handles.has(handle)) fail(`Runtime handle bulunamadı: ${handle}`);
+    if (typeof handle !== "string" || !/^(?:[A-Za-z][A-Za-z0-9_-]{0,127})$/.test(handle) || !this.handles.has(handle)) fail(`Runtime handle not found: ${handle}`);
     return this.handles.get(handle);
   }
 
   resolveArgument(value, depth = 0) {
-    if (depth > MAX_DEPTH) fail("Runtime argüman derinliği aşıldı.");
+    if (depth > MAX_DEPTH) fail("Runtime argument depth exceeded.");
     if (Array.isArray(value)) return value.map((item) => this.resolveArgument(item, depth + 1));
     if (!value || typeof value !== "object") return value;
     const bytes = decodeBytes(value);
@@ -594,7 +594,7 @@ export class RuntimeAgent {
     if (Object.keys(value).length === 1 && typeof value.$handle === "string") return this.requireHandle(value.$handle);
     const resolved = {};
     for (const [key, item] of Object.entries(value)) {
-      if (forbiddenKeys.has(key)) fail(`Güvenli olmayan runtime argüman alanı: ${key}`);
+      if (forbiddenKeys.has(key)) fail(`Unsafe runtime argument field: ${key}`);
       resolved[key] = this.resolveArgument(item, depth + 1);
     }
     return resolved;
@@ -602,17 +602,17 @@ export class RuntimeAgent {
 
   resolveArgs(args) {
     if (args === undefined) return [];
-    if (!Array.isArray(args)) fail("Runtime args array olmalı.");
+    if (!Array.isArray(args)) fail("Runtime args must be an array.");
     return args.map((item) => this.resolveArgument(item));
   }
 
   resolveExportPath(value) {
     const segments = assertPublicPath(value);
     let current = this.api[segments[0]];
-    if (current === undefined) fail(`Public export bulunamadı: ${value}`);
+    if (current === undefined) fail(`Public export not found: ${value}`);
     let parent = null;
     for (const segment of segments.slice(1)) {
-      if ((current === null || (typeof current !== "object" && typeof current !== "function")) || !Object.hasOwn(current, segment)) fail(`Public export yolu bulunamadı: ${value}`);
+      if ((current === null || (typeof current !== "object" && typeof current !== "function")) || !Object.hasOwn(current, segment)) fail(`Public export path not found: ${value}`);
       parent = current;
       current = current[segment];
     }
@@ -627,19 +627,19 @@ export class RuntimeAgent {
       const ownerName = prototype.constructor?.name;
       const descriptor = Object.getOwnPropertyDescriptor(prototype, method);
       if (descriptor) {
-        if (!isPublicMethod(ownerName, method)) fail(`Public method değil: ${method}`);
-        if (typeof descriptor.value !== "function") fail(`Public method değil: ${method}`);
+        if (!isPublicMethod(ownerName, method)) fail(`Not a public method: ${method}`);
+        if (typeof descriptor.value !== "function") fail(`Not a public method: ${method}`);
         return descriptor.value;
       }
       prototype = Object.getPrototypeOf(prototype);
     }
-    fail(`Runtime method bulunamadı: ${method}`);
+    fail(`Runtime method not found: ${method}`);
   }
 
   getPublicStaticMethod(Constructor, method) {
     assertPublicName(method, "method");
     const descriptor = Object.getOwnPropertyDescriptor(Constructor, method);
-    if (!descriptor || typeof descriptor.value !== "function") fail(`Static method bulunamadı: ${Constructor.name}.${method}`);
+    if (!descriptor || typeof descriptor.value !== "function") fail(`Static method not found: ${Constructor.name}.${method}`);
     return descriptor.value;
   }
 
@@ -650,7 +650,7 @@ export class RuntimeAgent {
       if (Object.getOwnPropertyDescriptor(prototype, property)) return object[property];
       prototype = Object.getPrototypeOf(prototype);
     }
-    fail(`Runtime property bulunamadı: ${property}`);
+    fail(`Runtime property not found: ${property}`);
   }
 
   inspectHandle(object, handle) {
@@ -675,14 +675,14 @@ export class RuntimeAgent {
   }
 
   async executeBatch(command) {
-    if (!Array.isArray(command.calls) || command.calls.length === 0 || command.calls.length > MAX_BATCH_CALLS) fail("Runtime batch calls 1 ile 8 arasında olmalı.", "EXI_RUNTIME_BATCH_LIMIT");
-    if (command.stopOnError !== undefined && typeof command.stopOnError !== "boolean") fail("Runtime batch stopOnError boolean olmalı.");
+    if (!Array.isArray(command.calls) || command.calls.length === 0 || command.calls.length > MAX_BATCH_CALLS) fail("Runtime batch calls must be between 1 and 8.", "EXI_RUNTIME_BATCH_LIMIT");
+    if (command.stopOnError !== undefined && typeof command.stopOnError !== "boolean") fail("Runtime batch stopOnError must be a boolean.");
     const stopOnError = command.stopOnError !== false;
     const results = [];
     for (let index = 0; index < command.calls.length; index += 1) {
       try {
         const call = resolveBatchReferences(command.calls[index], results);
-        if (!call || typeof call !== "object" || Array.isArray(call) || typeof call.operation !== "string" || !call.operation || call.operation === "batch") fail(`Runtime batch call ${index} geçersiz.`);
+        if (!call || typeof call !== "object" || Array.isArray(call) || typeof call.operation !== "string" || !call.operation || call.operation === "batch") fail(`Runtime batch call ${index} is invalid.`);
         const value = await this.execute(call);
         results.push({ index, ok: true, value });
       } catch (error) {
@@ -694,14 +694,14 @@ export class RuntimeAgent {
   }
 
   async executeScenario(command, args) {
-    if (args.length > 1) fail("scenario en fazla bir options argümanı alır.");
+    if (args.length > 1) fail("scenario accepts at most one options argument.");
     const options = scenarioOptions(args[0]);
     const engineHandle = command.handle === undefined ? "engine" : command.handle;
     const engine = this.requireHandle(engineHandle);
     const input = readDataProperty(engine, "input");
     const scene = readDataProperty(engine, "scene");
-    if (!input || typeof input !== "object" || typeof readDataProperty(input, "inject") !== "function") fail("scenario engine.input.inject desteklemiyor.", "EXI_RUNTIME_SCENARIO_UNAVAILABLE");
-    if (!scene || !isHandleable(scene)) fail("scenario engine.scene desteklemiyor.", "EXI_RUNTIME_SCENARIO_UNAVAILABLE");
+    if (!input || typeof input !== "object" || typeof readDataProperty(input, "inject") !== "function") fail("scenario: engine.input does not support inject.", "EXI_RUNTIME_SCENARIO_UNAVAILABLE");
+    if (!scene || !isHandleable(scene)) fail("scenario: engine.scene is not supported.", "EXI_RUNTIME_SCENARIO_UNAVAILABLE");
     const stop = this.getPublicMethod(engine, "stop");
     const step = this.getPublicMethod(engine, "step");
     const inject = this.getPublicMethod(input, "inject");
@@ -722,7 +722,7 @@ export class RuntimeAgent {
         step.call(engine, delta);
         const result = { index, delta, inputEvents: frame.input.length };
         if (frame.observe !== null) {
-          if (!this.observe) fail("scenario observe bu RuntimeAgent sayfasında yapılandırılmamış.", "EXI_RUNTIME_OBSERVE_UNAVAILABLE");
+          if (!this.observe) fail("scenario observe is not configured on this RuntimeAgent page.", "EXI_RUNTIME_OBSERVE_UNAVAILABLE");
           result.observe = await this.observe(frame.observe);
         }
         if (frame.snapshot !== null) result.snapshot = sceneSnapshot(this, scene, sceneHandle, frame.snapshot);
@@ -789,35 +789,35 @@ export class RuntimeAgent {
     if (command.operation === "batch") return this.executeBatch(command);
     const args = this.resolveArgs(command.args);
     if (command.operation === "observe") {
-      if (!this.observe) fail("Canvas observe bu RuntimeAgent sayfasında yapılandırılmamış.", "EXI_RUNTIME_OBSERVE_UNAVAILABLE");
-      if (args.length > 1) fail("observe en fazla bir options argümanı alır.");
+      if (!this.observe) fail("Canvas observe is not configured on this RuntimeAgent page.", "EXI_RUNTIME_OBSERVE_UNAVAILABLE");
+      if (args.length > 1) fail("observe accepts at most one options argument.");
       return this.serialize(await this.observe(args[0]));
     }
     if (command.operation === "snapshot") {
-      if (args.length > 1) fail("snapshot en fazla bir options argümanı alır.");
+      if (args.length > 1) fail("snapshot accepts at most one options argument.");
       const rootHandle = command.handle === undefined ? "scene" : command.handle;
       return this.serialize(sceneSnapshot(this, this.requireHandle(rootHandle), rootHandle, snapshotOptions(args[0])));
     }
     if (command.operation === "scenario") return this.serialize(await this.executeScenario(command, args));
     if (command.operation === "function") {
       const fn = this.api[assertPublicName(command.name, "name")];
-      if (typeof fn !== "function" || isClass(fn)) fail(`Public function bulunamadı: ${command.name}`);
+      if (typeof fn !== "function" || isClass(fn)) fail(`Public function not found: ${command.name}`);
       return this.serialize(await fn(...args));
     }
     if (command.operation === "create") {
       const Constructor = this.api[assertPublicName(command.type, "type")];
-      if (!isClass(Constructor)) fail(`Public class bulunamadı: ${command.type}`);
+      if (!isClass(Constructor)) fail(`Public class not found: ${command.type}`);
       return this.serialize(new Constructor(...args));
     }
     if (command.operation === "export_get") return this.serialize(this.resolveExportPath(command.path).value);
     if (command.operation === "export_call") {
       const resolved = this.resolveExportPath(command.path);
-      if (typeof resolved.value !== "function") fail(`Public export function değil: ${command.path}`);
+      if (typeof resolved.value !== "function") fail(`Public export is not a function: ${command.path}`);
       return this.serialize(await resolved.value.apply(resolved.parent, args));
     }
     if (command.operation === "static_call") {
       const Constructor = this.api[assertPublicName(command.type, "type")];
-      if (!isClass(Constructor)) fail(`Static method bulunamadı: ${command.type}.${command.method}`);
+      if (!isClass(Constructor)) fail(`Static method not found: ${command.type}.${command.method}`);
       return this.serialize(await this.getPublicStaticMethod(Constructor, command.method).apply(Constructor, args));
     }
     if (command.operation === "call") {
@@ -835,17 +835,17 @@ export class RuntimeAgent {
         descriptor = Object.getOwnPropertyDescriptor(target, property);
         target = Object.getPrototypeOf(target);
       }
-      if (!descriptor || typeof descriptor.value === "function" || ("value" in descriptor && descriptor.writable !== true) || (!("value" in descriptor) && typeof descriptor.set !== "function")) fail(`Runtime property yazılabilir değil: ${property}`);
+      if (!descriptor || typeof descriptor.value === "function" || ("value" in descriptor && descriptor.writable !== true) || (!("value" in descriptor) && typeof descriptor.set !== "function")) fail(`Runtime property is not writable: ${property}`);
       const current = object[property];
-      if (Array.isArray(current) || current instanceof Map || current instanceof Set) fail(`Collection property doğrudan yazılamaz: ${property}`);
+      if (Array.isArray(current) || current instanceof Map || current instanceof Set) fail(`Collection property cannot be written directly: ${property}`);
       const next = this.resolveArgument(command.value);
-      if (current && typeof current === "object" && next && typeof next === "object" && !this.objectHandles.has(next)) fail(`Object property handle ile değiştirilmelidir: ${property}`);
+      if (current && typeof current === "object" && next && typeof next === "object" && !this.objectHandles.has(next)) fail(`Object property must be changed through a handle: ${property}`);
       object[property] = next;
       return { handle: command.handle, property, value: this.serialize(object[property]) };
     }
     if (command.operation === "release") {
       const object = this.requireHandle(command.handle);
-      if (this.protectedHandles.has(command.handle)) fail(`Runtime kök handle bırakılamaz: ${command.handle}`, "EXI_RUNTIME_ROOT_HANDLE");
+      if (this.protectedHandles.has(command.handle)) fail(`Runtime root handle cannot be released: ${command.handle}`, "EXI_RUNTIME_ROOT_HANDLE");
       if (typeof object.destroy === "function") object.destroy();
       this.handles.delete(command.handle);
       this.objectHandles.delete(object);
@@ -854,6 +854,6 @@ export class RuntimeAgent {
       }
       return { released: command.handle };
     }
-    fail(`Bilinmeyen runtime operation: ${command.operation}`);
+    fail(`Unknown runtime operation: ${command.operation}`);
   }
 }

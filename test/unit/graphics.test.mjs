@@ -24,9 +24,9 @@ test("graphics: polygon ve doğrulama", () => {
   const item = poly.getRenderItems()[0];
   assert.equal(item.positions.length, 24);
   assert.deepEqual(item.bounds, { x: 0, y: 0, width: 20, height: 30 });
-  assert.throws(() => new Graphics().polygon([0, 0, 1, 1]), /en az üç nokta/);
-  assert.throws(() => new Graphics().polygon([0, 0, 10, 10, 0, 10, 10, 0]), /alanı geçersiz/);
-  assert.throws(() => new Graphics().polygon(new Array(514).fill(0)), /nokta limiti/);
+  assert.throws(() => new Graphics().polygon([0, 0, 1, 1]), /at least three points/);
+  assert.throws(() => new Graphics().polygon([0, 0, 10, 10, 0, 10, 10, 0]), /area is invalid/);
+  assert.throws(() => new Graphics().polygon(new Array(514).fill(0)), /point limit/);
 });
 
 test("graphics: staticCache invalidasyon ve clear", () => {
@@ -50,11 +50,11 @@ test("graphics: staticCache invalidasyon ve clear", () => {
 test("graphics: limitler ve güvenli değerler", () => {
   const limitProbe = new Graphics();
   limitProbe.commands.length = 4_096;
-  assert.throws(() => limitProbe.rect(0, 0, 1, 1), /limiti/);
+  assert.throws(() => limitProbe.rect(0, 0, 1, 1), /limit/);
   const direct = new Graphics();
   direct.commands.length = 4_097;
-  assert.throws(() => direct.getRenderItems(), /limiti/);
-  assert.throws(() => direct.getLocalBounds(), /limiti/);
+  assert.throws(() => direct.getRenderItems(), /limit/);
+  assert.throws(() => direct.getLocalBounds(), /limit/);
   const safe = new Graphics().rect(Infinity, NaN, 8, 8, { alpha: Infinity });
   assert.deepEqual(safe.getLocalBounds(), { x: 0, y: 0, width: 8, height: 8 });
 });

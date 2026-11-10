@@ -34,10 +34,10 @@ export class ParticleEmitter extends Node {
   constructor({ texture = Texture.white, maxParticles = 512, rate = 0, gravityX = 0, gravityY = 0, lifetime = 1, size = 8, tint = 0xffffff, alpha = 1, random = Math.random, instanced = true, gpuCulling = false, ...options } = {}) {
     super({ name: "particles", ...options });
     this.isRenderable = true;
-    if (!(texture instanceof Texture)) throw new TypeError("ParticleEmitter texture bekleniyor.");
+    if (!(texture instanceof Texture)) throw new TypeError("ParticleEmitter texture expected.");
     this.texture = texture;
     const requestedMaxParticles = Number(maxParticles);
-    if (!Number.isSafeInteger(requestedMaxParticles) || requestedMaxParticles < 1 || requestedMaxParticles > MAX_PARTICLES) throw new RangeError(`ParticleEmitter maxParticles limiti ${MAX_PARTICLES}.`);
+    if (!Number.isSafeInteger(requestedMaxParticles) || requestedMaxParticles < 1 || requestedMaxParticles > MAX_PARTICLES) throw new RangeError(`ParticleEmitter maxParticles limit is ${MAX_PARTICLES}.`);
     this._particleCapacity = requestedMaxParticles;
     this.maxParticles = requestedMaxParticles;
     this.rate = Math.min(MAX_PARTICLE_RATE, Math.max(0, number(rate, 0)));
@@ -64,7 +64,7 @@ export class ParticleEmitter extends Node {
   }
 
   assertParticleLimit() {
-    if (this.maxParticles !== this._particleCapacity || this.particles.length > this._particleCapacity) throw new RangeError(`ParticleEmitter particle limiti ${this._particleCapacity}.`);
+    if (this.maxParticles !== this._particleCapacity || this.particles.length > this._particleCapacity) throw new RangeError(`ParticleEmitter particle limit is ${this._particleCapacity}.`);
   }
 
   get count() { return this.particles.length; }

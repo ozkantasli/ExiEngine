@@ -11,7 +11,7 @@ function isRecord(value) {
 function normalizePoint(value, label) {
   const point = Array.isArray(value) ? { x: value[0], y: value[1] } : value;
   if (!isRecord(point) || !Number.isSafeInteger(point.x) || !Number.isSafeInteger(point.y)) {
-    throw new TypeError(`${label} x/y tam sayı olmalı`);
+    throw new TypeError(`${label} x/y must be integers`);
   }
   return { x: point.x, y: point.y };
 }
@@ -58,13 +58,13 @@ function popHeap(nodes, scores) {
 }
 
 function validateGrid(grid) {
-  if (!Array.isArray(grid) || grid.length === 0) throw new TypeError("grid boş olmayan satır dizisi olmalı");
+  if (!Array.isArray(grid) || grid.length === 0) throw new TypeError("grid must be a non-empty array of rows");
   const height = grid.length;
-  if (!Array.isArray(grid[0]) || grid[0].length === 0) throw new TypeError("grid satırları boş olmayan dizi olmalı");
+  if (!Array.isArray(grid[0]) || grid[0].length === 0) throw new TypeError("grid rows must be non-empty arrays");
   const width = grid[0].length;
-  if (width * height > MAX_GRID_PATH_CELLS) throw new RangeError(`grid ${MAX_GRID_PATH_CELLS} hücre sınırını aşamaz`);
+  if (width * height > MAX_GRID_PATH_CELLS) throw new RangeError(`grid cannot exceed the ${MAX_GRID_PATH_CELLS} cell limit`);
   for (const row of grid) {
-    if (!Array.isArray(row) || row.length !== width) throw new TypeError("grid dikdörtgen olmalı");
+    if (!Array.isArray(row) || row.length !== width) throw new TypeError("grid must be rectangular");
   }
   return { width, height, cellCount: width * height };
 }
@@ -98,19 +98,19 @@ function makePath(parents, startIndex, goalIndex, width) {
  */
 export function findGridPath(grid, start, goal, options = {}) {
   const { width, height, cellCount } = validateGrid(grid);
-  if (!isRecord(options)) throw new TypeError("pathfinding options object olmalı");
+  if (!isRecord(options)) throw new TypeError("pathfinding options must be an object");
   const startPoint = normalizePoint(start, "start");
   const goalPoint = normalizePoint(goal, "goal");
   if (!inBounds(startPoint.x, startPoint.y, width, height) || !inBounds(goalPoint.x, goalPoint.y, width, height)) {
-    throw new RangeError("start/goal grid sınırları içinde olmalı");
+    throw new RangeError("start/goal must be within the grid bounds");
   }
   const blockedValues = options.blockedValues === undefined ? DEFAULT_BLOCKED_VALUES : options.blockedValues;
-  if (!Array.isArray(blockedValues) || blockedValues.length > MAX_BLOCKED_VALUES) throw new RangeError(`blockedValues en fazla ${MAX_BLOCKED_VALUES} değer içerebilir`);
+  if (!Array.isArray(blockedValues) || blockedValues.length > MAX_BLOCKED_VALUES) throw new RangeError(`blockedValues can contain at most ${MAX_BLOCKED_VALUES} values`);
   const blocked = new Set(blockedValues);
   const diagonal = options.diagonal === true;
   const allowCornerCutting = options.allowCornerCutting === true;
   const maxNodes = options.maxNodes === undefined ? Math.min(cellCount, DEFAULT_MAX_NODES) : options.maxNodes;
-  if (!Number.isSafeInteger(maxNodes) || maxNodes < 1 || maxNodes > cellCount) throw new RangeError(`maxNodes 1 ile ${cellCount} arasında olmalı`);
+  if (!Number.isSafeInteger(maxNodes) || maxNodes < 1 || maxNodes > cellCount) throw new RangeError(`maxNodes must be between 1 and ${cellCount}`);
   const isWalkable = (x, y) => !blocked.has(grid[y][x]);
   const startIndex = startPoint.y * width + startPoint.x;
   const goalIndex = goalPoint.y * width + goalPoint.x;

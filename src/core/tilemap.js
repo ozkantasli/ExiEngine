@@ -40,7 +40,7 @@ function normalizeSolidTiles(value) {
   if (value === null || value === undefined) return null;
   if (typeof value === "function") return value;
   if (value instanceof Set) return value;
-  throw new TypeError("TileMap solidTiles Set veya predicate fonksiyonu olmalı.");
+  throw new TypeError("TileMap solidTiles must be a Set or a predicate function.");
 }
 
 function isSolidTile(tileIndex, x, y, solidTiles) {
@@ -50,7 +50,7 @@ function isSolidTile(tileIndex, x, y, solidTiles) {
 
 function normalizeTileFlags(options) {
   if (options === undefined) return 0;
-  if (options === null || typeof options !== "object") throw new TypeError("TileMap tile seçenekleri nesne olmalı.");
+  if (options === null || typeof options !== "object") throw new TypeError("TileMap tile options must be an object.");
   return (options.flipX ? TILE_FLIP_X : 0) | (options.flipY ? TILE_FLIP_Y : 0);
 }
 
@@ -169,14 +169,14 @@ function resetRenderItem(items, index) {
 export class TileMap extends Node {
   constructor({ texture = Texture.white, tileWidth, tileHeight, columns, rows, staticCache = false, instanced = true, gpuCulling = true, cullTiles = true, ...options } = {}) {
     super({ name: "tilemap", ...options });
-    if (!(texture instanceof Texture)) throw new TypeError("TileMap texture bekleniyor.");
+    if (!(texture instanceof Texture)) throw new TypeError("TileMap texture expected.");
     this.texture = texture;
     this.isBatch = true;
     this.tileWidth = Math.max(1, tileWidth | 0);
     this.tileHeight = Math.max(1, tileHeight | 0);
     this.columns = Math.max(1, columns | 0);
     this.rows = Math.max(1, rows | 0);
-    if (this.columns * this.rows > MAX_TILE_COUNT) throw new RangeError("TileMap tile sayısı limiti aşıldı.");
+    if (this.columns * this.rows > MAX_TILE_COUNT) throw new RangeError("TileMap tile count limit exceeded.");
     this.tiles = new Int32Array(this.columns * this.rows);
     this.tiles.fill(-1);
     this.tileFlags = null;
@@ -306,11 +306,11 @@ export class TileMap extends Node {
 
   validateTileIndex(tileIndex) {
     const value = Number(tileIndex);
-    if (!Number.isSafeInteger(value)) throw new RangeError("TileMap tile index geçersiz.");
+    if (!Number.isSafeInteger(value)) throw new RangeError("TileMap tile index is invalid.");
     if (value < 0) return value;
     const gridColumns = Math.floor(this.texture.sourceWidth / this.tileWidth);
     const gridRows = Math.floor(this.texture.sourceHeight / this.tileHeight);
-    if (gridColumns <= 0 || gridRows <= 0 || value >= gridColumns * gridRows) throw new RangeError("TileMap tile index sınır dışında.");
+    if (gridColumns <= 0 || gridRows <= 0 || value >= gridColumns * gridRows) throw new RangeError("TileMap tile index is out of bounds.");
     return value;
   }
 
@@ -335,8 +335,8 @@ export class TileMap extends Node {
   getTile(x, y) { return this.inBounds(x, y) ? this.tiles[this.index(x, y)] : -1; }
 
   setTiles(values) {
-    if (!ArrayBuffer.isView(values) && !Array.isArray(values)) throw new TypeError("TileMap verisi dizi olmalı.");
-    if (values.length !== this.tiles.length) throw new RangeError("TileMap veri boyutu eşleşmiyor.");
+    if (!ArrayBuffer.isView(values) && !Array.isArray(values)) throw new TypeError("TileMap data must be an array.");
+    if (values.length !== this.tiles.length) throw new RangeError("TileMap data size does not match.");
     let changed = false;
     if (values instanceof Int32Array) {
       for (let index = 0; index < values.length; index += 1) {
@@ -356,10 +356,10 @@ export class TileMap extends Node {
 
   setRegion(x, y, width, height, values) {
     const left = Number(x); const top = Number(y); const regionWidth = Number(width); const regionHeight = Number(height);
-    if (![left, top, regionWidth, regionHeight].every(Number.isSafeInteger) || left < 0 || top < 0 || regionWidth <= 0 || regionHeight <= 0 || left + regionWidth > this.columns || top + regionHeight > this.rows) throw new RangeError("TileMap bölgesi sınır dışında.");
-    if (!ArrayBuffer.isView(values) && !Array.isArray(values)) throw new TypeError("TileMap bölge verisi dizi olmalı.");
+    if (![left, top, regionWidth, regionHeight].every(Number.isSafeInteger) || left < 0 || top < 0 || regionWidth <= 0 || regionHeight <= 0 || left + regionWidth > this.columns || top + regionHeight > this.rows) throw new RangeError("TileMap region is out of bounds.");
+    if (!ArrayBuffer.isView(values) && !Array.isArray(values)) throw new TypeError("TileMap region data must be an array.");
     const area = regionWidth * regionHeight;
-    if (values.length !== area) throw new RangeError("TileMap bölge veri boyutu eşleşmiyor.");
+    if (values.length !== area) throw new RangeError("TileMap region data size does not match.");
     const directValues = ArrayBuffer.isView(values);
     const normalized = directValues ? null : new Int32Array(area);
     for (let index = 0; index < area; index += 1) {
@@ -393,7 +393,7 @@ export class TileMap extends Node {
 
   getCollisionRects(solidTiles = null, out = this.collisionRects) {
     const predicate = normalizeSolidTiles(solidTiles);
-    if (!Array.isArray(out)) throw new TypeError("TileMap collision rect output dizisi gerekli.");
+    if (!Array.isArray(out)) throw new TypeError("TileMap collision rect output array is required.");
     out.length = 0;
     let active = new Map();
     for (let row = 0; row < this.rows; row += 1) {
@@ -427,8 +427,8 @@ export class TileMap extends Node {
   }
 
   createStaticBodies(physicsWorld, { solidTiles = null, tag = "tilemap", layer = 1, mask = 0xFFFFFFFF } = {}) {
-    if (!physicsWorld || typeof physicsWorld.add !== "function" || typeof physicsWorld.remove !== "function") throw new TypeError("TileMap PhysicsWorld gerekli.");
-    if (this.destroyed) throw new Error("TileMap yok edilmiş.");
+    if (!physicsWorld || typeof physicsWorld.add !== "function" || typeof physicsWorld.remove !== "function") throw new TypeError("TileMap PhysicsWorld is required.");
+    if (this.destroyed) throw new Error("TileMap has been destroyed.");
     const predicate = normalizeSolidTiles(solidTiles);
     const tileMap = this;
     const controller = {
@@ -438,7 +438,7 @@ export class TileMap extends Node {
       nodes: [],
       destroyed: false,
       rebuild() {
-        if (this.destroyed || tileMap.destroyed) throw new Error("TileMap collision controller yok edilmiş.");
+        if (this.destroyed || tileMap.destroyed) throw new Error("TileMap collision controller has been destroyed.");
         const rects = tileMap.getCollisionRects(predicate);
         const nextNodes = [];
         const nextBodies = [];
@@ -612,7 +612,7 @@ export class TileMap extends Node {
 
   getFrame(tileIndex) {
     const gridColumns = Math.floor(this.texture.sourceWidth / this.tileWidth);
-    if (gridColumns <= 0) throw new RangeError("TileMap texture tile grid geçersiz.");
+    if (gridColumns <= 0) throw new RangeError("TileMap texture tile grid is invalid.");
     const frameX = (tileIndex % gridColumns) * this.tileWidth;
     const frameY = Math.floor(tileIndex / gridColumns) * this.tileHeight;
     const textureVersion = this.texture?.baseTexture?.version ?? this.texture?.version ?? 0;

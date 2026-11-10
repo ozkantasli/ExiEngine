@@ -9,13 +9,13 @@ const nextPowerOfTwo = (value) => 2 ** Math.ceil(Math.log2(Math.max(1, value)));
 function assertAtlasFrame(texture, value, name) {
   const frame = value?.frame || value;
   const x = Number(frame?.x); const y = Number(frame?.y); const width = Number(frame?.width ?? frame?.w); const height = Number(frame?.height ?? frame?.h);
-  if (![x, y, width, height].every(Number.isFinite) || x < 0 || y < 0 || width <= 0 || height <= 0 || x + width > texture.sourceWidth || y + height > texture.sourceHeight) throw new RangeError(`Atlas frame sınır dışı: ${name}`);
+  if (![x, y, width, height].every(Number.isFinite) || x < 0 || y < 0 || width <= 0 || height <= 0 || x + width > texture.sourceWidth || y + height > texture.sourceHeight) throw new RangeError(`Atlas frame is out of bounds: ${name}`);
   return frame;
 }
 
 function atlasLimit(value, maximum, label) {
   const number = Number(value);
-  if (!Number.isSafeInteger(number) || number <= 0 || number > maximum) throw new RangeError(`${label} limiti geçersiz.`);
+  if (!Number.isSafeInteger(number) || number <= 0 || number > maximum) throw new RangeError(`${label} limit is invalid.`);
   return number;
 }
 
@@ -26,7 +26,7 @@ function createCanvas(width, height) {
     canvas.width = width; canvas.height = height;
     return canvas;
   }
-  throw new Error("TextureAtlas.pack için Canvas veya OffscreenCanvas gerekli.");
+  throw new Error("TextureAtlas.pack requires Canvas or OffscreenCanvas.");
 }
 
 function drawPaddedImage(context, item, padding) {
@@ -52,25 +52,25 @@ function resolvePackSource(source) {
     const sourceY = source.v0 * base.sourceHeight;
     const width = (source.u1 - source.u0) * base.sourceWidth;
     const height = (source.v1 - source.v0) * base.sourceHeight;
-    if (source.destroyed || base.destroyed || !base.source || ![sourceX, sourceY, width, height].every(Number.isSafeInteger) || sourceX < 0 || sourceY < 0 || width <= 0 || height <= 0 || sourceX + width > base.sourceWidth || sourceY + height > base.sourceHeight) throw new TypeError("Atlas pack Texture kaynağı geçersiz veya yok edilmiş.");
+    if (source.destroyed || base.destroyed || !base.source || ![sourceX, sourceY, width, height].every(Number.isSafeInteger) || sourceX < 0 || sourceY < 0 || width <= 0 || height <= 0 || sourceX + width > base.sourceWidth || sourceY + height > base.sourceHeight) throw new TypeError("Atlas pack Texture source is invalid or destroyed.");
     return { source: base.source, sourceX, sourceY, width, height };
   }
   const width = Number(source?.width);
   const height = Number(source?.height);
-  if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width <= 0 || height <= 0) throw new RangeError("Atlas pack kaynak boyutu geçersiz.");
+  if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width <= 0 || height <= 0) throw new RangeError("Atlas pack source size is invalid.");
   return { source, sourceX: 0, sourceY: 0, width, height };
 }
 
 export class TextureAtlas {
   constructor(texture, frames) {
-    if (!(texture instanceof Texture)) throw new TypeError("Atlas texture bekleniyor.");
-    if (texture.destroyed || texture.baseTexture?.destroyed) throw new Error("Atlas texture yok edilmiş.");
-    if (!frames || typeof frames !== "object" || Array.isArray(frames)) throw new TypeError("Atlas frames alanı geçersiz.");
+    if (!(texture instanceof Texture)) throw new TypeError("Atlas texture expected.");
+    if (texture.destroyed || texture.baseTexture?.destroyed) throw new Error("Atlas texture has been destroyed.");
+    if (!frames || typeof frames !== "object" || Array.isArray(frames)) throw new TypeError("Atlas frames field is invalid.");
     const entries = Object.entries(frames);
-    if (entries.length > MAX_ATLAS_FRAMES) throw new RangeError("Atlas frame limiti aşıldı.");
+    if (entries.length > MAX_ATLAS_FRAMES) throw new RangeError("Atlas frame limit exceeded.");
     const normalizedFrames = Object.create(null);
     for (const [name, value] of entries) {
-      if (name.length > MAX_ATLAS_FRAME_NAME_LENGTH) throw new RangeError("Atlas frame adı limiti aşıldı.");
+      if (name.length > MAX_ATLAS_FRAME_NAME_LENGTH) throw new RangeError("Atlas frame name limit exceeded.");
       const frame = assertAtlasFrame(texture, value, name);
       const x = Number(frame.x); const y = Number(frame.y); const width = Number(frame.width ?? frame.w); const height = Number(frame.height ?? frame.h);
       normalizedFrames[name] = { x, y, width, height };
@@ -83,7 +83,7 @@ export class TextureAtlas {
   }
 
   _assertFrameBudget() {
-    if (!(this.frames instanceof Map) || this.frames.size > this._frameCapacity) throw new RangeError(`Atlas frame limiti ${this._frameCapacity}.`);
+    if (!(this.frames instanceof Map) || this.frames.size > this._frameCapacity) throw new RangeError(`Atlas frame limit is ${this._frameCapacity}.`);
   }
 
   invalidateIfTextureDestroyed() {
@@ -96,10 +96,10 @@ export class TextureAtlas {
   }
 
   get(name) {
-    if (!this.invalidateIfTextureDestroyed()) throw new Error("TextureAtlas yok edilmiş.");
+    if (!this.invalidateIfTextureDestroyed()) throw new Error("TextureAtlas has been destroyed.");
     this._assertFrameBudget();
     const frame = this.frames.get(name);
-    if (!frame) throw new Error(`Atlas frame bulunamadı: ${name}`);
+    if (!frame) throw new Error(`Atlas frame not found: ${name}`);
     assertAtlasFrame(this.texture, frame, name);
     if (this.frameCache.has(name)) return this.frameCache.get(name);
     const texture = this.texture.subTexture({ ...frame, id: `${this.texture.id}:${name}` });
@@ -108,14 +108,14 @@ export class TextureAtlas {
   }
 
   getFrames(names) {
-    if (!this.invalidateIfTextureDestroyed()) throw new Error("TextureAtlas yok edilmiş.");
+    if (!this.invalidateIfTextureDestroyed()) throw new Error("TextureAtlas has been destroyed.");
     this._assertFrameBudget();
-    if (!Array.isArray(names) || names.length === 0 || names.length > MAX_ATLAS_FRAMES || names.some((name) => typeof name !== "string" || name.length === 0 || name.length > MAX_ATLAS_FRAME_NAME_LENGTH)) throw new TypeError("Atlas frame adı dizisi geçersiz veya limit dışı.");
+    if (!Array.isArray(names) || names.length === 0 || names.length > MAX_ATLAS_FRAMES || names.some((name) => typeof name !== "string" || name.length === 0 || name.length > MAX_ATLAS_FRAME_NAME_LENGTH)) throw new TypeError("Atlas frame name array is invalid or out of limits.");
     return names.map((name) => this.get(name));
   }
 
   getClip(names, options = {}) {
-    if (!options || typeof options !== "object" || Array.isArray(options)) throw new TypeError("Atlas clip seçenekleri nesne olmalı.");
+    if (!options || typeof options !== "object" || Array.isArray(options)) throw new TypeError("Atlas clip options must be an object.");
     return {
       frames: this.getFrames(names),
       frameRate: options.frameRate ?? 12,
@@ -143,22 +143,22 @@ export class TextureAtlas {
 
   static fromJSON(texture, data, { maxFrames = 10000 } = {}) {
     const rawFrames = data?.frames;
-    if (!rawFrames || typeof rawFrames !== "object") throw new TypeError("Atlas frames alanı geçersiz.");
+    if (!rawFrames || typeof rawFrames !== "object") throw new TypeError("Atlas frames field is invalid.");
     const entries = Array.isArray(rawFrames)
       ? rawFrames.map((value, index) => [typeof value?.filename === "string" && value.filename ? value.filename : typeof value?.name === "string" && value.name ? value.name : String(index), value])
       : Object.entries(rawFrames);
     const frameLimit = atlasLimit(maxFrames, MAX_ATLAS_FRAMES, "Atlas frame");
-    if (entries.length > frameLimit) throw new Error("Atlas frame limiti aşıldı.");
-    if (entries.length > maxFrames) throw new Error("Atlas frame limiti aşıldı.");
+    if (entries.length > frameLimit) throw new Error("Atlas frame limit exceeded.");
+    if (entries.length > maxFrames) throw new Error("Atlas frame limit exceeded.");
     const frames = Object.create(null);
     const seenNames = new Set();
     for (const [name, value] of entries) {
-      if (name.length > MAX_ATLAS_FRAME_NAME_LENGTH) throw new Error("Atlas frame adı limiti aşıldı.");
-      if (seenNames.has(name)) throw new Error(`Atlas frame adı tekrar ediyor: ${name}`);
-      if (value?.rotated || value?.trimmed) throw new Error(`Atlas rotated/trimmed frame metadata desteklenmiyor: ${name}`);
+      if (name.length > MAX_ATLAS_FRAME_NAME_LENGTH) throw new Error("Atlas frame name limit exceeded.");
+      if (seenNames.has(name)) throw new Error(`Duplicate atlas frame name: ${name}`);
+      if (value?.rotated || value?.trimmed) throw new Error(`Atlas rotated/trimmed frame metadata is not supported: ${name}`);
       const frame = value?.frame || value;
       const x = Number(frame?.x); const y = Number(frame?.y); const width = Number(frame?.w ?? frame?.width); const height = Number(frame?.h ?? frame?.height);
-      if (![x, y, width, height].every(Number.isFinite) || x < 0 || y < 0 || width <= 0 || height <= 0 || x + width > texture.sourceWidth || y + height > texture.sourceHeight) throw new Error(`Atlas frame sınır dışı: ${name}`);
+      if (![x, y, width, height].every(Number.isFinite) || x < 0 || y < 0 || width <= 0 || height <= 0 || x + width > texture.sourceWidth || y + height > texture.sourceHeight) throw new Error(`Atlas frame is out of bounds: ${name}`);
       seenNames.add(name);
       frames[name] = { x, y, width, height };
     }
@@ -166,22 +166,22 @@ export class TextureAtlas {
   }
 
   static fromGrid(texture, { frameWidth, frameHeight, columns, rows, marginX = 0, marginY = 0, spacingX = 0, spacingY = 0, names = null, maxFrames = 10000 } = {}) {
-    if (!(texture instanceof Texture)) throw new TypeError("Atlas texture bekleniyor.");
+    if (!(texture instanceof Texture)) throw new TypeError("Atlas texture expected.");
     const values = [frameWidth, frameHeight, columns, rows, marginX, marginY, spacingX, spacingY].map(Number);
-    if (![frameWidth, frameHeight, columns, rows].every((value) => Number.isInteger(Number(value)) && Number(value) > 0) || [marginX, marginY, spacingX, spacingY].some((value) => !Number.isInteger(Number(value)) || Number(value) < 0)) throw new RangeError("Atlas grid ölçüleri geçersiz.");
+    if (![frameWidth, frameHeight, columns, rows].every((value) => Number.isInteger(Number(value)) && Number(value) > 0) || [marginX, marginY, spacingX, spacingY].some((value) => !Number.isInteger(Number(value)) || Number(value) < 0)) throw new RangeError("Atlas grid dimensions are invalid.");
     const [width, height, columnCount, rowCount, left, top, gapX, gapY] = values;
     const count = columnCount * rowCount;
     const frameLimit = atlasLimit(maxFrames, MAX_ATLAS_FRAMES, "Atlas frame");
-    if (!Number.isSafeInteger(count) || count > frameLimit) throw new Error("Atlas frame limiti aşıldı.");
-    if (count > maxFrames) throw new Error("Atlas frame limiti aşıldı.");
-    if (names !== null && (!Array.isArray(names) || names.length !== count || new Set(names.map(String)).size !== count)) throw new TypeError("Atlas grid isimleri frame sayısıyla eşleşmeli.");
+    if (!Number.isSafeInteger(count) || count > frameLimit) throw new Error("Atlas frame limit exceeded.");
+    if (count > maxFrames) throw new Error("Atlas frame limit exceeded.");
+    if (names !== null && (!Array.isArray(names) || names.length !== count || new Set(names.map(String)).size !== count)) throw new TypeError("Atlas grid names must match the frame count.");
     const frames = Object.create(null);
     for (let row = 0; row < rowCount; row += 1) {
       for (let column = 0; column < columnCount; column += 1) {
         const index = row * columnCount + column;
         const x = left + column * (width + gapX);
         const y = top + row * (height + gapY);
-        if (x + width > texture.sourceWidth || y + height > texture.sourceHeight) throw new RangeError(`Atlas grid frame sınır dışında: ${index}`);
+        if (x + width > texture.sourceWidth || y + height > texture.sourceHeight) throw new RangeError(`Atlas grid frame is out of bounds: ${index}`);
         frames[names ? String(names[index]) : String(index)] = { x, y, width, height };
       }
     }
@@ -189,18 +189,18 @@ export class TextureAtlas {
   }
 
   static pack(entries, { padding = 1, maxWidth = 2048, maxHeight = 2048, maxPixels = 16 * 1024 * 1024, id = "packed-atlas" } = {}) {
-    if (!Array.isArray(entries) || entries.length === 0) throw new TypeError("Atlas pack girdisi boş olamaz.");
+    if (!Array.isArray(entries) || entries.length === 0) throw new TypeError("Atlas pack input cannot be empty.");
     const pad = Number(padding); const limitWidth = Number(maxWidth); const limitHeight = Number(maxHeight); const pixelLimit = Number(maxPixels);
-    if (entries.length > MAX_ATLAS_FRAMES || !Number.isSafeInteger(pad) || pad < 0 || !Number.isSafeInteger(limitWidth) || limitWidth <= 0 || limitWidth > MAX_ATLAS_DIMENSION || !Number.isSafeInteger(limitHeight) || limitHeight <= 0 || limitHeight > MAX_ATLAS_DIMENSION || !Number.isSafeInteger(pixelLimit) || pixelLimit <= 0 || pixelLimit > MAX_ATLAS_PIXELS) throw new RangeError("Atlas pack limitleri geçersiz.");
-    if (![pad, limitWidth, limitHeight, pixelLimit].every(Number.isFinite) || ![pad, limitWidth, limitHeight, pixelLimit].every(Number.isInteger) || pad < 0 || limitWidth <= 0 || limitHeight <= 0 || pixelLimit <= 0) throw new RangeError("Atlas pack limitleri geçersiz.");
+    if (entries.length > MAX_ATLAS_FRAMES || !Number.isSafeInteger(pad) || pad < 0 || !Number.isSafeInteger(limitWidth) || limitWidth <= 0 || limitWidth > MAX_ATLAS_DIMENSION || !Number.isSafeInteger(limitHeight) || limitHeight <= 0 || limitHeight > MAX_ATLAS_DIMENSION || !Number.isSafeInteger(pixelLimit) || pixelLimit <= 0 || pixelLimit > MAX_ATLAS_PIXELS) throw new RangeError("Atlas pack limits are invalid.");
+    if (![pad, limitWidth, limitHeight, pixelLimit].every(Number.isFinite) || ![pad, limitWidth, limitHeight, pixelLimit].every(Number.isInteger) || pad < 0 || limitWidth <= 0 || limitHeight <= 0 || pixelLimit <= 0) throw new RangeError("Atlas pack limits are invalid.");
     const names = new Set();
     const items = entries.map((entry) => {
       const name = String(entry?.name || "");
       const resolved = resolvePackSource(entry?.source);
       const { source, sourceX, sourceY, width, height } = resolved;
-      if (!name || name.length > MAX_ATLAS_FRAME_NAME_LENGTH || names.has(name)) throw new TypeError("Atlas pack frame adı geçersiz veya benzersiz değil.");
+      if (!name || name.length > MAX_ATLAS_FRAME_NAME_LENGTH || names.has(name)) throw new TypeError("Atlas pack frame name is invalid or not unique.");
       const paddedWidth = width + pad * 2; const paddedHeight = height + pad * 2;
-      if (!source || width > MAX_ATLAS_DIMENSION || height > MAX_ATLAS_DIMENSION || !Number.isSafeInteger(paddedWidth) || !Number.isSafeInteger(paddedHeight) || paddedWidth > limitWidth || paddedHeight > limitHeight) throw new RangeError(`Atlas pack kaynak boyutu limiti aşıldı: ${name}`);
+      if (!source || width > MAX_ATLAS_DIMENSION || height > MAX_ATLAS_DIMENSION || !Number.isSafeInteger(paddedWidth) || !Number.isSafeInteger(paddedHeight) || paddedWidth > limitWidth || paddedHeight > limitHeight) throw new RangeError(`Atlas pack source size limit exceeded: ${name}`);
       names.add(name);
       return { name, source, sourceX, sourceY, width, height };
     });
@@ -218,13 +218,13 @@ export class TextureAtlas {
         x += packedWidth; rowHeight = Math.max(rowHeight, packedHeight);
       }
       if (next.length === items.length) { placements = next; atlasHeight = y + rowHeight; break; }
-      if (atlasWidth >= limitWidth) throw new RangeError("Atlas pack maksimum boyutu aşıldı.");
+      if (atlasWidth >= limitWidth) throw new RangeError("Atlas pack maximum size exceeded.");
       atlasWidth = Math.min(limitWidth, atlasWidth * 2);
     }
-    if (atlasWidth * atlasHeight > pixelLimit) throw new RangeError("Atlas pack pixel limiti aşıldı.");
+    if (atlasWidth * atlasHeight > pixelLimit) throw new RangeError("Atlas pack pixel limit exceeded.");
     const canvas = createCanvas(atlasWidth, atlasHeight);
     const context = canvas.getContext?.("2d");
-    if (!context?.drawImage) throw new Error("Atlas pack için 2D canvas context gerekli.");
+    if (!context?.drawImage) throw new Error("Atlas pack requires a 2D canvas context.");
     const frames = Object.create(null);
     for (const item of placements) {
       drawPaddedImage(context, item, pad);

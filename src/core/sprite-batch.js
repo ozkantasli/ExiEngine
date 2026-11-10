@@ -47,7 +47,7 @@ function syncSpriteAnimationTexture(sprite) {
 function normalizeAnimation(options) {
   if (options === null || options === undefined) return null;
   if (!options || typeof options !== "object" || !Array.isArray(options.frames) || options.frames.length === 0 || options.frames.length > MAX_ANIMATION_FRAMES || options.frames.some((frame) => !(frame instanceof Texture))) {
-    throw new TypeError("SpriteBatch animation frames Texture dizisi geçersiz veya limit dışı.");
+    throw new TypeError("SpriteBatch animation frames Texture array is invalid or out of limits.");
   }
   const requestedRate = Number(options.frameRate ?? 12);
   const requestedFrame = Number(options.currentFrame ?? 0);
@@ -142,7 +142,7 @@ function includeBoundsPoint(bounds, x, y) {
 export class SpriteBatch extends Node {
   constructor({ texture = Texture.white, chunkSize = 256, spatialCulling = false, cellSize = 256, instanced = false, gpuCulling = false, ...options } = {}) {
     super({ name: "sprite-batch", ...options });
-    if (!(texture instanceof Texture)) throw new TypeError("SpriteBatch texture bekleniyor.");
+    if (!(texture instanceof Texture)) throw new TypeError("SpriteBatch texture expected.");
     this.texture = texture;
     this.isBatch = true;
     this.chunkSize = Math.max(1, Math.min(4096, Number(chunkSize) | 0 || 256));
@@ -208,27 +208,27 @@ export class SpriteBatch extends Node {
   markDirty() { this.invalidate({ preserveInstanceBuffer: true }); return this; }
 
   validateSpriteTexture(texture) {
-    if (!(texture instanceof Texture)) throw new TypeError("SpriteBatch sprite texture bekleniyor.");
+    if (!(texture instanceof Texture)) throw new TypeError("SpriteBatch sprite texture expected.");
     const batchBase = this.texture.baseTexture || this.texture;
     const spriteBase = texture.baseTexture || texture;
-    if (batchBase !== spriteBase) throw new Error("SpriteBatch sprite texture aynı atlas/base texture kullanmalı.");
+    if (batchBase !== spriteBase) throw new Error("SpriteBatch sprite texture must use the same atlas/base texture.");
   }
 
   validateSpriteAnimation(animation) {
     if (!animation) return;
-    if (typeof animation.onComplete !== "function" && animation.onComplete !== null) throw new TypeError("SpriteBatch animation onComplete fonksiyonu gerekli.");
-    if (typeof animation.onLoop !== "function" && animation.onLoop !== null) throw new TypeError("SpriteBatch animation onLoop fonksiyonu gerekli.");
-    if (typeof animation.onFrameChange !== "function" && animation.onFrameChange !== null) throw new TypeError("SpriteBatch animation onFrameChange fonksiyonu gerekli.");
+    if (typeof animation.onComplete !== "function" && animation.onComplete !== null) throw new TypeError("SpriteBatch animation onComplete function is required.");
+    if (typeof animation.onLoop !== "function" && animation.onLoop !== null) throw new TypeError("SpriteBatch animation onLoop function is required.");
+    if (typeof animation.onFrameChange !== "function" && animation.onFrameChange !== null) throw new TypeError("SpriteBatch animation onFrameChange function is required.");
     const batchBase = this.texture.baseTexture || this.texture;
     for (const frame of animation.frames) {
-      if (!(frame instanceof Texture)) throw new TypeError("SpriteBatch animation frame Texture bekleniyor.");
+      if (!(frame instanceof Texture)) throw new TypeError("SpriteBatch animation frame Texture expected.");
       const frameBase = frame.baseTexture || frame;
-      if (batchBase !== frameBase) throw new Error("SpriteBatch animation frame'leri aynı atlas/base texture kullanmalı.");
+      if (batchBase !== frameBase) throw new Error("SpriteBatch animation frames must use the same atlas/base texture.");
     }
   }
 
   addSprite(options = {}) {
-    if (this.sprites.length >= MAX_SPRITES) throw new RangeError(`SpriteBatch sprite limiti ${MAX_SPRITES}.`);
+    if (this.sprites.length >= MAX_SPRITES) throw new RangeError(`SpriteBatch sprite limit is ${MAX_SPRITES}.`);
     const sprite = normalizeSprite(options, this.texture);
     this.validateSpriteTexture(sprite.texture);
     this.validateSpriteAnimation(sprite.animation);
@@ -238,8 +238,8 @@ export class SpriteBatch extends Node {
   }
 
   addSprites(options = []) {
-    if (!Array.isArray(options)) throw new TypeError("SpriteBatch toplu sprite listesi array olmalı.");
-    if (options.length > MAX_SPRITES - this.sprites.length) throw new RangeError(`SpriteBatch sprite limiti ${MAX_SPRITES}.`);
+    if (!Array.isArray(options)) throw new TypeError("SpriteBatch bulk sprite list must be an array.");
+    if (options.length > MAX_SPRITES - this.sprites.length) throw new RangeError(`SpriteBatch sprite limit is ${MAX_SPRITES}.`);
     if (options.length === 0) return this;
     const pending = new Array(options.length);
     for (let index = 0; index < options.length; index += 1) {
@@ -379,11 +379,11 @@ export class SpriteBatch extends Node {
   clear() { this.sprites.length = 0; this.chunkItems.length = 0; this.chunkBounds.length = 0; this.instanceChunkItems.length = 0; this.invalidate(); return this; }
 
   setTexture(texture) {
-    if (!(texture instanceof Texture)) throw new TypeError("SpriteBatch texture bekleniyor.");
+    if (!(texture instanceof Texture)) throw new TypeError("SpriteBatch texture expected.");
     const batchBase = texture.baseTexture || texture;
     for (const sprite of this.sprites) {
       const spriteBase = sprite.texture.baseTexture || sprite.texture;
-      if (batchBase !== spriteBase) throw new Error("SpriteBatch mevcut sprite texture'larıyla aynı atlas/base texture kullanmalı.");
+      if (batchBase !== spriteBase) throw new Error("SpriteBatch must use the same atlas/base texture as its existing sprite textures.");
     }
     this.texture = texture;
     this.invalidate();
@@ -391,7 +391,7 @@ export class SpriteBatch extends Node {
   }
 
   setFrame(texture) {
-    if (!(texture instanceof Texture)) throw new TypeError("SpriteBatch frame texture bekleniyor.");
+    if (!(texture instanceof Texture)) throw new TypeError("SpriteBatch frame texture expected.");
     this.validateSpriteTexture(texture);
     for (const sprite of this.sprites) sprite.texture = texture;
     this.invalidate({ preserveInstanceBuffer: true });
@@ -512,7 +512,7 @@ export class SpriteBatch extends Node {
   }
 
   getInstanceItems(camera, width, height, { gpuCulling = false, alpha = this.worldAlpha } = {}) {
-    if (this.sprites.length > MAX_SPRITES) throw new RangeError(`SpriteBatch sprite limiti ${MAX_SPRITES}.`);
+    if (this.sprites.length > MAX_SPRITES) throw new RangeError(`SpriteBatch sprite limit is ${MAX_SPRITES}.`);
     const renderAlpha = Number.isFinite(Number(alpha)) ? Math.max(0, Math.min(1, Number(alpha))) : 1;
     const useGpuCulling = this.gpuCulling && gpuCulling;
     const canCull = Boolean(camera && this.cullable !== false);
@@ -744,7 +744,7 @@ export class SpriteBatch extends Node {
   }
 
   getRenderItems(camera = null, width = 0, height = 0) {
-    if (this.sprites.length > MAX_SPRITES) throw new RangeError(`SpriteBatch sprite limiti ${MAX_SPRITES}.`);
+    if (this.sprites.length > MAX_SPRITES) throw new RangeError(`SpriteBatch sprite limit is ${MAX_SPRITES}.`);
     const canCull = camera && this.cullable !== false;
     const renderItemsKey = canCull ? this.getStaticRenderKey(camera, width, height) : "all";
     if (!this.itemsDirty && this.renderItemsKey === renderItemsKey) { this.lastCulledCount = 0; return this.renderItems; }
@@ -780,7 +780,7 @@ export class SpriteBatch extends Node {
   }
 
   getLocalBounds() {
-    if (this.sprites.length > MAX_SPRITES) throw new RangeError(`SpriteBatch sprite limiti ${MAX_SPRITES}.`);
+    if (this.sprites.length > MAX_SPRITES) throw new RangeError(`SpriteBatch sprite limit is ${MAX_SPRITES}.`);
     if (this.boundsCache.version === this.contentVersion) return this.boundsCache.value;
     if (!this.sprites.length) {
       this.boundsCache = { version: this.contentVersion, value: { x: 0, y: 0, width: 0, height: 0 } };

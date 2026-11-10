@@ -76,28 +76,28 @@ function readImageDimensions(bytes) {
 }
 
 function assertImageDimensions(width, height, maxImageSize, maxTexturePixels) {
-  if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width <= 0 || height <= 0) throw new Error("Texture boyutu geçersiz.");
-  if (width > maxImageSize || height > maxImageSize) throw new Error("Texture boyutu limiti aşıldı.");
+  if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width <= 0 || height <= 0) throw new Error("Texture size is invalid.");
+  if (width > maxImageSize || height > maxImageSize) throw new Error("Texture size limit exceeded.");
   const pixels = width * height;
-  if (!Number.isSafeInteger(pixels) || pixels > maxTexturePixels) throw new Error("Texture pixel limiti aşıldı.");
+  if (!Number.isSafeInteger(pixels) || pixels > maxTexturePixels) throw new Error("Texture pixel limit exceeded.");
 }
 
 function positiveLimit(value, label) {
-  if (!Number.isSafeInteger(value) || value <= 0) throw new RangeError(`${label} limiti geçersiz.`);
+  if (!Number.isSafeInteger(value) || value <= 0) throw new RangeError(`${label} limit is invalid.`);
   return value;
 }
 
 function boundedPositiveLimit(value, label, maximum) {
   const result = positiveLimit(value, label);
-  if (result > maximum) throw new RangeError(`${label} limiti ${maximum} değerini aşamaz.`);
+  if (result > maximum) throw new RangeError(`${label} limit cannot exceed ${maximum}.`);
   return result;
 }
 
 function normalizeIntegrity(value) {
   if (value === undefined || value === null || value === "") return null;
-  if (typeof value !== "string" || value.length > MAX_INTEGRITY_LENGTH) throw new TypeError("Asset integrity değeri geçersiz.");
+  if (typeof value !== "string" || value.length > MAX_INTEGRITY_LENGTH) throw new TypeError("Asset integrity value is invalid.");
   const hashes = value.trim().split(/\s+/).filter(Boolean);
-  if (hashes.length === 0 || hashes.length > MAX_INTEGRITY_HASHES || hashes.some((hash) => !/^sha256-[A-Za-z0-9+/]{43}=$/.test(hash))) throw new TypeError("Asset integrity yalnızca en fazla dört sha256 hash kabul eder.");
+  if (hashes.length === 0 || hashes.length > MAX_INTEGRITY_HASHES || hashes.some((hash) => !/^sha256-[A-Za-z0-9+/]{43}=$/.test(hash))) throw new TypeError("Asset integrity accepts at most four sha256 hashes.");
   return hashes.join(" ");
 }
 
@@ -119,12 +119,12 @@ function encodeBase64(bytes) {
 async function verifyIntegrity(bytes, integrity) {
   if (!integrity) return bytes;
   const subtle = globalThis.crypto?.subtle;
-  if (typeof subtle?.digest !== "function") throw new Error("Asset integrity için Web Crypto gerekli.");
+  if (typeof subtle?.digest !== "function") throw new Error("Asset integrity requires Web Crypto.");
   const verifiedBytes = bytes.slice();
   const digest = await subtle.digest("SHA-256", verifiedBytes);
   const actual = `sha256-${encodeBase64(new Uint8Array(digest))}`;
   if (!integrity.split(" ").includes(actual)) {
-    const error = new Error("Asset integrity doğrulaması başarısız.");
+    const error = new Error("Asset integrity verification failed.");
     error.code = "EXI_ASSET_INTEGRITY";
     throw error;
   }
@@ -139,9 +139,9 @@ function validateJSONShape(value, maxNodes, maxDepth) {
     const current = values.pop();
     const depth = depths.pop();
     nodes += 1;
-    if (nodes > maxNodes) throw new RangeError("JSON düğüm limiti aşıldı.");
+    if (nodes > maxNodes) throw new RangeError("JSON node limit exceeded.");
     if (!current || typeof current !== "object") continue;
-    if (depth >= maxDepth) throw new RangeError("JSON derinlik limiti aşıldı.");
+    if (depth >= maxDepth) throw new RangeError("JSON depth limit exceeded.");
     if (Array.isArray(current)) {
       for (let index = current.length - 1; index >= 0; index -= 1) {
         values.push(current[index]);
@@ -166,7 +166,7 @@ function validateJSONTextBudget(text, maxNodes, maxDepth) {
   let stringIsObjectKey = false;
   const recordValue = () => {
     nodes += 1;
-    if (nodes > maxNodes) throw new RangeError("JSON düğüm limiti aşıldı.");
+    if (nodes > maxNodes) throw new RangeError("JSON node limit exceeded.");
   };
   for (let index = 0; index < text.length; index += 1) {
     const character = text[index];
@@ -186,7 +186,7 @@ function validateJSONTextBudget(text, maxNodes, maxDepth) {
       continue;
     }
     if (character === "{" || character === "[") {
-      if (depth >= maxDepth) throw new RangeError("JSON derinlik limiti aşıldı.");
+      if (depth >= maxDepth) throw new RangeError("JSON depth limit exceeded.");
       recordValue();
       depth += 1;
       contexts.push({ type: character === "{" ? "object" : "array", state: character === "{" ? "key" : "value" });
@@ -194,7 +194,7 @@ function validateJSONTextBudget(text, maxNodes, maxDepth) {
     }
     if (character === "}" || character === "]") {
       const context = contexts.pop();
-      if (!context || (character === "}" ? context.type !== "object" : context.type !== "array")) throw new SyntaxError("JSON yapısı geçersiz.");
+      if (!context || (character === "}" ? context.type !== "object" : context.type !== "array")) throw new SyntaxError("JSON structure is invalid.");
       depth -= 1;
       continue;
     }
@@ -212,16 +212,16 @@ function validateJSONTextBudget(text, maxNodes, maxDepth) {
     recordValue();
     while (index + 1 < text.length && !/[\s\[\]{}:,]/.test(text[index + 1])) index += 1;
   }
-  if (inString || escaped || depth !== 0) throw new SyntaxError("JSON yapısı geçersiz.");
+  if (inString || escaped || depth !== 0) throw new SyntaxError("JSON structure is invalid.");
 }
 
 async function readLimited(response, maxBytes) {
-  if (!response.ok) throw new Error(`Asset yüklenemedi: HTTP ${response.status}`);
+  if (!response.ok) throw new Error(`Asset could not be loaded: HTTP ${response.status}`);
   const contentLength = Number(response.headers.get("content-length"));
-  if (contentLength > maxBytes) throw new Error(`Asset limiti aşıldı: ${contentLength} > ${maxBytes} byte`);
+  if (contentLength > maxBytes) throw new Error(`Asset limit exceeded: ${contentLength} > ${maxBytes} bytes`);
   if (!response.body?.getReader) {
     const bytes = new Uint8Array(await response.arrayBuffer());
-    if (bytes.byteLength > maxBytes) throw new Error("Asset limiti aşıldı.");
+    if (bytes.byteLength > maxBytes) throw new Error("Asset limit exceeded.");
     return bytes;
   }
   const reader = response.body.getReader();
@@ -229,9 +229,9 @@ async function readLimited(response, maxBytes) {
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
-    if (chunks.length >= MAX_STREAM_CHUNKS) { await reader.cancel(); throw new Error("Asset stream parça limiti aşıldı."); }
+    if (chunks.length >= MAX_STREAM_CHUNKS) { await reader.cancel(); throw new Error("Asset stream chunk limit exceeded."); }
     size += value.byteLength;
-    if (size > maxBytes) { await reader.cancel(); throw new Error("Asset limiti aşıldı."); }
+    if (size > maxBytes) { await reader.cancel(); throw new Error("Asset limit exceeded."); }
     chunks.push(value);
   }
   const bytes = new Uint8Array(size); let offset = 0;
@@ -241,7 +241,7 @@ async function readLimited(response, maxBytes) {
 
 function waitForAbort(promise, signal) {
   if (!signal || typeof signal.addEventListener !== "function") return promise;
-  const abortReason = () => signal.reason || Object.assign(new Error("Asset yükleme iptal edildi."), { name: "AbortError" });
+  const abortReason = () => signal.reason || Object.assign(new Error("Asset loading was aborted."), { name: "AbortError" });
   if (signal.aborted) return Promise.reject(abortReason());
   return new Promise((resolve, reject) => {
     // First-settle-wins latch via shared sentinels: UNINITIALIZED (pending) → CONSUMED (fired).
@@ -262,8 +262,8 @@ export class AssetLoader {
     this._allowedOriginsSnapshot = new Set(this.allowedOrigins);
     this.maxBytes = boundedPositiveLimit(maxBytes, "Asset byte", MAX_ASSET_BYTES);
     this.maxJSONBytes = boundedPositiveLimit(maxJSONBytes, "JSON byte", MAX_JSON_BYTES);
-    this.maxJSONNodes = boundedPositiveLimit(maxJSONNodes, "JSON düğüm", MAX_JSON_NODES);
-    this.maxJSONDepth = boundedPositiveLimit(maxJSONDepth, "JSON derinlik", MAX_JSON_DEPTH);
+    this.maxJSONNodes = boundedPositiveLimit(maxJSONNodes, "JSON node", MAX_JSON_NODES);
+    this.maxJSONDepth = boundedPositiveLimit(maxJSONDepth, "JSON depth", MAX_JSON_DEPTH);
     this.maxImageSize = boundedPositiveLimit(maxImageSize, "Image", MAX_IMAGE_SIZE);
     this.maxTexturePixels = boundedPositiveLimit(maxTexturePixels, "Texture pixel", MAX_TEXTURE_PIXELS);
     this._maxBytesCapacity = this.maxBytes;
@@ -272,8 +272,8 @@ export class AssetLoader {
     this._maxJSONDepthCapacity = this.maxJSONDepth;
     this._maxImageSizeCapacity = this.maxImageSize;
     this._maxTexturePixelsCapacity = this.maxTexturePixels;
-    if (!Number.isSafeInteger(maxCacheTextures) || maxCacheTextures <= 0 || maxCacheTextures > MAX_CACHE_TEXTURES) throw new RangeError("Texture cache sayı limiti geçersiz.");
-    if (!Number.isSafeInteger(maxCachePixels) || maxCachePixels <= 0 || maxCachePixels > MAX_CACHE_PIXELS) throw new RangeError("Texture cache pixel limiti geçersiz.");
+    if (!Number.isSafeInteger(maxCacheTextures) || maxCacheTextures <= 0 || maxCacheTextures > MAX_CACHE_TEXTURES) throw new RangeError("Texture cache count limit is invalid.");
+    if (!Number.isSafeInteger(maxCachePixels) || maxCachePixels <= 0 || maxCachePixels > MAX_CACHE_PIXELS) throw new RangeError("Texture cache pixel limit is invalid.");
     this._cacheTextureCapacity = maxCacheTextures;
     this._cachePixelCapacity = maxCachePixels;
     this.maxCacheTextures = maxCacheTextures;
@@ -294,11 +294,11 @@ export class AssetLoader {
   }
 
   assertConfigBudget() {
-    if (this.baseURL !== this._baseURLSnapshot || !(this.allowedOrigins instanceof Set) || this.allowedOrigins.size !== this._allowedOriginsSnapshot.size || [...this._allowedOriginsSnapshot].some((origin) => !this.allowedOrigins.has(origin))) throw new Error("Asset origin ayarları doğrudan değiştirilemez.");
-    if (this.maxBytes !== this._maxBytesCapacity || this.maxJSONBytes !== this._maxJSONBytesCapacity || this.maxJSONNodes !== this._maxJSONNodesCapacity || this.maxJSONDepth !== this._maxJSONDepthCapacity || this.maxImageSize !== this._maxImageSizeCapacity || this.maxTexturePixels !== this._maxTexturePixelsCapacity) throw new RangeError("Asset limit bütçesi doğrudan değiştirilemez.");
+    if (this.baseURL !== this._baseURLSnapshot || !(this.allowedOrigins instanceof Set) || this.allowedOrigins.size !== this._allowedOriginsSnapshot.size || [...this._allowedOriginsSnapshot].some((origin) => !this.allowedOrigins.has(origin))) throw new Error("Asset origin settings cannot be changed directly.");
+    if (this.maxBytes !== this._maxBytesCapacity || this.maxJSONBytes !== this._maxJSONBytesCapacity || this.maxJSONNodes !== this._maxJSONNodesCapacity || this.maxJSONDepth !== this._maxJSONDepthCapacity || this.maxImageSize !== this._maxImageSizeCapacity || this.maxTexturePixels !== this._maxTexturePixelsCapacity) throw new RangeError("Asset limit budget cannot be changed directly.");
   }
 
-  ensureActive() { if (this.destroyed) throw new Error("AssetLoader yok edilmiş."); this.assertConfigBudget(); }
+  ensureActive() { if (this.destroyed) throw new Error("AssetLoader has been destroyed."); this.assertConfigBudget(); }
 
   createRequestSignal(signal) {
     if (typeof AbortController !== "function") return { signal, dispose() {} };
@@ -339,16 +339,16 @@ export class AssetLoader {
   }
 
   assertCacheBudget() {
-    if (this.maxCacheTextures !== this._cacheTextureCapacity || this.maxCachePixels !== this._cachePixelCapacity) throw new RangeError("Texture cache bütçesi doğrudan değiştirilemez.");
-    if (this.cache.size > this._cacheTextureCapacity) throw new RangeError(`Texture cache sayısı limiti ${this._cacheTextureCapacity}.`);
+    if (this.maxCacheTextures !== this._cacheTextureCapacity || this.maxCachePixels !== this._cachePixelCapacity) throw new RangeError("Texture cache budget cannot be changed directly.");
+    if (this.cache.size > this._cacheTextureCapacity) throw new RangeError(`Texture cache count limit is ${this._cacheTextureCapacity}.`);
     let pixels = 0;
     for (const [key, texture] of this.cache) {
-      if (!(texture instanceof Texture)) throw new TypeError("Cache texture bekleniyor.");
+      if (!(texture instanceof Texture)) throw new TypeError("Cache texture expected.");
       if (texture.destroyed) { this.cache.delete(key); continue; }
       const texturePixels = texture.sourceWidth * texture.sourceHeight;
-      if (!Number.isSafeInteger(texturePixels) || texturePixels <= 0) throw new RangeError("Cache texture boyutu geçersiz.");
+      if (!Number.isSafeInteger(texturePixels) || texturePixels <= 0) throw new RangeError("Cache texture size is invalid.");
       pixels += texturePixels;
-      if (!Number.isSafeInteger(pixels) || pixels > this._cachePixelCapacity) throw new RangeError(`Texture cache pixel limiti ${this._cachePixelCapacity}.`);
+      if (!Number.isSafeInteger(pixels) || pixels > this._cachePixelCapacity) throw new RangeError(`Texture cache pixel limit is ${this._cachePixelCapacity}.`);
     }
     this.cachePixels = pixels;
   }
@@ -362,9 +362,9 @@ export class AssetLoader {
 
   cacheTexture(resolved, texture) {
     this.assertCacheBudget();
-    if (!(texture instanceof Texture)) throw new TypeError("Cache texture bekleniyor.");
+    if (!(texture instanceof Texture)) throw new TypeError("Cache texture expected.");
     const pixels = texture.sourceWidth * texture.sourceHeight;
-    if (!Number.isSafeInteger(pixels) || pixels <= 0) throw new RangeError("Cache texture boyutu geçersiz.");
+    if (!Number.isSafeInteger(pixels) || pixels <= 0) throw new RangeError("Cache texture size is invalid.");
     const existing = this.cache.get(resolved);
     if (existing) {
       if (existing.destroyed) {
@@ -381,9 +381,9 @@ export class AssetLoader {
   resolve(url) {
     this.assertConfigBudget();
     const resolved = new URL(url, this.baseURL);
-    if (resolved.username || resolved.password) throw new Error("Asset URL kimlik bilgisi taşıyamaz.");
+    if (resolved.username || resolved.password) throw new Error("Asset URL cannot carry credentials.");
     if (!["http:", "https:"].includes(resolved.protocol) || !this.allowedOrigins.has(resolved.origin)) {
-      throw new Error(`Asset originine izin yok: ${resolved.origin}`);
+      throw new Error(`Asset origin is not allowed: ${resolved.origin}`);
     }
     return resolved.href;
   }
@@ -400,13 +400,13 @@ export class AssetLoader {
 
   resolveJSONNodes(requested) {
     this.assertConfigBudget();
-    const value = requested === undefined ? this.maxJSONNodes : positiveLimit(requested, "JSON düğüm");
+    const value = requested === undefined ? this.maxJSONNodes : positiveLimit(requested, "JSON node");
     return Math.min(this.maxJSONNodes, value);
   }
 
   resolveJSONDepth(requested) {
     this.assertConfigBudget();
-    const value = requested === undefined ? this.maxJSONDepth : positiveLimit(requested, "JSON derinlik");
+    const value = requested === undefined ? this.maxJSONDepth : positiveLimit(requested, "JSON depth");
     return Math.min(this.maxJSONDepth, value);
   }
 
@@ -457,7 +457,7 @@ export class AssetLoader {
       this.ensureActive();
       const current = integrity ? null : this.getCachedTexture(resolved);
       if (current) return current;
-      if (typeof createImageBitmap !== "function") throw new Error("createImageBitmap gerekli.");
+      if (typeof createImageBitmap !== "function") throw new Error("createImageBitmap is required.");
       const bytes = await this.loadBytes(resolved, { ...options, signal: null, maxBytes });
       const dimensions = readImageDimensions(bytes);
       if (dimensions) assertImageDimensions(dimensions.width, dimensions.height, this.maxImageSize, this.maxTexturePixels);
@@ -480,7 +480,7 @@ export class AssetLoader {
       }
       try { assertImageDimensions(Number(source.width), Number(source.height), this.maxImageSize, this.maxTexturePixels); }
       catch (error) { source.close?.(); throw error; }
-      if (this.destroyed) { source.close?.(); throw new Error("AssetLoader yok edilmiş."); }
+      if (this.destroyed) { source.close?.(); throw new Error("AssetLoader has been destroyed."); }
       const texture = Texture.fromImage(source, { id: resolved });
       if (!integrity) {
         const existing = this.getCachedTexture(resolved);
@@ -525,18 +525,18 @@ export class AssetLoader {
       const info = this.inspectKTX2(bytes);
       let texture;
       if (info.rgba8) {
-        if (typeof globalThis.createImageBitmap !== "function" || typeof globalThis.ImageData !== "function") throw new Error("KTX2 RGBA8 için ImageData ve createImageBitmap gerekli.");
+        if (typeof globalThis.createImageBitmap !== "function" || typeof globalThis.ImageData !== "function") throw new Error("KTX2 RGBA8 requires ImageData and createImageBitmap.");
         const level = info.levels[0];
         const pixels = new Uint8ClampedArray(bytes.buffer, bytes.byteOffset + level.byteOffset, level.byteLength);
         const source = await globalThis.createImageBitmap(new globalThis.ImageData(pixels, info.width, info.height));
-        if (!source || Number(source.width) !== info.width || Number(source.height) !== info.height) { source?.close?.(); throw new TypeError("KTX2 ImageBitmap boyutu header ile eşleşmiyor."); }
-        if (this.destroyed) { source.close?.(); throw new Error("AssetLoader yok edilmiş."); }
+        if (!source || Number(source.width) !== info.width || Number(source.height) !== info.height) { source?.close?.(); throw new TypeError("KTX2 ImageBitmap size does not match the header."); }
+        if (this.destroyed) { source.close?.(); throw new Error("AssetLoader has been destroyed."); }
         texture = Texture.fromImage(source, { id: resolved });
       } else {
-        if (typeof decoder !== "function") throw new Error("KTX2 sıkıştırılmış formatı için decoder adaptörü gerekli.");
+        if (typeof decoder !== "function") throw new Error("A decoder adapter is required for compressed KTX2 formats.");
         const decoded = await decoder(bytes, info, { signal: null });
-        if (!decoded || decoded instanceof Texture || Number(decoded.width) !== info.width || Number(decoded.height) !== info.height) throw new TypeError("KTX2 decoder eşleşen CanvasImageSource döndürmeli.");
-        if (this.destroyed) { decoded.close?.(); throw new Error("AssetLoader yok edilmiş."); }
+        if (!decoded || decoded instanceof Texture || Number(decoded.width) !== info.width || Number(decoded.height) !== info.height) throw new TypeError("KTX2 decoder must return a matching CanvasImageSource.");
+        if (this.destroyed) { decoded.close?.(); throw new Error("AssetLoader has been destroyed."); }
         texture = Texture.fromImage(decoded, { id: resolved });
       }
       if (!integrity) {
@@ -551,8 +551,8 @@ export class AssetLoader {
   }
 
   async loadMany(entries, { onProgress = () => {}, signal = null, stopOnError = true, maxConcurrent = 4 } = {}) {
-    if (!Array.isArray(entries)) throw new TypeError("Asset listesi dizi olmalı.");
-    if (entries.length > MAX_BATCH_ENTRIES) throw new RangeError(`Asset batch limiti ${MAX_BATCH_ENTRIES}.`);
+    if (!Array.isArray(entries)) throw new TypeError("Asset list must be an array.");
+    if (entries.length > MAX_BATCH_ENTRIES) throw new RangeError(`Asset batch limit is ${MAX_BATCH_ENTRIES}.`);
     const total = entries.length;
     const results = new Map();
     const errors = new Map();
@@ -562,19 +562,19 @@ export class AssetLoader {
     const workerCount = Math.max(1, Math.min(total || 1, Math.floor(maxConcurrent) || 1));
 
     const loadEntry = async (entry) => {
-      if (!entry || typeof entry.key !== "string" || !entry.key.trim() || entry.key.length > MAX_ASSET_KEY_LENGTH) throw new TypeError("Asset anahtarı geçersiz veya fazla uzun.");
-      if (seen.has(entry.key)) throw new Error(`Asset anahtarı tekrar ediyor: ${entry.key}`);
+      if (!entry || typeof entry.key !== "string" || !entry.key.trim() || entry.key.length > MAX_ASSET_KEY_LENGTH) throw new TypeError("Asset key is invalid or too long.");
+      if (seen.has(entry.key)) throw new Error(`Duplicate asset key: ${entry.key}`);
       seen.add(entry.key);
       const options = { ...(entry.options || {}), signal: signal || entry.options?.signal };
       if (entry.type === "json") return this.loadJSON(entry.url, options);
       if (entry.type === "bytes") return this.loadBytes(entry.url, options);
       if (entry.type === "ktx2") return this.loadKTX2(entry.url, { ...options, decoder: entry.decoder });
       if (entry.type === "atlas") {
-        if (typeof entry.atlasUrl !== "string" || !entry.atlasUrl) throw new TypeError("Atlas asset atlasUrl gerekli.");
+        if (typeof entry.atlasUrl !== "string" || !entry.atlasUrl) throw new TypeError("Atlas asset atlasUrl is required.");
         return this.loadAtlas(entry.url, entry.atlasUrl, options);
       }
       if (!entry.type || entry.type === "texture") return this.loadTexture(entry.url, options);
-      throw new Error(`Desteklenmeyen asset türü: ${entry.type}`);
+      throw new Error(`Unsupported asset type: ${entry.type}`);
     };
 
     const worker = async () => {

@@ -51,22 +51,22 @@ test("animation: Animator ekle/çıkar ve limitler", () => {
   const b = new Tween({ value: 0 }, "value", 1, 1);
   assert.equal(limited.add(a), a);
   assert.equal(limited.add(a), a);
-  assert.throws(() => limited.add(b), /en fazla 1 tween/);
+  assert.throws(() => limited.add(b), /at most 1 tween/);
   assert.equal(limited.remove(a), true);
   assert.equal(limited.add(b), b);
-  assert.throws(() => new Animator({ maxTweens: 0 }), /tween limiti/);
-  assert.throws(() => new Animator({ maxTweens: 65_537 }), /tween limiti/);
+  assert.throws(() => new Animator({ maxTweens: 0 }), /tween limit/);
+  assert.throws(() => new Animator({ maxTweens: 65_537 }), /tween limit/);
 });
 
 test("animation: Animator doğrudan mutasyon koruması", () => {
   const limited = new Animator({ maxTweens: 1 });
   limited.tweens.add(new Tween({ value: 0 }, "value", 1, 1));
-  assert.throws(() => limited.add(new Tween({ value: 0 }, "value", 1, 1)), /en fazla 1 tween/);
+  assert.throws(() => limited.add(new Tween({ value: 0 }, "value", 1, 1)), /at most 1 tween/);
   limited.tweens.add(new Tween({ value: 0 }, "value", 1, 1));
-  assert.throws(() => limited.update(0), /tween limiti/);
+  assert.throws(() => limited.update(0), /tween limit/);
   const capacity = new Animator({ maxTweens: 1 });
   capacity.maxTweens = 2;
-  assert.throws(() => capacity.add(new Tween({ value: 0 }, "value", 1, 1)), /tween limiti/);
+  assert.throws(() => capacity.add(new Tween({ value: 0 }, "value", 1, 1)), /tween limit/);
 });
 
 test("animation: onComplete ve otomatik kaldırma", () => {

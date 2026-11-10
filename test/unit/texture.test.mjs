@@ -10,7 +10,7 @@ test("texture: varsayılanlar ve güvenli normalizasyon", () => {
   assert.equal(safe.u0, 0);
   assert.equal(safe.u1, 1);
   assert.throws(() => new Texture({ u0: 0.8, u1: 0.2 }), /UV/);
-  assert.throws(() => new Texture({ source: { width: 16_385, height: 1 } }), /boyutu/);
+  assert.throws(() => new Texture({ source: { width: 16_385, height: 1 } }), /size/);
   assert.equal(Texture.white.width, 1);
 });
 
@@ -36,7 +36,7 @@ test("texture: subTexture UV hesaplaması", () => {
   assert.equal(inner.v0, 0.25);
   assert.equal(inner.u1, 0.5);
   assert.equal(inner.v1, 0.35);
-  assert.throws(() => new Texture({ id: "tiny", sourceWidth: 2, sourceHeight: 2 }).subTexture({ x: 2, y: 0, width: 1, height: 1 }), /sınır/);
+  assert.throws(() => new Texture({ id: "tiny", sourceWidth: 2, sourceHeight: 2 }).subTexture({ x: 2, y: 0, width: 1, height: 1 }), /bound|limit/);
 });
 
 test("texture: destroy ve markDirty", () => {
@@ -51,8 +51,8 @@ test("texture: destroy ve markDirty", () => {
   assert.throws(() => texture.updateSource({ width: 8, height: 8 }));
   texture.destroy();
   assert.throws(() => texture.markDirty());
-  assert.throws(() => texture.subTexture({ x: 0, y: 0, width: 1, height: 1 }), /yok edilmiş/);
-  assert.throws(() => texture.setFilter("nearest"), /yok edilmiş/);
+  assert.throws(() => texture.subTexture({ x: 0, y: 0, width: 1, height: 1 }), /destroyed/);
+  assert.throws(() => texture.setFilter("nearest"), /destroyed/);
 });
 
 test("texture: fromImage ve markDirty source kilit", () => {
@@ -62,7 +62,7 @@ test("texture: fromImage ve markDirty source kilit", () => {
   const mutableSource = { width: 4, height: 4 };
   const mutable = new Texture({ source: mutableSource });
   mutableSource.width = 8;
-  assert.throws(() => mutable.markDirty(), /değiştirilemez/);
+  assert.throws(() => mutable.markDirty(), /cannot be changed/);
 });
 
 test("textureAtlas: fromJSON, prototype güvenliği, lifecycle", () => {
@@ -87,7 +87,7 @@ test("textureAtlas: fromJSON, prototype güvenliği, lifecycle", () => {
   assert.equal(lifecycle.destroyed, true);
   assert.equal(frame.destroyed, true);
   assert.equal(base.destroyed, false);
-  assert.throws(() => lifecycle.get("hero"), /yok edilmiş/);
+  assert.throws(() => lifecycle.get("hero"), /destroyed/);
 });
 
 test("textureAtlas: fromGrid ve kapasite", () => {
@@ -97,12 +97,12 @@ test("textureAtlas: fromGrid ve kapasite", () => {
   assert.equal(grid.get("frame-3").v1, 0.5);
   assert.deepEqual(grid.getFrames(["frame-0", "frame-1", "frame-0"]), [grid.get("frame-0"), grid.get("frame-1"), grid.get("frame-0")]);
   assert.deepEqual(grid.getClip(["frame-0", "frame-1"], { frameRate: 8, pingPong: true }).frames, [grid.get("frame-0"), grid.get("frame-1")]);
-  assert.throws(() => grid.getFrames([]), /dizisi/);
-  assert.throws(() => grid.getFrames(["frame-0", 1]), /dizisi/);
-  assert.throws(() => grid.getClip(["frame-0"], null), /seçenekleri/);
+  assert.throws(() => grid.getFrames([]), /array/);
+  assert.throws(() => grid.getFrames(["frame-0", 1]), /array/);
+  assert.throws(() => grid.getClip(["frame-0"], null), /options/);
   const capacity = TextureAtlas.fromGrid(gridTexture, { frameWidth: 8, frameHeight: 8, columns: 4, rows: 2 });
   capacity.frames.set("overflow", { x: 0, y: 0, width: 1, height: 1 });
-  assert.throws(() => capacity.get("frame-0"), /frame limiti/);
+  assert.throws(() => capacity.get("frame-0"), /frame limit/);
   assert.throws(() => TextureAtlas.fromGrid(gridTexture, { frameWidth: 16, frameHeight: 8, columns: 3, rows: 1 }));
   assert.throws(() => TextureAtlas.fromGrid(gridTexture, { frameWidth: 8, frameHeight: 8, columns: 2, rows: 1, names: ["same", "same"] }));
 });
@@ -114,10 +114,10 @@ test("renderTexture: boyut ve subTexture koruması", () => {
   assert.equal(target.sourceWidth, 64);
   assert.equal(target.resize(32, 16), target);
   assert.deepEqual({ width: target.width, height: target.height }, { width: 32, height: 16 });
-  assert.throws(() => new RenderTexture({ width: 16_385, height: 1 }), /boyutu/);
+  assert.throws(() => new RenderTexture({ width: 16_385, height: 1 }), /size/);
   assert.throws(() => new RenderTexture({ width: 4097, height: 4096 }), /pixel/);
-  assert.throws(() => target.subTexture({ x: 0, y: 0, width: 1, height: 1 }), /alt texture/);
-  assert.throws(() => target.updateSource({ width: 64, height: 32 }), /değiştirilemez/);
+  assert.throws(() => target.subTexture({ x: 0, y: 0, width: 1, height: 1 }), /sub-texture/);
+  assert.throws(() => target.updateSource({ width: 64, height: 32 }), /cannot be changed/);
 });
 
 test("renderTexture: renderToTexture eşleşme", () => {

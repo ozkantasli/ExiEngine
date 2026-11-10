@@ -15,9 +15,9 @@ const pixelRatioValue = (value, fallback) => {
   return Number.isFinite(number) && number > 0 ? Math.min(MAX_CAMERA_PIXEL_RATIO, Math.max(0.25, number)) : fallback;
 };
 function normalizeBounds(value) {
-  if (!value || typeof value !== "object") throw new TypeError("Camera bounds nesnesi gerekli.");
+  if (!value || typeof value !== "object") throw new TypeError("Camera bounds object is required.");
   const x = Number(value.x); const y = Number(value.y); const width = Number(value.width); const height = Number(value.height);
-  if (![x, y, width, height].every(Number.isFinite) || width <= 0 || height <= 0) throw new RangeError("Camera bounds finite ve pozitif olmalı.");
+  if (![x, y, width, height].every(Number.isFinite) || width <= 0 || height <= 0) throw new RangeError("Camera bounds must be finite and positive.");
   return { x: worldValue(x), y: worldValue(y), width: worldValue(width), height: worldValue(height) };
 }
 
@@ -149,7 +149,7 @@ export class Camera {
 
   follow(target, { offsetX = 0, offsetY = 0, smoothing = 1, deadzoneWidth = 0, deadzoneHeight = 0 } = {}) {
     const point = target?.position || target;
-    if (!target || typeof target !== "object" || !point || typeof point !== "object" || !("x" in point) || !("y" in point)) throw new TypeError("Camera follow hedefi x/y veya position.x/position.y taşımalı.");
+    if (!target || typeof target !== "object" || !point || typeof point !== "object" || !("x" in point) || !("y" in point)) throw new TypeError("Camera follow target must have x/y or position.x/position.y.");
     const requestedSmoothing = Number(smoothing);
     this.followTarget = target;
     this.followOffset.set(offsetX, offsetY);

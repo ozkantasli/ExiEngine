@@ -94,6 +94,6 @@ test("pathfinding: diyagonal ve köşe kırpma seçenekleri", () => {
   assert.equal(findGridPath(grid, [0, 0], [1, 1], { diagonal: true, allowCornerCutting: true }).reached, true);
   assert.equal(findGridPath([[0, 0, 0]], [0, 0], [2, 0], { maxNodes: 1 }).truncated, true);
   assert.equal(findGridPath([[1]], [0, 0], [0, 0]).reached, false);
-  assert.throws(() => findGridPath([[0], [0, 0]], [0, 0], [0, 1]), /dikdörtgen/);
-  assert.throws(() => findGridPath([[]], [0, 0], [0, 0]), /boş olmayan/);
+  assert.throws(() => findGridPath([[0], [0, 0]], [0, 0], [0, 1]), /rectangle|rectangular/);
+  assert.throws(() => findGridPath([[]], [0, 0], [0, 0]), /non-empty/);
 });

@@ -107,7 +107,7 @@ test("node: derinlik ve child limitleri", () => {
     cursor.children.push(child);
     cursor = child;
   }
-  assert.throws(() => root.update(0), /derinlik/);
+  assert.throws(() => root.update(0), /depth/);
   const oversized = new Node();
   oversized.children.length = 65_537;
   assert.throws(() => oversized.update(0), /child/);
@@ -122,8 +122,8 @@ test("node: destroy zinciri ve atomic add", () => {
   parent.destroy();
   assert.equal(parent.children.length, 0);
   assert.equal(child.destroyed, true);
-  assert.throws(() => new Node().add(child), /yok edilmiş/);
-  assert.throws(() => parent.add(new Node()), /yok edilmiş/);
+  assert.throws(() => new Node().add(child), /destroyed/);
+  assert.throws(() => parent.add(new Node()), /destroyed/);
   const scene = new Scene();
   const before = new Node({ name: "atomic-before" });
   scene.add(before);

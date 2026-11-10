@@ -33,27 +33,27 @@ function ktx2Fixture() {
 test("assets: resolve origin allowlist", () => {
   const loader = new AssetLoader({ baseURL: "http://127.0.0.1:4174/" });
   assert.equal(loader.resolve("/assets/demo.json"), "http://127.0.0.1:4174/assets/demo.json");
-  assert.throws(() => loader.resolve("https://evil.example/image.png"), /originine izin yok/);
-  assert.throws(() => loader.resolve("http://user:pass@127.0.0.1:4174/assets/demo.json"), /kimlik bilgisi/);
-  assert.throws(() => loader.resolve("data:text/plain,unsafe"), /originine izin yok/);
+  assert.throws(() => loader.resolve("https://evil.example/image.png"), /origin is not allowed/);
+  assert.throws(() => loader.resolve("http://user:pass@127.0.0.1:4174/assets/demo.json"), /credentials/);
+  assert.throws(() => loader.resolve("data:text/plain,unsafe"), /origin is not allowed/);
   loader.allowedOrigins.add("https://evil.example");
-  assert.throws(() => loader.resolve("https://evil.example/image.png"), /doğrudan değiştirilemez/);
+  assert.throws(() => loader.resolve("https://evil.example/image.png"), /cannot be changed directly/);
   loader.allowedOrigins.delete("https://evil.example");
   loader.baseURL = "https://evil.example/";
-  assert.throws(() => loader.resolve("/image.png"), /doğrudan değiştirilemez/);
+  assert.throws(() => loader.resolve("/image.png"), /cannot be changed directly/);
   loader.baseURL = "http://127.0.0.1:4174/";
   loader.destroy();
 });
 
 test("assets: constructor limitler", () => {
-  assert.throws(() => new AssetLoader({ maxBytes: 0 }), /limiti/);
-  assert.throws(() => new AssetLoader({ maxBytes: 64 * 1024 * 1024 + 1 }), /aşamaz/);
-  assert.throws(() => new AssetLoader({ maxJSONBytes: 0 }), /limiti/);
-  assert.throws(() => new AssetLoader({ maxJSONNodes: 1_000_001 }), /aşamaz/);
-  assert.throws(() => new AssetLoader({ maxJSONDepth: 129 }), /aşamaz/);
-  assert.throws(() => new AssetLoader({ maxImageSize: 0 }), /limiti/);
-  assert.throws(() => new AssetLoader({ maxImageSize: 16_385 }), /aşamaz/);
-  assert.throws(() => new AssetLoader({ maxTexturePixels: 16 * 1024 * 1024 + 1 }), /aşamaz/);
+  assert.throws(() => new AssetLoader({ maxBytes: 0 }), /limit/);
+  assert.throws(() => new AssetLoader({ maxBytes: 64 * 1024 * 1024 + 1 }), /cannot exceed/);
+  assert.throws(() => new AssetLoader({ maxJSONBytes: 0 }), /limit/);
+  assert.throws(() => new AssetLoader({ maxJSONNodes: 1_000_001 }), /cannot exceed/);
+  assert.throws(() => new AssetLoader({ maxJSONDepth: 129 }), /cannot exceed/);
+  assert.throws(() => new AssetLoader({ maxImageSize: 0 }), /limit/);
+  assert.throws(() => new AssetLoader({ maxImageSize: 16_385 }), /cannot exceed/);
+  assert.throws(() => new AssetLoader({ maxTexturePixels: 16 * 1024 * 1024 + 1 }), /cannot exceed/);
   assert.throws(() => new AssetLoader({ maxCacheTextures: 4_097 }), /cache/);
   assert.throws(() => new AssetLoader({ maxCachePixels: 512 * 1024 * 1024 + 1 }), /cache/);
   assert.throws(() => new AssetLoader({ allowedOrigins: ["not-a-url"] }), /Invalid URL/);
@@ -72,23 +72,23 @@ test("assets: loadJSON bütçeleri (maxBytes/maxJSONNodes/maxJSONDepth)", async 
 
   const nodeLoader = new AssetLoader({ maxJSONNodes: 4 });
   nodeLoader.loadBytes = async () => new TextEncoder().encode("[0,1,2,3]");
-  await assert.rejects(() => nodeLoader.loadJSON("/nodes.json"), /JSON düğüm/);
+  await assert.rejects(() => nodeLoader.loadJSON("/nodes.json"), /JSON node/);
   const overrideLoader = new AssetLoader({ maxJSONNodes: 8 });
   overrideLoader.loadBytes = async () => new TextEncoder().encode("[0,1,2,3]");
-  await assert.rejects(() => overrideLoader.loadJSON("/nodes.json", { maxJSONNodes: 3 }), /JSON düğüm/);
+  await assert.rejects(() => overrideLoader.loadJSON("/nodes.json", { maxJSONNodes: 3 }), /JSON node/);
   assert.deepEqual(await overrideLoader.loadJSON("/nodes.json", { maxJSONNodes: 99 }), [0, 1, 2, 3]);
 
   const depthLoader = new AssetLoader({ maxJSONDepth: 3 });
   depthLoader.loadBytes = async () => new TextEncoder().encode("[[[[0]]]]");
-  await assert.rejects(() => depthLoader.loadJSON("/depth.json"), /JSON derinlik/);
-  await assert.rejects(() => depthLoader.loadJSON("/depth.json", { maxJSONDepth: 2 }), /JSON derinlik/);
+  await assert.rejects(() => depthLoader.loadJSON("/depth.json"), /JSON depth/);
+  await assert.rejects(() => depthLoader.loadJSON("/depth.json", { maxJSONDepth: 2 }), /JSON depth/);
   // preflight: parse çağrılmadan derinlik reddi
   const previousJSONParse = JSON.parse;
   let jsonParseCalls = 0;
   JSON.parse = (...args) => { jsonParseCalls += 1; return previousJSONParse(...args); };
   const preflight = new AssetLoader({ maxJSONDepth: 3 });
   preflight.loadBytes = async () => new TextEncoder().encode("[".repeat(65) + "0" + "]".repeat(65));
-  await assert.rejects(() => preflight.loadJSON("/preflight.json"), /JSON derinlik/);
+  await assert.rejects(() => preflight.loadJSON("/preflight.json"), /JSON depth/);
   assert.equal(jsonParseCalls, 0);
   JSON.parse = previousJSONParse;
 });
@@ -150,7 +150,7 @@ test("assets: fragmente stream limiti", async () => {
       }),
     },
   });
-  await assert.rejects(() => new AssetLoader({ baseURL: "http://127.0.0.1:4174/" }).loadBytes("/fragmented.bin"), /parça/);
+  await assert.rejects(() => new AssetLoader({ baseURL: "http://127.0.0.1:4174/" }).loadBytes("/fragmented.bin"), /chunk/);
   assert.equal(reads, 16_385);
   assert.equal(cancelled, true);
   globalThis.fetch = previousFetch;
@@ -208,9 +208,9 @@ test("assets: loadMany ve loadAtlas", async () => {
   assert.equal(loaded.results.size, 3);
   assert.equal(progress.at(-1).percent, 1);
   await assert.rejects(() => loader.loadMany([{ key: "invalid", type: "atlas", url: "/characters.png" }]), /atlasUrl/);
-  await assert.rejects(() => loader.loadMany([{ key: "same", type: "json", url: "/a" }, { key: "same", type: "json", url: "/b" }]), /tekrar ediyor/);
+  await assert.rejects(() => loader.loadMany([{ key: "same", type: "json", url: "/a" }, { key: "same", type: "json", url: "/b" }]), /Duplicate/);
   await assert.rejects(() => loader.loadMany(new Array(4_097).fill({ key: "entry", type: "bytes", url: "/entry" })), /batch/);
-  await assert.rejects(() => loader.loadMany([{ key: "k".repeat(257), type: "bytes", url: "/entry" }]), /anahtarı/);
+  await assert.rejects(() => loader.loadMany([{ key: "k".repeat(257), type: "bytes", url: "/entry" }]), /key/);
 });
 
 test("assets: loadKTX2 inspect ve decoder", async () => {
@@ -219,8 +219,8 @@ test("assets: loadKTX2 inspect ve decoder", async () => {
   assert.deepEqual({ width: info.width, height: info.height, levelCount: info.levelCount, rgba8: info.rgba8 }, { width: 2, height: 1, levelCount: 1, rgba8: true });
   const corrupt = bytes.slice();
   new DataView(corrupt.buffer).setUint32(84, 0x00200000, true);
-  assert.throws(() => inspectKTX2(corrupt), /güvenli/);
-  assert.throws(() => inspectKTX2(new Uint8Array([0, 1])), /header eksik/);
+  assert.throws(() => inspectKTX2(corrupt), /safe/);
+  assert.throws(() => inspectKTX2(new Uint8Array([0, 1])), /header is incomplete/);
 
   const previousImageDataDesc = Object.getOwnPropertyDescriptor(globalThis, "ImageData");
   Object.defineProperty(globalThis, "ImageData", { configurable: true, writable: true, value: class { constructor(data, width, height) { this.data = data; this.width = width; this.height = height; } } });
@@ -267,7 +267,7 @@ test("assets: destroy sonrası ve pixel preflight", async () => {
   loader.destroy();
   assert.equal(destroyedSignal.aborted, true);
   await assert.rejects(pending, /aborted/);
-  await assert.rejects(() => loader.loadBytes("/after-destroy.bin"), /yok edilmiş/);
+  await assert.rejects(() => loader.loadBytes("/after-destroy.bin"), /destroyed/);
 
   // PNG header pixel preflight
   const oversizedPNG = new Uint8Array(24);
@@ -278,7 +278,7 @@ test("assets: destroy sonrası ve pixel preflight", async () => {
   let bitmapCalls = 0;
   globalThis.createImageBitmap = async () => { bitmapCalls += 1; return { width: 1, height: 1, close() {} }; };
   globalThis.fetch = async () => fakeResponse(oversizedPNG);
-  await assert.rejects(() => new AssetLoader({ baseURL: "http://127.0.0.1:4174/", maxImageSize: 4096 }).loadTexture("/oversized.png"), /boyutu/);
+  await assert.rejects(() => new AssetLoader({ baseURL: "http://127.0.0.1:4174/", maxImageSize: 4096 }).loadTexture("/oversized.png"), /size/);
   assert.equal(bitmapCalls, 0);
   globalThis.fetch = previousFetch;
   globalThis.createImageBitmap = bitmapCallsBefore;
@@ -290,12 +290,12 @@ test("saveStore: set/get ve limitler", () => {
   const saves = new SaveStore({ storage, namespace: "smoke" });
   saves.set("progress", { level: 2, unlocked: true });
   assert.deepEqual(saves.get("progress"), { level: 2, unlocked: true });
-  assert.throws(() => new SaveStore({ storage, maxBytes: 0 }), /limiti/);
-  assert.throws(() => new SaveStore({ storage, maxBytes: 16 * 1024 * 1024 + 1 }), /limiti/);
-  assert.throws(() => new SaveStore({ storage, namespace: "n".repeat(65) }), /limiti/);
-  assert.throws(() => saves.set("k".repeat(129), true), /limiti/);
+  assert.throws(() => new SaveStore({ storage, maxBytes: 0 }), /limit/);
+  assert.throws(() => new SaveStore({ storage, maxBytes: 16 * 1024 * 1024 + 1 }), /limit/);
+  assert.throws(() => new SaveStore({ storage, namespace: "n".repeat(65) }), /limit/);
+  assert.throws(() => saves.set("k".repeat(129), true), /limit/);
   const unicode = new SaveStore({ storage, namespace: "unicode", maxBytes: 20 });
-  assert.throws(() => unicode.set("emoji", "😀😀😀😀😀"), /çok büyük/);
+  assert.throws(() => unicode.set("emoji", "😀😀😀😀😀"), /too large/);
   values.set("unicode:oversized", `"${"😀".repeat(20)}"`);
   assert.equal(unicode.get("oversized", "fallback"), "fallback");
   const deep = "[".repeat(65) + "0" + "]".repeat(65);
@@ -303,7 +303,7 @@ test("saveStore: set/get ve limitler", () => {
   assert.equal(saves.get("deep", "fallback"), "fallback");
   const direct = new SaveStore({ storage, namespace: "direct" });
   direct.maxBytes = 16 * 1024 * 1024;
-  assert.throws(() => direct.set("progress", { safe: true }), /limiti/);
+  assert.throws(() => direct.set("progress", { safe: true }), /limit/);
   const small = new SaveStore({ storage, namespace: "small", maxBytes: 1 });
-  assert.throws(() => small.set("too-large", "x".repeat(20)), /çok büyük/);
+  assert.throws(() => small.set("too-large", "x".repeat(20)), /too large/);
 });
