@@ -145,6 +145,7 @@ test("demo render + WebGPU/WebGL2 hardware soak", async () => {
   test.setTimeout((soakSecondsForTimeout * backends.length + 30) * 1_000);
   const launchOptions = { args: ["--no-sandbox", "--enable-webgl", "--ignore-gpu-blocklist"] };
   if (process.env.EXI_PLAYWRIGHT_CHANNEL) launchOptions.channel = process.env.EXI_PLAYWRIGHT_CHANNEL;
+  if (process.env.EXI_PLAYWRIGHT_EXECUTABLE) launchOptions.executablePath = process.env.EXI_PLAYWRIGHT_EXECUTABLE;
   const browser = await chromium.launch(launchOptions);
   const page = await browser.newPage();
   const consoleErrors = [];

@@ -354,7 +354,7 @@ export class Input {
     if (axes !== null && (typeof axes !== "object" || Array.isArray(axes))) throw new TypeError("Input axes must be an object.");
     if (actions) for (const name of Object.keys(actions)) this.bindAction(name, actions[name]);
     if (axes) for (const name of Object.keys(axes)) this.bindAxis(name, axes[name]);
-    this.eventTarget.addEventListener?.("keydown", this.handleKeyDown, { passive: true });
+    this.eventTarget.addEventListener?.("keydown", this.handleKeyDown, { passive: false });
     this.eventTarget.addEventListener?.("keyup", this.handleKeyUp, { passive: true });
     this.eventTarget.addEventListener?.("blur", this.clearTransientState, { passive: true });
     this.eventTarget.addEventListener?.("pagehide", this.clearTransientState, { passive: true });

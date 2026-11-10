@@ -50,6 +50,7 @@ Full list and behavior details: [FEATURES.md](FEATURES.md)
 | Your goal | Start here | What you get |
 |---|---|---|
 | **Try the engine** | [Run the demo](#run-the-demo) | A live scene you can switch between Auto / WebGL2 / WebGPU, with FPS/draw/node stats |
+| **Learn from a game** | [Examples](#examples) | Small complete games: platformer (Tiled), top-down arena, UI menu |
 | **Write a game** | [Quick start](#quick-start) and [API.md](API.md) | Your first game loop with scene, camera, input and physics |
 | **Build a game with an AI agent** | [Using with AI agents](#using-with-ai-agents) | Scaffolding, scene generation and browser preview over MCP |
 | **Contribute** | [Development](#development) | Tests, lint, coverage and the release gate |
@@ -66,6 +67,20 @@ npm run dev
 
 Then open `http://127.0.0.1:4173/` in your browser. The server listens on loopback
 only and sends CSP/`nosniff` headers.
+
+### Examples
+
+`npm run dev`, then open `http://127.0.0.1:4173/examples/`. Every example is a single
+`main.js` that imports only `src/index.js` and ships without binary assets.
+
+| Example | Shows |
+|---|---|
+| [`examples/platformer`](examples/platformer/main.js) | `TileMap.fromTiled` level, tile-property collision bodies, gravity, coyote time / jump buffering, camera follow + bounds, HUD overlay |
+| [`examples/top-down`](examples/top-down/main.js) | Code-built TileMap walls, zero-gravity physics, trigger pickups, A* (`findGridPath`) chasers, particles, camera shake |
+| [`examples/ui-menu`](examples/ui-menu/main.js) | Overlay UI, pointer + keyboard focus (Tab/Enter), tweened buttons, `StateMachine` screens |
+
+`npm test` checks the examples statically; `npm run test:e2e:examples` runs them in a real
+Chromium through Playwright.
 
 ### Install
 
@@ -182,13 +197,14 @@ with `exi_preview_call`. All tools and their safety limits:
 | Command | What it does |
 |---|---|
 | `npm run doctor` | Fast environment, export and agent-contract check |
-| `npm test` | Static, server, engine smoke, unit, typecheck and build stages |
+| `npm test` | Static, server, engine smoke, unit, typecheck, build and examples stages |
 | `npm run test:unit` | Unit tests only |
 | `npm run lint` | Zero-dependency syntax and anti-pattern scan |
 | `npm run build` | Single-file ESM + global bundles in `dist/` (also runs on `npm pack`) |
 | `npm run test:coverage` | Unit suite coverage thresholds |
 | `npm run test:mcp` | Modern and legacy MCP end-to-end smoke test |
-| `npm run test:e2e:browser` | Real Chrome/Chromium canvas and runtime telemetry test |
+| `npm run test:e2e:browser` | Real Chrome/Chromium canvas and runtime telemetry test (`EXI_PLAYWRIGHT_EXECUTABLE` / `EXI_PLAYWRIGHT_CHANNEL` pick the browser) |
+| `npm run test:e2e:examples` | Opens every example in real Chromium, drives input and checks for errors |
 | `npm run test:clients` | Real handshake test for every client config in the repo |
 | `npm run verify` | Release gate: `npm test` plus all benchmarks |
 | `npm run bench:regression` | Benchmark drift check against the local baseline |

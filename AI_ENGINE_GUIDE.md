@@ -79,11 +79,12 @@ For `Node.traverse`, `Node.find`, `Scene.pick`, input/physics filters and other 
 
 ## Test infrastructure
 
-- `test/run-all.mjs`: the `npm test` orchestrator — runs every stage sequentially but independently; even if a stage fails, the following ones still run and a summary is reported. Stages: static, server, doctor, clients, mcp, engine-smoke, unit, typecheck, build.
+- `test/run-all.mjs`: the `npm test` orchestrator — runs every stage sequentially but independently; even if a stage fails, the following ones still run and a summary is reported. Stages: static, server, doctor, clients, mcp, engine-smoke, unit, typecheck, build, examples.
 - `test/coverage/` + `test/coverage/thresholds.mjs`: unit suite coverage thresholds (after Phase 3, 20 files / ~210 tests; webgl2 %75+, webgpu %85+, unit modules %90+; GPU renderers verify the contract with a fake GL/device, hardware-soak is the real GPU evidence).
 - `tools/lint.mjs`: zero-dep lint — `node --check` syntax + bans on engine imports/eval/console.log (MCP)/mixed indentation.
 - `test/typecheck-syntax.mjs`: runs `index.d.ts` integrity + the `test/fixtures/typecheck.ts` consumer with `--experimental-strip-types` (Node 22.6+; SKIP on Node 22, fully runs on Node 24).
 - `test/benchmark/benchmark-regression.mjs`: compares 25 benchmarks with the baseline (elapsed +50%, fps -40% tolerance). Creates `benchmark-baseline.json` on the first run.
+- `test/examples-smoke.mjs` / `test/e2e/examples-e2e.mjs`: `examples/<name>/` games must import only real `src/index.js` exports, keep the strict CSP shell and load their Tiled levels; the e2e variant runs them in real Chromium (`npm run test:e2e:examples`). Update both when adding an example.
 - `test/e2e/preview-e2e.mjs`: starts the loopback server and verifies HTTP 200 + security headers.
 - `test/e2e/browser-e2e.mjs`: verifies real browser demo frame/FPS telemetry and a short WebGPU/WebGL2 hardware-soak run with on-demand Playwright; for a locally installed Chrome use `EXI_PLAYWRIGHT_CHANNEL=chrome npm run test:e2e:browser`. Set `EXI_PLAYWRIGHT_SECONDS=30` for a 30-second release soak.
 - CI: `.github/workflows/ci.yml` — test (Node 22+24), verify (Node 24), coverage (Node 24) and preview-e2e (Node 24) jobs on push/PR. Node 20 was removed from the matrix because it is deprecated.

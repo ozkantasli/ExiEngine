@@ -10,8 +10,9 @@ const previousNavigator = Object.getOwnPropertyDescriptor(globalThis, "navigator
 const windowListeners = new Map();
 const documentListeners = new Map();
 const canvasListeners = new Map();
+const windowListenerOptions = new Map();
 
-globalThis.window = { addEventListener: (type, listener) => windowListeners.set(type, listener), removeEventListener: (type) => windowListeners.delete(type) };
+globalThis.window = { addEventListener: (type, listener, options) => { windowListeners.set(type, listener); windowListenerOptions.set(type, options); }, removeEventListener: (type) => windowListeners.delete(type) };
 globalThis.document = { addEventListener: (type, listener) => documentListeners.set(type, listener), removeEventListener: (type) => documentListeners.delete(type) };
 
 function makeCanvas() {
@@ -261,5 +262,12 @@ test("input: getVector ve injectKeyUp", () => {
   input.inject([{ type: "keydown", code: "KeyZ" }]);
   input.injectKeyUp("KeyZ");
   assert.equal(input.wasKeyReleased("KeyZ"), true);
+  input.destroy();
+});
+
+test("input: keydown listener is not passive so engine Tab focus can preventDefault", () => {
+  const input = new Input(makeCanvas());
+  assert.equal(windowListenerOptions.get("keydown")?.passive, false);
+  assert.equal(windowListenerOptions.get("keyup")?.passive, true);
   input.destroy();
 });

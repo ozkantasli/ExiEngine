@@ -21,6 +21,7 @@ const stages = [
   { name: "unit", file: "test/unit/", command: ["node", "--test", "test/unit/*.test.mjs"], minFiles: [".test.mjs"] },
   { name: "typecheck", file: "test/typecheck-syntax.mjs", command: ["node", "test/typecheck-syntax.mjs"] },
   { name: "build", file: "test/build-smoke.mjs", command: ["node", "test/build-smoke.mjs"] },
+  { name: "examples", file: "test/examples-smoke.mjs", command: ["node", "test/examples-smoke.mjs"] },
 ];
 
 async function exists(relativePath, minFiles) {

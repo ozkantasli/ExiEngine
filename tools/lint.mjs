@@ -10,7 +10,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const sourceDirs = ["src", "tools"];
+const sourceDirs = ["src", "tools", "examples"];
 const sourceFiles = ["server.mjs"];
 
 async function listSourceFiles() {
