@@ -43,4 +43,15 @@ for (const name of examples) {
     assert.ok(Exi.TileMap.tiledTileIdsWithProperty(level, "solid").size > 0, `${name}/${file}: solid tiles`);
   }
 }
-console.log(`[examples] OK: ${examples.join(", ")}`);
+// The browser editor lives in editor/ and follows the same page contract.
+const editorDir = path.join(root, "editor");
+const editorHtml = fs.readFileSync(path.join(editorDir, "index.html"), "utf8");
+const editorMain = fs.readFileSync(path.join(editorDir, "editor.js"), "utf8");
+assert.match(editorHtml, /Content-Security-Policy[^>]*script-src 'self'/, "editor: strict CSP meta");
+assert.doesNotMatch(editorHtml, /frame-ancestors/, "editor: frame-ancestors is ignored in <meta>");
+execFileSync(process.execPath, ["--check", path.join(editorDir, "editor.js")]);
+assert.doesNotMatch(editorMain, /\beval\s*\(|new\s+Function\s*\(|innerHTML\s*=/, "editor: no dynamic code or innerHTML");
+const editorImport = /^import\s*\{([^}]*)\}\s*from\s*"\.\.\/src\/index\.js";/m.exec(editorMain);
+assert.ok(editorImport, "editor: imports the public entry");
+for (const imported of editorImport[1].split(",").map((part) => part.trim()).filter(Boolean)) assert.ok(imported in Exi, `editor: ${imported} is not a public export`);
+console.log(`[examples] OK: ${examples.join(", ")} + editor`);

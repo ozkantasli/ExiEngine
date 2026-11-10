@@ -214,14 +214,28 @@ function resolveTexture(id, label, context) {
   return null;
 }
 
-function missingTilesetTexture(source, options) {
+// A missing texture becomes a sourceless placeholder that keeps the original id,
+// so saving the scene again never rewrites the reference (renderers draw
+// sourceless textures as plain white). TileMap placeholders are sized to cover
+// every stored tile index so the tile data stays valid.
+function placeholderTexture(id, context, width = 1, height = 1) {
+  const key = `${id}\u0000${width}x${height}`;
+  let texture = context.placeholders.get(key);
+  if (!texture) {
+    texture = new Texture({ id, sourceWidth: width, sourceHeight: height });
+    context.placeholders.set(key, texture);
+  }
+  return texture;
+}
+
+function missingTilesetTexture(id, source, options, context) {
   const tileWidth = Math.max(1, options.tileWidth | 0);
   const tileHeight = Math.max(1, options.tileHeight | 0);
   let highest = 0;
   if (Array.isArray(source.tiles)) for (const value of source.tiles) if (Number.isSafeInteger(value) && value > highest) highest = value;
   const columns = Math.max(1, Math.min(Math.floor(16_384 / tileWidth), highest + 1));
   const rows = Math.max(1, Math.ceil((highest + 1) / columns));
-  return new Texture({ id: `missing-tileset:${String(source.texture).slice(0, 64)}`, sourceWidth: columns * tileWidth, sourceHeight: rows * tileHeight });
+  return placeholderTexture(id, context, columns * tileWidth, rows * tileHeight);
 }
 
 const COMMON_KEYS = new Set([...NODE_NUMBER_KEYS, ...NODE_BOOLEAN_KEYS, ...NODE_STRING_KEYS, ...NODE_RECT_KEYS, "layout"]);
@@ -295,7 +309,7 @@ function buildNode(entry, context, depth, path) {
   const options = readCommonOptions(source, label);
   let node;
   if (type === "Sprite" || type === "NineSliceSprite") {
-    options.texture = resolveTexture(source.texture, label, context) || Texture.white;
+    options.texture = resolveTexture(source.texture, label, context) || placeholderTexture(source.texture, context);
     for (const key of SPRITE_NUMBER_KEYS) readNumber(source, key, options, label);
     for (const key of SPRITE_BOOLEAN_KEYS) readBoolean(source, key, options, label);
     readColor(source, "tint", options, label);
@@ -312,9 +326,7 @@ function buildNode(entry, context, depth, path) {
     const texture = resolveTexture(source.texture, label, context);
     for (const key of TILEMAP_NUMBER_KEYS) readNumber(source, key, options, label);
     for (const key of TILEMAP_BOOLEAN_KEYS) readBoolean(source, key, options, label);
-    // A missing tileset becomes a sourceless placeholder wide enough for every
-    // stored tile index; the renderers draw sourceless textures as plain white.
-    options.texture = texture || missingTilesetTexture(source, options);
+        options.texture = texture || missingTilesetTexture(source.texture, source, options, context);
     node = new TileMap(options);
     try {
       const count = node.columns * node.rows;
@@ -348,7 +360,7 @@ export function deserializeScene(document, { textures = null, resolveTexture: re
   if (!Number.isSafeInteger(maxNodes) || maxNodes <= 0 || maxNodes > MAX_SERIALIZED_NODES) throw new RangeError(`deserializeScene maxNodes must be between 1 and ${MAX_SERIALIZED_NODES}.`);
   if (resolver !== null && typeof resolver !== "function") throw new TypeError("deserializeScene resolveTexture must be a function.");
   if (report !== null && !isRecord(report)) throw new TypeError("deserializeScene report must be an object.");
-  const context = { textures, resolveTexture: resolver, strict: Boolean(strict), maxNodes, nodes: 0, missingTextures: new Set() };
+  const context = { textures, resolveTexture: resolver, strict: Boolean(strict), maxNodes, nodes: 0, missingTextures: new Set(), placeholders: new Map() };
   const root = buildNode(document.root, context, 0, "root");
   if (report) {
     report.nodes = context.nodes;

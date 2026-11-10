@@ -59,9 +59,57 @@ try {
     console.log(`[examples-e2e] ${ok ? "PASS" : "FAIL"} ${name} ${JSON.stringify(info)}${errors.length ? ` errors=${JSON.stringify(errors)}` : ""}`);
     await page.close();
   }
+  failures += await checkEditor();
 } finally {
   await browser.close();
   server.kill();
 }
+async function checkEditor() {
+  const page = await browser.newPage({ viewport: { width: 1400, height: 820 } });
+  const errors = [];
+  page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto(`${base}/editor/`);
+  await page.waitForFunction(() => window.editor?.engine?.running === true, null, { timeout: 10_000 }).catch(() => {});
+  const toClient = (x, y) => page.evaluate(([wx, wy]) => {
+    const canvas = window.editor.engine.canvas;
+    const rect = canvas.getBoundingClientRect();
+    const point = window.editor.camera.worldToScreen(wx, wy);
+    return { x: rect.left + (point.x * rect.width) / canvas.width, y: rect.top + (point.y * rect.height) / canvas.height };
+  }, [x, y]);
+  const result = {};
+  try {
+    await page.evaluate(() => { localStorage.clear(); window.editor.load(window.editor.serialize()); });
+    const player = await page.evaluate(() => { const node = window.editor.root.findByName("player"); return { x: node.position.x, y: node.position.y }; });
+    const start = await toClient(player.x, player.y);
+    await page.mouse.move(start.x, start.y);
+    await page.mouse.down();
+    await page.mouse.move(start.x + 80, start.y - 40, { steps: 6 });
+    await page.mouse.up();
+    result.dragged = await page.evaluate(([x, y]) => { const node = window.editor.root.findByName("player"); return node.position.x !== x || node.position.y !== y; }, [player.x, player.y]);
+    result.selected = await page.evaluate(() => window.editor.root.children[window.editor.selection?.[0]]?.name === "player");
+    const before = await page.evaluate(() => window.editor.root.children.length);
+    await page.click("[data-add=Rect]");
+    result.added = (await page.evaluate(() => window.editor.root.children.length)) === before + 1;
+    await page.click("[data-action=undo]");
+    result.undone = (await page.evaluate(() => window.editor.root.children.length)) === before;
+    await page.evaluate(() => window.editor.select([0]));
+    await page.fill("#field-paint-tile", "5");
+    await page.press("#field-paint-tile", "Tab");
+    await page.keyboard.press("KeyP");
+    const ground = await page.evaluate(() => { const map = window.editor.root.children[0]; return { x: map.position.x + map.tileWidth / 2, y: map.position.y + map.tileHeight / 2 }; });
+    const cell = await toClient(ground.x, ground.y);
+    await page.mouse.click(cell.x, cell.y);
+    result.painted = await page.evaluate(() => window.editor.root.children[0].getTile(0, 0) === 5);
+    result.roundTrip = await page.evaluate(() => { const json = JSON.stringify(window.editor.serialize()); window.editor.load(JSON.parse(json)); return JSON.stringify(window.editor.serialize()) === json; });
+  } catch (error) {
+    errors.push(error.message);
+  }
+  await page.close();
+  const ok = errors.length === 0 && Object.values(result).every(Boolean) && Object.keys(result).length === 6;
+  console.log(`[examples-e2e] ${ok ? "PASS" : "FAIL"} editor ${JSON.stringify(result)}${errors.length ? ` errors=${JSON.stringify(errors)}` : ""}`);
+  return ok ? 0 : 1;
+}
+
 if (failures) { console.error(`[examples-e2e] ${failures} example(s) failed.`); process.exit(1); }
 console.log("[examples-e2e] All examples run in a real browser.");

@@ -51,6 +51,7 @@ Full list and behavior details: [FEATURES.md](FEATURES.md)
 |---|---|---|
 | **Try the engine** | [Run the demo](#run-the-demo) | A live scene you can switch between Auto / WebGL2 / WebGPU, with FPS/draw/node stats |
 | **Learn from a game** | [Examples](#examples) | Small complete games: platformer (Tiled), top-down arena, UI menu |
+| **Build a level visually** | [Editor](#editor) | Browser scene editor: hierarchy, inspector, drag/snap, tile painting, JSON save/load |
 | **Write a game** | [Quick start](#quick-start) and [API.md](API.md) | Your first game loop with scene, camera, input and physics |
 | **Build a game with an AI agent** | [Using with AI agents](#using-with-ai-agents) | Scaffolding, scene generation and browser preview over MCP |
 | **Contribute** | [Development](#development) | Tests, lint, coverage and the release gate |
@@ -81,6 +82,29 @@ only and sends CSP/`nosniff` headers.
 
 `npm test` checks the examples statically; `npm run test:e2e:examples` runs them in a real
 Chromium through Playwright.
+
+### Editor
+
+`npm run dev`, then open `http://127.0.0.1:4173/editor/`. The editor is plain HTML/JS on
+top of the engine (no dependencies) and edits a live ExiEngine scene:
+
+- **Hierarchy** and **inspector** for `Scene`, groups, `Sprite`, `NineSliceSprite` panels,
+  `Text`, `Graphics` shapes and `TileMap`s (transform, alpha, z-index, visibility, filters,
+  blend mode, sprite/text style, textures)
+- **Viewport**: click to select, drag to move with grid snapping (Shift = free), wheel zoom,
+  right/middle/Space-drag pan, arrow-key nudge, `F` to frame the scene
+- **Tile painting** (`P`): left-drag paints the chosen tile, right/Alt-drag erases
+- **Undo/redo**, duplicate, delete, image import as textures, autosave in the browser
+- **Save/Open** produce and read the same JSON document as `serializeScene()` /
+  `deserializeScene()`, so a game loads an edited level with one call:
+
+```js
+const level = await loader.loadJSON("./level.json");
+engine.setScene(deserializeScene(level, { textures: { "tiles.png": tilesTexture } }));
+```
+
+Textures are referenced by id (the imported file name); scripts and callbacks stay in your
+game code. `window.editor` exposes the same operations for scripting and AI agents.
 
 ### Install
 
@@ -269,8 +293,9 @@ hidden), but the physical iOS/Android device matrix is not complete yet.
 
 ## Limitations
 
-ExiEngine is a **core**: a visual editor, scene serialization and hot reload are on
-the v1.0 roadmap. Device-loss and fallback flows are verified with simulated smoke
+ExiEngine is a **core** with a lightweight scene editor: it edits and saves scenes, but it
+does not yet have hot reload, animation timelines, prefab/asset management or a play-in-
+editor mode, which full engines provide. Device-loss and fallback flows are verified with simulated smoke
 tests; real GPU memory soak, driver resets and physical device testing must be done
 separately. Audio is subject to the browser's user-gesture policy. In production,
 HTTPS and server-side security headers still need to be configured.
@@ -285,7 +310,7 @@ drive directly, try ExiEngine.
 |---|---|---|
 | MVP | ✅ | Dependency-free 2D core, scene graph, camera, input, MCP bridge |
 | v0.2 | ✅ | Physics/collision, deterministic fixed step, A*, asset pipeline, safety limits, benchmark gate |
-| v1.0 | 🛠️ | Visual editor, scene serialization, hot reload, GPU profiling, mobile device matrix |
+| v1.0 | 🛠️ | Scene serialization ✅, browser editor ✅ (first version), hot reload, GPU profiling, mobile device matrix |
 
 Details: [ROADMAP.md](ROADMAP.md)
 

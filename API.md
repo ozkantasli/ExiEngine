@@ -102,6 +102,12 @@ interface EngineOptions {
 }
 ```
 
+> **Canvas replacement on fallback.** With `renderer: "auto"`, a failed or lost WebGPU
+> backend falls back to WebGL2 on a fresh clone of the canvas (a canvas cannot switch
+> context types). DOM listeners you attached to the original canvas do not move with it:
+> attach them to a stable parent element, or always read the current canvas from
+> `engine.canvas`. The engine's own `Input` is re-created on the new canvas automatically.
+
 Main lifecycle methods:
 
 - `static create(options): Promise<ExiEngine>`: async backend setup in the browser.
@@ -284,7 +290,7 @@ const restored = deserializeScene(JSON.parse(localStorage.getItem("level")), {
 engine.setScene(restored);
 ```
 
-Documents are `{ format: "exi-scene", version: 1, root }`, where every node is the same `{ type, options, children }` shape that MCP `exi_build_scene` accepts. Supported types are `SERIALIZABLE_NODE_TYPES` (`Scene`, `Node`, `Sprite`, `NineSliceSprite`, `Text`, `Graphics`, `TileMap`); common transform/visual/interaction fields, Sprite/Text style, Graphics commands (polygons keep their source points) and TileMap tiles/flip flags are stored. Callbacks and caches are never stored and loading never evaluates code: unknown types or option keys, non-finite numbers, over-long strings and documents past `MAX_SERIALIZED_NODES` (10 000) nodes or depth 64 are rejected. Textures are stored by id (`"white"` for `Texture.white`); an unresolved id falls back to a white placeholder and is listed in `report.missingTextures`, or throws with `strict: true`. Unsupported nodes (particles, batches, render groups) throw on save unless `unsupported: "skip"` is passed, which lists them in `document.skipped`.
+Documents are `{ format: "exi-scene", version: 1, root }`, where every node is the same `{ type, options, children }` shape that MCP `exi_build_scene` accepts. Supported types are `SERIALIZABLE_NODE_TYPES` (`Scene`, `Node`, `Sprite`, `NineSliceSprite`, `Text`, `Graphics`, `TileMap`); common transform/visual/interaction fields, Sprite/Text style, Graphics commands (polygons keep their source points) and TileMap tiles/flip flags are stored. Callbacks and caches are never stored and loading never evaluates code: unknown types or option keys, non-finite numbers, over-long strings and documents past `MAX_SERIALIZED_NODES` (10 000) nodes or depth 64 are rejected. Textures are stored by id (`"white"` for `Texture.white`); an unresolved id becomes a sourceless placeholder (drawn white) that keeps the original id, so saving again never loses the reference; it is listed in `report.missingTextures`, or loading throws with `strict: true`. Unsupported nodes (particles, batches, render groups) throw on save unless `unsupported: "skip"` is passed, which lists them in `document.skipped`.
 
 ## 7. Atlases and asset loading
 

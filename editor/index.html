@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'none'">
+    <title>ExiEngine Editor</title>
+    <link rel="stylesheet" href="./editor.css">
+  </head>
+  <body>
+    <header class="toolbar" role="toolbar" aria-label="Editor actions">
+      <strong class="brand">Exi<span>Editor</span></strong>
+      <div class="group">
+        <button data-action="new" title="New scene">New</button>
+        <button data-action="open" title="Open a .json scene document">Open…</button>
+        <button data-action="save" title="Download the scene as JSON (Ctrl+S)">Save</button>
+        <button data-action="import-texture" title="Import images as textures">Textures…</button>
+      </div>
+      <div class="group">
+        <button data-action="undo" title="Undo (Ctrl+Z)">Undo</button>
+        <button data-action="redo" title="Redo (Ctrl+Y / Ctrl+Shift+Z)">Redo</button>
+      </div>
+      <div class="group" aria-label="Add node">
+        <span class="label">Add</span>
+        <button data-add="Node">Group</button>
+        <button data-add="Sprite">Sprite</button>
+        <button data-add="Rect">Rect</button>
+        <button data-add="Circle">Circle</button>
+        <button data-add="Text">Text</button>
+        <button data-add="NineSliceSprite">Panel</button>
+        <button data-add="TileMap">TileMap</button>
+      </div>
+      <div class="group">
+        <button data-action="duplicate" title="Duplicate (Ctrl+D)">Duplicate</button>
+        <button data-action="delete" title="Delete (Del)">Delete</button>
+      </div>
+      <div class="group">
+        <label><input type="checkbox" id="snap" checked> Snap</label>
+        <label>Grid <input type="number" id="grid-size" value="16" min="2" max="256" step="1"></label>
+        <button data-action="frame" title="Frame the scene (F)">Frame</button>
+      </div>
+      <input type="file" id="open-file" accept=".json,application/json" hidden>
+      <input type="file" id="texture-file" accept="image/*" multiple hidden>
+    </header>
+    <aside class="panel hierarchy" aria-label="Scene hierarchy">
+      <h2>Hierarchy</h2>
+      <ul id="tree" role="tree"></ul>
+      <h2>Textures</h2>
+      <ul id="textures"></ul>
+    </aside>
+    <main class="viewport">
+      <canvas id="editor-canvas" aria-label="Scene view"></canvas>
+      <p class="hint">Drag to move · Wheel to zoom · Right/middle-drag or Space-drag to pan · Shift = no snap</p>
+    </main>
+    <aside class="panel inspector" aria-label="Inspector">
+      <h2>Inspector</h2>
+      <form id="inspector" autocomplete="off"></form>
+    </aside>
+    <footer class="status" id="status" role="status">Ready</footer>
+    <script type="module" src="./editor.js"></script>
+  </body>
+</html>

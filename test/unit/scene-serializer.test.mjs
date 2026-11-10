@@ -69,8 +69,14 @@ test("scene serializer: textures resolve through a Map, a function or fall back 
   assert.equal(deserializeScene(document, { textures: new Map([["tiles", tiles]]) }).findByName("hero").texture, tiles);
   assert.equal(deserializeScene(document, { resolveTexture: (id) => (id === "tiles" ? tiles : null) }).findByName("hero").texture, tiles);
   const report = {};
-  assert.equal(deserializeScene(document, { report }).findByName("hero").texture, Texture.white);
+  const withoutTextures = deserializeScene(document, { report });
+  const placeholder = withoutTextures.findByName("hero").texture;
+  assert.equal(placeholder.id, "tiles");
+  assert.equal(placeholder.source, null);
   assert.deepEqual(report.missingTextures, ["tiles"]);
+  // Saving a scene with unresolved textures must not rewrite their ids.
+  assert.deepEqual(serializeScene(withoutTextures), document);
+  assert.ok(withoutTextures.findByName("ground").texture.sourceWidth >= 32);
   assert.throws(() => deserializeScene(document, { strict: true }), /could not be resolved/);
   assert.throws(() => deserializeScene(document, { textures: { tiles: "nope" } }), /live Texture/);
 });
