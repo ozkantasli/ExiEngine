@@ -830,9 +830,24 @@ export class RigidBodyWorld {
   remove(body: RigidBody): boolean;
   clear(): void;
   queryPoint(x: number, y: number, out?: RigidBody[]): RigidBody[];
+  readonly joints: Array<RevoluteJoint | DistanceJoint>;
+  addJoint<T extends RevoluteJoint | DistanceJoint>(joint: T): T;
+  removeJoint(joint: RevoluteJoint | DistanceJoint): boolean;
   step(delta: number): this;
 }
 export function collideRigidBodies(a: RigidBody, b: RigidBody, manifold?: RigidContactManifold): RigidContactManifold | null;
+export const MAX_RIGID_JOINTS: number;
+export class RevoluteJoint {
+  readonly a: RigidBody; readonly b: RigidBody; readonly collideConnected: boolean; world: RigidBodyWorld | null;
+  constructor(options: { a: RigidBody; b: RigidBody; x: number; y: number; collideConnected?: boolean });
+  worldAnchors(): { ax: number; ay: number; bx: number; by: number };
+}
+export class DistanceJoint {
+  readonly a: RigidBody; readonly b: RigidBody; readonly collideConnected: boolean; world: RigidBodyWorld | null;
+  length: number; rope: boolean;
+  constructor(options: { a: RigidBody; b: RigidBody; anchorA?: Point | null; anchorB?: Point | null; length?: number; rope?: boolean; collideConnected?: boolean });
+  worldAnchors(): { ax: number; ay: number; bx: number; by: number };
+}
 
 export const MAX_BITMAP_FONT_GLYPHS: number;
 export const MAX_BITMAP_TEXT_LENGTH: number;

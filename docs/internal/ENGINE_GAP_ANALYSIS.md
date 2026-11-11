@@ -34,7 +34,7 @@ Legend: ✅ built in · 🔌 official/common plugin or companion package · ➖ 
 | GPU culling / instancing | ✅ compute culling + indirect draw | ➖ | ➖ | — | — | — | — | ➖ | ✅ |
 | Arcade / AABB physics | ✅ `PhysicsWorld` | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Rigid bodies with rotation | ✅ `RigidBodyWorld` (no joints yet) | ✅ (Matter) | — | ✅ | — | ➖ | ✅ | ✅ | ✅ |
-| Joints / constraints | — | ✅ | — | — | — | — | ✅ | ✅ | ✅ |
+| Joints / constraints | ✅ revolute + distance/rope | ✅ | — | — | — | — | ✅ | ✅ | ✅ |
 | Tiled import | ✅ `TileMap.fromTiled` | ✅ | 🔌 | 🔌 | ➖ | ✅ | ➖ | ➖ | 🔌 |
 | LDtk import | — | 🔌 | 🔌 | 🔌 | — | — | — | — | 🔌 |
 | Bitmap fonts (BMFont) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
@@ -81,8 +81,8 @@ Legend: ✅ built in · 🔌 official/common plugin or companion package · ➖ 
 **P1 — common feature requests**
 3. **Skeletal animation (Spine/DragonBones).** Expected by artists; usually solved with a
    runtime adapter.
-4. **Joints and continuous collision** for `RigidBodyWorld` (revolute/distance joints, CCD
-   for fast thin bodies).
+4. **Continuous collision** for `RigidBodyWorld` (✅ revolute and distance/rope joints shipped;
+   CCD for fast thin bodies, prismatic/weld/motor joints still open).
 5. **Normal maps and shadows.** ✅ `LightLayer` point lights shipped; normal-mapped sprites and
    shadow casting are still open.
 6. **UI widgets:** text input (IME), scroll views, sliders, layout containers.
@@ -101,7 +101,7 @@ Legend: ✅ built in · 🔌 official/common plugin or companion package · ➖ 
 1. Publish to npm (owner action) and announce the CDN path.
 2. Grow examples: shooter, puzzle, endless runner, physics puzzle; one tutorial per example.
 3. Editor v3: prefabs, asset browser, simple data-driven behaviours (play/hot reload ✅).
-4. Joints + CCD in `RigidBodyWorld`.
+4. CCD and more joint types in `RigidBodyWorld`.
 5. Spine runtime adapter as an optional package (keeps the core dependency-free).
 6. Decide the custom-shader policy; if accepted, ship a bounded `registerFilter` API.
 7. Normal-mapped sprites and simple shadow casting on top of `LightLayer`.

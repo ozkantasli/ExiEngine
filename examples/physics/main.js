@@ -1,9 +1,10 @@
 // ExiEngine example: rigid-body sandbox.
 // Shows RigidBodyWorld with boxes, circles and convex polygons: rotation,
-// friction, restitution, a pyramid that stays standing, static ramps, and
+// friction, restitution, a pyramid that stays standing, static ramps, a plank
+// bridge on revolute joints, a pendulum on a distance joint, and
 // RigidBody.node keeping Graphics nodes in sync. Passed to ExiEngine as
 // `physics`, so the engine steps it on its fixed timestep.
-import { Camera, ExiEngine, Graphics, RigidBody, RigidBodyWorld, Scene, Text } from "../../src/index.js";
+import { Camera, DistanceJoint, ExiEngine, Graphics, RevoluteJoint, RigidBody, RigidBodyWorld, Scene, Text } from "../../src/index.js";
 
 const WIDTH = 960;
 const HEIGHT = 540;
@@ -39,12 +40,29 @@ function spawnShape(x, y) {
 
 function buildLevel() {
   for (const body of [...world.bodies]) { world.remove(body); body.node?.destroy(); }
+  for (const node of [...scene.children]) if (node.name === "rope") node.destroy();
   spawned = 0;
   createBody({ shape: { type: "box", width: WIDTH * 2, height: 40 }, x: WIDTH / 2, y: HEIGHT - 20, static: true }, 0x1e293b);
   createBody({ shape: { type: "box", width: 30, height: HEIGHT }, x: -15, y: HEIGHT / 2, static: true }, 0x1e293b);
   createBody({ shape: { type: "box", width: 30, height: HEIGHT }, x: WIDTH + 15, y: HEIGHT / 2, static: true }, 0x1e293b);
   createBody({ shape: { type: "box", width: 260, height: 16 }, x: 190, y: 250, angle: 0.35, static: true, friction: 0.3 }, 0x334155);
   createBody({ shape: { type: "box", width: 200, height: 16 }, x: 760, y: 300, angle: -0.3, static: true }, 0x334155);
+  // A plank bridge hanging between two posts (revolute joints at plank ends).
+  const postLeft = createBody({ shape: { type: "box", width: 12, height: 40 }, x: 600, y: 150, static: true }, 0x475569);
+  let previous = postLeft;
+  for (let index = 0; index < 8; index += 1) {
+    const plank = createBody({ shape: { type: "box", width: 30, height: 8 }, x: 621 + index * 30, y: 132, friction: 0.8 }, 0xa16207);
+    world.addJoint(new RevoluteJoint({ a: previous, b: plank, x: 606 + index * 30, y: 132 }));
+    previous = plank;
+  }
+  const postRight = createBody({ shape: { type: "box", width: 12, height: 40 }, x: 852, y: 150, static: true }, 0x475569);
+  world.addJoint(new RevoluteJoint({ a: previous, b: postRight, x: 846, y: 132 }));
+  // A pendulum: a heavy ball on a distance joint, released from the side.
+  const pivot = createBody({ shape: { type: "circle", radius: 5 }, x: 330, y: 30, static: true }, 0x94a3b8);
+  const ball = createBody({ shape: { type: "circle", radius: 22 }, x: 230, y: 70, density: 3, friction: 0.3 }, 0xe2e8f0);
+  world.addJoint(new DistanceJoint({ a: pivot, b: ball }));
+  const rope = new Graphics({ name: "rope", zIndex: -1, onUpdate: (delta, node) => { node.clear().line(pivot.position.x, pivot.position.y, ball.position.x, ball.position.y, 2, { fill: 0x94a3b8 }); } });
+  scene.add(rope);
   // A pyramid that stays standing until something hits it.
   for (let row = 0; row < 7; row += 1) {
     for (let index = 0; index < 7 - row; index += 1) {
@@ -83,7 +101,7 @@ const engine = await ExiEngine.create({
     }
     if (input.wasActionPressed("slow")) { slowMotion = !slowMotion; currentEngine.setTimeScale(slowMotion ? 0.25 : 1); }
     if (input.wasActionPressed("reset")) buildLevel();
-    label.setText(`${world.bodies.length} bodies · ${world.contacts.length} contacts${slowMotion ? " · slow motion" : ""}`);
+    label.setText(`${world.bodies.length} bodies · ${world.joints.length} joints · ${world.contacts.length} contacts${slowMotion ? " · slow motion" : ""}`);
   },
 });
 engine.start();

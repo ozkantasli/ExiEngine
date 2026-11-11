@@ -353,6 +353,187 @@ export function collideRigidBodies(a, b, manifold = createManifold()) {
   return hit ? manifold : null;
 }
 
+
+// ---------------------------------------------------------------- joints
+// Velocity constraints solved together with contacts (warm started, with a
+// Baumgarte position bias). Anchors are given in world space at creation and
+// stored in each body's local frame.
+
+export const MAX_RIGID_JOINTS = 2_048;
+const JOINT_POSITION_FACTOR = 0.2;
+const JOINT_SLOP = 0.005;
+const JOINT_POSITION_ITERATIONS = 4;
+
+// Position-level impulse: shifts positions and angles of a pair directly.
+function moveBodies(a, b, ra, rb, px, py) {
+  a.position.x -= px * a.invMass; a.position.y -= py * a.invMass;
+  if (!a.fixedRotation) a.angle -= a.invInertia * cross(ra.x, ra.y, px, py);
+  b.position.x += px * b.invMass; b.position.y += py * b.invMass;
+  if (!b.fixedRotation) b.angle += b.invInertia * cross(rb.x, rb.y, px, py);
+}
+
+function toLocal(body, x, y) {
+  const dx = x - body.position.x; const dy = y - body.position.y;
+  const cos = Math.cos(-body.angle); const sin = Math.sin(-body.angle);
+  return { x: dx * cos - dy * sin, y: dx * sin + dy * cos };
+}
+
+function rotate(body, local, out) {
+  const cos = Math.cos(body.angle); const sin = Math.sin(body.angle);
+  out.x = local.x * cos - local.y * sin;
+  out.y = local.x * sin + local.y * cos;
+  return out;
+}
+
+function jointBodies(a, b) {
+  if (!(a instanceof RigidBody) || !(b instanceof RigidBody)) throw new TypeError("Joint bodies must be RigidBody instances.");
+  if (a === b) throw new RangeError("A joint needs two different bodies.");
+  if (a.invMass === 0 && b.invMass === 0) throw new RangeError("A joint needs at least one dynamic body.");
+}
+
+class RigidJoint {
+  constructor(a, b, collideConnected) {
+    jointBodies(a, b);
+    this.a = a; this.b = b;
+    this.collideConnected = Boolean(collideConnected);
+    this.world = null;
+    this.ra = { x: 0, y: 0 }; this.rb = { x: 0, y: 0 };
+  }
+
+  worldAnchors() {
+    rotate(this.a, this.localA, this.ra); rotate(this.b, this.localB, this.rb);
+    return { ax: this.a.position.x + this.ra.x, ay: this.a.position.y + this.ra.y, bx: this.b.position.x + this.rb.x, by: this.b.position.y + this.rb.y };
+  }
+
+  relativeVelocity() {
+    const { a, b, ra, rb } = this;
+    return {
+      x: b.velocity.x - b.angularVelocity * rb.y - a.velocity.x + a.angularVelocity * ra.y,
+      y: b.velocity.y + b.angularVelocity * rb.x - a.velocity.y - a.angularVelocity * ra.x,
+    };
+  }
+}
+
+// Pins two bodies together at one world point; they may rotate freely around it.
+export class RevoluteJoint extends RigidJoint {
+  constructor({ a, b, x, y, collideConnected = false } = {}) {
+    super(a, b, collideConnected);
+    const px = Number(x); const py = Number(y);
+    if (!Number.isFinite(px) || !Number.isFinite(py)) throw new RangeError("RevoluteJoint x/y must be finite.");
+    this.localA = toLocal(a, px, py);
+    this.localB = toLocal(b, px, py);
+    this.impulse = { x: 0, y: 0 };
+    this.mass = { a: 0, b: 0, c: 0, d: 0 };
+  }
+
+  prepare(delta) {
+    const { a, b, ra, rb } = this;
+    const anchors = this.worldAnchors();
+    const k11 = a.invMass + b.invMass + a.invInertia * ra.y * ra.y + b.invInertia * rb.y * rb.y;
+    const k12 = -a.invInertia * ra.x * ra.y - b.invInertia * rb.x * rb.y;
+    const k22 = a.invMass + b.invMass + a.invInertia * ra.x * ra.x + b.invInertia * rb.x * rb.x;
+    const determinant = k11 * k22 - k12 * k12 || 1e-12;
+    this.mass.a = k22 / determinant; this.mass.b = -k12 / determinant; this.mass.c = -k12 / determinant; this.mass.d = k11 / determinant;
+    void anchors; void delta;
+    applyPairImpulse(a, b, ra, rb, this.impulse.x, this.impulse.y);
+  }
+
+  // Removes drift by moving positions/angles directly (no velocity energy).
+  correctPosition() {
+    const { a, b, ra, rb } = this;
+    const anchors = this.worldAnchors();
+    const cx = anchors.bx - anchors.ax; const cy = anchors.by - anchors.ay;
+    const error = Math.hypot(cx, cy);
+    if (error < JOINT_SLOP) return error;
+    const k11 = a.invMass + b.invMass + a.invInertia * ra.y * ra.y + b.invInertia * rb.y * rb.y;
+    const k12 = -a.invInertia * ra.x * ra.y - b.invInertia * rb.x * rb.y;
+    const k22 = a.invMass + b.invMass + a.invInertia * ra.x * ra.x + b.invInertia * rb.x * rb.x;
+    const determinant = k11 * k22 - k12 * k12 || 1e-12;
+    const px = -(k22 * cx - k12 * cy) / determinant;
+    const py = -(-k12 * cx + k11 * cy) / determinant;
+    moveBodies(a, b, ra, rb, px * JOINT_POSITION_FACTOR, py * JOINT_POSITION_FACTOR);
+    return error;
+  }
+
+  solve() {
+    const velocity = this.relativeVelocity();
+    const rx = -velocity.x; const ry = -velocity.y;
+    const ix = this.mass.a * rx + this.mass.b * ry;
+    const iy = this.mass.c * rx + this.mass.d * ry;
+    this.impulse.x += ix; this.impulse.y += iy;
+    applyPairImpulse(this.a, this.b, this.ra, this.rb, ix, iy);
+  }
+}
+
+// Keeps two anchor points at a fixed distance (a rigid rod), or with rope: true
+// at most that distance (slack allowed).
+export class DistanceJoint extends RigidJoint {
+  constructor({ a, b, anchorA = null, anchorB = null, length, rope = false, collideConnected = false } = {}) {
+    super(a, b, collideConnected);
+    const worldA = anchorA ?? a.position; const worldB = anchorB ?? b.position;
+    for (const value of [worldA.x, worldA.y, worldB.x, worldB.y]) if (!Number.isFinite(Number(value))) throw new RangeError("DistanceJoint anchors must be finite.");
+    this.localA = toLocal(a, Number(worldA.x), Number(worldA.y));
+    this.localB = toLocal(b, Number(worldB.x), Number(worldB.y));
+    const initial = Math.hypot(worldB.x - worldA.x, worldB.y - worldA.y);
+    this.length = length === undefined ? initial : Number(length);
+    if (!Number.isFinite(this.length) || this.length < 0) throw new RangeError("DistanceJoint length must be a finite, non-negative number.");
+    this.rope = Boolean(rope);
+    this.impulse = 0;
+    this.normal = { x: 0, y: 0 };
+    this.mass = 0;
+    this.active = true;
+  }
+
+  prepare(delta) {
+    const { a, b, ra, rb } = this;
+    const anchors = this.worldAnchors();
+    const dx = anchors.bx - anchors.ax; const dy = anchors.by - anchors.ay;
+    const current = Math.hypot(dx, dy);
+    this.normal.x = current > 1e-9 ? dx / current : 1; this.normal.y = current > 1e-9 ? dy / current : 0;
+    const error = current - this.length;
+    this.active = !this.rope || error > 0;
+    if (!this.active) { this.impulse = 0; return; }
+    const rnA = cross(ra.x, ra.y, this.normal.x, this.normal.y); const rnB = cross(rb.x, rb.y, this.normal.x, this.normal.y);
+    const k = a.invMass + b.invMass + a.invInertia * rnA * rnA + b.invInertia * rnB * rnB;
+    this.mass = k > 0 ? 1 / k : 0;
+    void delta;
+    applyPairImpulse(a, b, ra, rb, this.normal.x * this.impulse, this.normal.y * this.impulse);
+  }
+
+  correctPosition() {
+    const { a, b, ra, rb } = this;
+    const anchors = this.worldAnchors();
+    const dx = anchors.bx - anchors.ax; const dy = anchors.by - anchors.ay;
+    const current = Math.hypot(dx, dy);
+    let error = current - this.length;
+    if (this.rope) error = Math.max(0, error);
+    if (Math.abs(error) < JOINT_SLOP) return Math.abs(error);
+    const nx = current > 1e-9 ? dx / current : 1; const ny = current > 1e-9 ? dy / current : 0;
+    const rnA = cross(ra.x, ra.y, nx, ny); const rnB = cross(rb.x, rb.y, nx, ny);
+    const k = a.invMass + b.invMass + a.invInertia * rnA * rnA + b.invInertia * rnB * rnB;
+    if (!(k > 0)) return Math.abs(error);
+    const impulse = -(error / k) * JOINT_POSITION_FACTOR;
+    moveBodies(a, b, ra, rb, nx * impulse, ny * impulse);
+    return Math.abs(error);
+  }
+
+  solve() {
+    if (!this.active) return;
+    const velocity = this.relativeVelocity();
+    const normalVelocity = velocity.x * this.normal.x + velocity.y * this.normal.y;
+    let impulse = this.mass * -normalVelocity;
+    if (this.rope) {
+      // A rope can only pull: the accumulated impulse stays <= 0 (towards each other).
+      const previous = this.impulse;
+      this.impulse = Math.min(0, previous + impulse);
+      impulse = this.impulse - previous;
+    } else {
+      this.impulse += impulse;
+    }
+    applyPairImpulse(this.a, this.b, this.ra, this.rb, this.normal.x * impulse, this.normal.y * impulse);
+  }
+}
+
 // ---------------------------------------------------------------- world
 
 export class RigidBodyWorld {
@@ -375,6 +556,38 @@ export class RigidBodyWorld {
     // warm start the solver (much steadier stacks and resting contacts).
     this._cache = new Map();
     this._nextCache = new Map();
+    this.joints = [];
+    this._noCollidePairs = new Set();
+  }
+
+  addJoint(joint) {
+    if (!(joint instanceof RevoluteJoint) && !(joint instanceof DistanceJoint)) throw new TypeError("RigidBodyWorld.addJoint expects a RevoluteJoint or DistanceJoint.");
+    if (joint.world === this) return joint;
+    if (joint.world) throw new Error("Joint already belongs to another world.");
+    if (joint.a.world !== this || joint.b.world !== this) throw new Error("Add both joint bodies to this world first.");
+    if (this.joints.length >= MAX_RIGID_JOINTS) throw new RangeError(`RigidBodyWorld supports at most ${MAX_RIGID_JOINTS} joints.`);
+    joint.world = this;
+    this.joints.push(joint);
+    this._rebuildNoCollide();
+    return joint;
+  }
+
+  removeJoint(joint) {
+    const index = this.joints.indexOf(joint);
+    if (index < 0) return false;
+    this.joints.splice(index, 1);
+    joint.world = null;
+    this._rebuildNoCollide();
+    return true;
+  }
+
+  _rebuildNoCollide() {
+    this._noCollidePairs.clear();
+    for (const joint of this.joints) {
+      if (joint.collideConnected) continue;
+      const low = Math.min(joint.a.id, joint.b.id); const high = Math.max(joint.a.id, joint.b.id);
+      this._noCollidePairs.add(`${low}:${high}`);
+    }
   }
 
   add(body) {
@@ -393,12 +606,16 @@ export class RigidBodyWorld {
   remove(body) {
     const index = this.bodies.indexOf(body);
     if (index < 0) return false;
+    for (const joint of [...this.joints]) if (joint.a === body || joint.b === body) this.removeJoint(joint);
     this.bodies.splice(index, 1);
     body.world = null;
     return true;
   }
 
   clear() {
+    for (const joint of this.joints) joint.world = null;
+    this.joints.length = 0;
+    this._noCollidePairs.clear();
     for (const body of this.bodies) body.world = null;
     this.bodies.length = 0;
     this.contacts.length = 0;
@@ -441,6 +658,7 @@ export class RigidBodyWorld {
         if (a.invMass === 0 && b.invMass === 0) continue;
         if (b.bounds.top > a.bounds.bottom + CONTACT_MARGIN || b.bounds.bottom < a.bounds.top - CONTACT_MARGIN) continue;
         if ((a.layer & b.mask) === 0 || (b.layer & a.mask) === 0) continue;
+        if (this._noCollidePairs.size && this._noCollidePairs.has(a.id < b.id ? `${a.id}:${b.id}` : `${b.id}:${a.id}`)) continue;
         const first = a.id < b.id ? a : b; const second = first === a ? b : a;
         const contact = this._contact(count);
         if (!collideRigidBodies(first, second, contact.manifold)) continue;
@@ -641,7 +859,11 @@ export class RigidBodyWorld {
     }
     this._detect();
     this._prepare(step);
-    for (let iteration = 0; iteration < this.iterations; iteration += 1) this._solve();
+    for (const joint of this.joints) joint.prepare(step);
+    for (let iteration = 0; iteration < this.iterations; iteration += 1) {
+      for (const joint of this.joints) joint.solve();
+      this._solve();
+    }
     this._storeImpulses();
     this._correctPositions();
     for (const body of this.bodies) {
@@ -651,6 +873,16 @@ export class RigidBodyWorld {
       body.position.x = Math.max(-MAX_COORDINATE, Math.min(MAX_COORDINATE, body.position.x + body.velocity.x * step));
       body.position.y = Math.max(-MAX_COORDINATE, Math.min(MAX_COORDINATE, body.position.y + body.velocity.y * step));
       if (!body.fixedRotation) body.angle += body.angularVelocity * step;
+    }
+    if (this.joints.length) {
+      for (let iteration = 0; iteration < JOINT_POSITION_ITERATIONS; iteration += 1) {
+        let worst = 0;
+        for (const joint of this.joints) worst = Math.max(worst, joint.correctPosition());
+        if (worst < JOINT_SLOP) break;
+      }
+    }
+    for (const body of this.bodies) {
+      if (body.invMass === 0) continue;
       body.updateGeometry();
       body.syncNode();
     }

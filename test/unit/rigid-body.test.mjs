@@ -154,3 +154,74 @@ test("rigid: forces, impulses at an offset and layer masks", () => {
   run(gravityWorld, 60);
   assert.ok(ghost.position.y > 500, "masked layers do not collide");
 });
+
+test("rigid joints: pendulum keeps its length, rope allows slack, bridge settles", async () => {
+  const { DistanceJoint, RevoluteJoint } = await import("../../src/index.js");
+  const world = new RigidBodyWorld({ gravityY: 980 });
+  const pivot = world.add(new RigidBody({ shape: { type: "circle", radius: 2 }, x: 0, y: 0, static: true }));
+  const bob = world.add(new RigidBody({ shape: { type: "circle", radius: 10 }, x: 100, y: 0 }));
+  world.addJoint(new DistanceJoint({ a: pivot, b: bob }));
+  let maxError = 0; let lowest = -Infinity; let crossedLeft = false;
+  for (let index = 0; index < 600; index += 1) {
+    world.step(1 / 60);
+    maxError = Math.max(maxError, Math.abs(Math.hypot(bob.position.x, bob.position.y) - 100));
+    lowest = Math.max(lowest, bob.position.y);
+    if (bob.position.x < -50) crossedLeft = true;
+  }
+  assert.ok(maxError < 1, `length error ${maxError}`);
+  assert.ok(lowest > 98 && lowest < 101.5, "swings through the bottom");
+  assert.ok(crossedLeft, "swings to the other side");
+
+  const ropeWorld = new RigidBodyWorld();
+  const hook = ropeWorld.add(new RigidBody({ shape: { type: "circle", radius: 2 }, x: 0, y: 0, static: true }));
+  const load = ropeWorld.add(new RigidBody({ shape: { type: "circle", radius: 5 }, x: 0, y: 20 }));
+  const rope = ropeWorld.addJoint(new DistanceJoint({ a: hook, b: load, length: 80, rope: true }));
+  ropeWorld.step(1 / 60);
+  assert.ok(load.position.y < 25, "slack rope does not pull");
+  for (let index = 0; index < 300; index += 1) ropeWorld.step(1 / 60);
+  assert.ok(Math.abs(load.position.y - 80) < 0.5, "taut rope holds the load");
+  assert.equal(rope.length, 80);
+
+  const bridgeWorld = new RigidBodyWorld();
+  let previous = bridgeWorld.add(new RigidBody({ shape: { type: "box", width: 10, height: 10 }, x: 0, y: 0, static: true }));
+  const planks = [];
+  for (let index = 0; index < 10; index += 1) {
+    const plank = bridgeWorld.add(new RigidBody({ shape: { type: "box", width: 30, height: 6 }, x: 20 + index * 30, y: 0 }));
+    planks.push(plank);
+    bridgeWorld.addJoint(new RevoluteJoint({ a: previous, b: plank, x: 5 + index * 30, y: 0 }));
+    previous = plank;
+  }
+  bridgeWorld.addJoint(new RevoluteJoint({ a: previous, b: bridgeWorld.add(new RigidBody({ shape: { type: "box", width: 10, height: 10 }, x: 310, y: 0, static: true })), x: 305, y: 0 }));
+  for (let index = 0; index < 900; index += 1) bridgeWorld.step(1 / 60);
+  const sag = Math.max(...planks.map((plank) => plank.position.y));
+  assert.ok(sag > 5 && sag < 40, `the bridge sags (${sag})`);
+  assert.ok(Math.max(...planks.map((plank) => Math.hypot(plank.velocity.x, plank.velocity.y))) < 5, "and settles");
+  for (const joint of bridgeWorld.joints) { const anchors = joint.worldAnchors(); assert.ok(Math.hypot(anchors.bx - anchors.ax, anchors.by - anchors.ay) < 0.5); }
+});
+
+test("rigid joints: jointed bodies do not collide, removal and validation", async () => {
+  const { DistanceJoint, RevoluteJoint } = await import("../../src/index.js");
+  const world = new RigidBodyWorld({ gravityY: 0 });
+  const a = world.add(new RigidBody({ shape: { type: "box", width: 20, height: 20 }, x: 0, y: 0 }));
+  const b = world.add(new RigidBody({ shape: { type: "box", width: 20, height: 20 }, x: 10, y: 0 }));
+  const joint = world.addJoint(new RevoluteJoint({ a, b, x: 5, y: 0 }));
+  world.step(1 / 60);
+  assert.equal(world.contacts.length, 0, "overlapping jointed bodies are not pushed apart");
+  world.removeJoint(joint);
+  world.step(1 / 60);
+  assert.equal(world.contacts.length, 1);
+  const collide = world.addJoint(new RevoluteJoint({ a, b, x: 5, y: 0, collideConnected: true }));
+  world.step(1 / 60);
+  assert.equal(world.contacts.length, 1, "collideConnected keeps contacts");
+  world.remove(b);
+  assert.equal(world.joints.length, 0, "removing a body removes its joints");
+  assert.equal(collide.world, null);
+  const fixed = new RigidBody({ shape: { type: "circle", radius: 1 }, static: true });
+  assert.throws(() => new RevoluteJoint({ a, b: a, x: 0, y: 0 }), /different/);
+  assert.throws(() => new RevoluteJoint({ a: fixed, b: new RigidBody({ shape: { type: "circle", radius: 1 }, static: true }), x: 0, y: 0 }), /dynamic/);
+  assert.throws(() => new RevoluteJoint({ a, b: {}, x: 0, y: 0 }), /RigidBody/);
+  assert.throws(() => new RevoluteJoint({ a, b: fixed, x: NaN, y: 0 }), /finite/);
+  assert.throws(() => new DistanceJoint({ a, b: fixed, length: -1 }), /length/);
+  assert.throws(() => world.addJoint(new DistanceJoint({ a, b: fixed })), /both joint bodies/);
+  assert.throws(() => world.addJoint({}), /RevoluteJoint or DistanceJoint/);
+});

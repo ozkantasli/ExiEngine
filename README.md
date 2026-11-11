@@ -83,7 +83,7 @@ only and sends CSP/`nosniff` headers.
 |---|---|
 | [`examples/platformer`](examples/platformer/main.js) | `TileMap.fromTiled` level, tile-property collision bodies, gravity, coyote time / jump buffering, camera follow + bounds, HUD overlay |
 | [`examples/top-down`](examples/top-down/main.js) | Code-built TileMap walls, zero-gravity physics, trigger pickups, A* (`findGridPath`) chasers, particles, camera shake, `LightLayer` torch lighting |
-| [`examples/physics`](examples/physics/main.js) | `RigidBodyWorld`: boxes, circles, convex polygons, rotation, friction, restitution, a standing pyramid, click to drop shapes |
+| [`examples/physics`](examples/physics/main.js) | `RigidBodyWorld`: boxes, circles, convex polygons, rotation, friction, restitution, a standing pyramid, a plank bridge and a pendulum on joints, click to drop shapes |
 | [`examples/ui-menu`](examples/ui-menu/main.js) | Overlay UI, pointer + keyboard focus (Tab/Enter), tweened buttons, `StateMachine` screens |
 
 `npm test` checks the examples statically; `npm run test:e2e:examples` runs them in a real
