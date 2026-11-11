@@ -27,7 +27,8 @@ Content, authoring and game-feature release. Everything stays dependency-free.
 - **Audio:** audio sprites (`addSprites`), slices and loop regions, `playbackRate`, deterministic 2D
   spatial audio (`setListener`, `configureSpatial`, `setVoicePosition`).
 - **Multiplayer:** `RollbackSession`, transport-agnostic rollback netcode with desync detection.
-- **UI:** `Button`, `Slider`, `TextInput` (IME and mobile keyboards through a hidden input), `ScrollView`.
+- **UI:** `Button`, `Slider`, `TextInput` (IME and mobile keyboards through a hidden input), `ScrollView`,
+  `Checkbox`, `Dropdown`, `Stack` and `Grid` layout containers.
 - **Examples:** platformer (Tiled), top-down (A*, lighting), physics sandbox, UI menu, UI widgets;
   `npm run test:e2e:examples` drives them and the editor in Chromium.
 
@@ -45,6 +46,7 @@ Content, authoring and game-feature release. Everything stays dependency-free.
 - `Graphics.roundedRect` failed when the radius was half a side (pills, round buttons).
 - Tab focus navigation could not `preventDefault` inside a passive listener.
 - Double-encoded UTF-8 in several error messages; wrong `TileMap` and `Text` examples in API.md.
+- Widget pointer math ignored parent transforms, so widgets nested in containers or groups missed clicks.
 - `deserializeScene` placeholders now keep missing texture ids instead of rewriting them to `"white"`.
 
 ## [0.2.0]

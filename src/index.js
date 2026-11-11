@@ -32,5 +32,5 @@ export { RollbackSession, MAX_ROLLBACK_PLAYERS, MAX_ROLLBACK_FRAMES } from "./ne
 export { LightLayer, MAX_LIGHTS } from "./core/light-layer.js";
 export { watchScene, EDITOR_CHANNEL } from "./assets/scene-watch.js";
 export { tileMapFromLDtk, ldtkIntGrid, ldtkEntities } from "./core/ldtk.js";
-export { Button, Slider, ScrollView, TextInput, UI_THEME } from "./ui/widgets.js";
+export { Button, Checkbox, Dropdown, Grid, Slider, ScrollView, Stack, TextInput, UI_THEME } from "./ui/widgets.js";
 export { registerFilter, listFilters, MAX_CUSTOM_FILTERS } from "./render/custom-filters.js";

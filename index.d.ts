@@ -974,6 +974,32 @@ export class TextInput extends Node {
   setValue(value: string, options?: { silent?: boolean }): this; focusProxy(): void; redraw(): this;
 }
 
+export class Stack extends Node {
+  direction: "row" | "column"; gap: number; padding: number; align: "start" | "center" | "end"; width: number; height: number;
+  constructor(options?: NodeOptions & { direction?: "row" | "column"; gap?: number; padding?: number; align?: "start" | "center" | "end" });
+  /** Positions visible children; also runs on every update. */
+  arrange(): this;
+}
+export class Grid extends Node {
+  columns: number; cellWidth: number; cellHeight: number; gap: number; padding: number; width: number; height: number;
+  constructor(options?: NodeOptions & { columns?: number; cellWidth?: number; cellHeight?: number; gap?: number; padding?: number });
+  arrange(): this;
+}
+export class Checkbox extends Node {
+  checked: boolean; theme: UITheme; box: Graphics; label: Text;
+  onChange: ((checked: boolean, checkbox: Checkbox) => void) | null;
+  constructor(options?: NodeOptions & { label?: string; checked?: boolean; onChange?: ((checked: boolean, checkbox: Checkbox) => void) | null; theme?: Partial<UITheme> | null });
+  setChecked(value: boolean): this; toggle(): this; redraw(): this;
+}
+export type DropdownOption<T = unknown> = T | { label?: string; value: T };
+export class Dropdown<T = unknown> extends Node {
+  width: number; height: number; open: boolean; highlight: number; theme: UITheme; label: Text; background: Graphics; list: Node;
+  readonly choices: ReadonlyArray<{ label: string; value: T }>; value: T; readonly selectedIndex: number;
+  onChange: ((value: T, dropdown: Dropdown<T>) => void) | null;
+  constructor(options?: NodeOptions & { options?: DropdownOption<T>[]; value?: T; width?: number; height?: number; onChange?: ((value: T, dropdown: Dropdown<T>) => void) | null; theme?: Partial<UITheme> | null });
+  setOptions(options: DropdownOption<T>[], value?: T): this; select(index: number): this; setOpen(open: boolean): this; redraw(): this;
+}
+
 export const MAX_CUSTOM_FILTERS: number;
 /** Local game-code API (not reachable from MCP/RuntimeAgent). Bodies are function bodies:
  * GLSL `vec4 f(vec4 color, vec2 uv, float amount, vec2 texel)`, WGSL `fn f(color: vec4f, uv: vec2f, amount: f32, texel: vec2f) -> vec4f`;

@@ -33,7 +33,7 @@ Legend: ✅ built in · 🔌 official/common plugin or companion package · ➖ 
 | WebGPU backend | ✅ (+WebGL2 fallback) | ➖ | ✅ | — | — | — | — | ➖ | — |
 | GPU culling / instancing | ✅ compute culling + indirect draw | ➖ | ➖ | — | — | — | — | ➖ | ✅ |
 | Arcade / AABB physics | ✅ `PhysicsWorld` | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Rigid bodies with rotation | ✅ `RigidBodyWorld` (no joints yet) | ✅ (Matter) | — | ✅ | — | ➖ | ✅ | ✅ | ✅ |
+| Rigid bodies with rotation | ✅ `RigidBodyWorld` | ✅ (Matter) | — | ✅ | — | ➖ | ✅ | ✅ | ✅ |
 | Joints / constraints | ✅ revolute + distance/rope | ✅ | — | — | — | — | ✅ | ✅ | ✅ |
 | Tiled import | ✅ `TileMap.fromTiled` | ✅ | 🔌 | 🔌 | ➖ | ✅ | ➖ | ➖ | 🔌 |
 | LDtk import | ✅ tiles, IntGrid, entities | 🔌 | 🔌 | 🔌 | — | — | — | — | 🔌 |
@@ -47,7 +47,7 @@ Legend: ✅ built in · 🔌 official/common plugin or companion package · ➖ 
 | Visual editor | ➖ first browser editor | — (commercial 3rd party) | — | — | — | — | ✅ | ✅ | ✅ |
 | Hot reload / play-in-editor | ✅ `watchScene` + live Play window | ➖ (dev servers) | — | — | — | — | ✅ | ✅ | ✅ |
 | Prefabs / asset manager in editor | ➖ prefabs (no asset browser) | — | — | — | — | — | ✅ | ✅ | ✅ |
-| UI widgets (input, scroll, slider) | ✅ Button, Slider, TextInput (IME), ScrollView | ➖ | 🔌 | ➖ | ➖ | ➖ | ✅ | ✅ | ✅ |
+| UI widgets (input, scroll, slider, layout) | ✅ Button, Slider, TextInput (IME), ScrollView, Checkbox, Dropdown, Stack/Grid | ➖ | 🔌 | ➖ | ➖ | ➖ | ✅ | ✅ | ✅ |
 | Netcode helpers | ✅ `RollbackSession` (rollback, transport-agnostic) | — | — | — | — | — | ➖ | ✅ | ✅ |
 | npm package + CDN bundle | ✅ ready (not yet published) | ✅ | ✅ | ✅ | ✅ | ✅ | n/a | n/a | n/a |
 | Playable examples | ➖ 4 games + editor | ✅ (hundreds) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
@@ -85,8 +85,8 @@ Legend: ✅ built in · 🔌 official/common plugin or companion package · ➖ 
    anti-tunneling via speculative contacts + substeps shipped; prismatic/weld/motor joints open).
 5. **Normal maps and shadows.** ✅ `LightLayer` point lights shipped; normal-mapped sprites and
    shadow casting are still open.
-6. **UI widgets:** ✅ Button, Slider, TextInput (IME via hidden input), ScrollView shipped;
-   layout containers (rows/columns/grids), checkboxes, dropdowns still open.
+6. ~~UI widgets~~ ✅ Button, Slider, TextInput (IME via hidden input), ScrollView, Checkbox,
+   Dropdown and Stack/Grid layout containers shipped. Rich text and tooltips remain open.
 7. ~~LDtk import~~ ✅ shipped (tiles, IntGrid, entities).
 
 **P2 — strategic**

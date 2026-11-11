@@ -240,7 +240,7 @@ engine.renderer.getCustomFilterStatus();                     // { scanlines: { s
 
 Registers a filter written as a **function body** for both backends (GLSL ES 3.0 and WGSL) that receives the tinted `color`, the texture `uv`, the filter `amount` (0..1) and the `texel` size and returns the new color; `exiSample(uv)` samples the texture. Registered names work everywhere built-in filters do (`node.filter`, RenderGroup effects, the editor). Guard rails: 2-32 character lowercase names, at most `MAX_CUSTOM_FILTERS` (16) filters and 4 KiB per body; bodies must return a value, keep their braces balanced and cannot use preprocessor directives, `uniform`/`layout`/`precision`, WGSL attributes (`@`) or `enable`/`requires`/`diagnostic`, so they cannot declare anything outside their function. Renderers recompile on the next frame (WebGPU in the background; until then the filter draws unfiltered). A body that fails to compile is disabled on that backend with `status: "error"` and the compiler message, and the rest keeps rendering. `registerFilter` is a local game-code API: the MCP bridge and the browser RuntimeAgent can neither see nor call it, because it compiles caller-supplied shader code (`SECURITY.md`).
 
-### UI widgets: `Button`, `Slider`, `TextInput`, `ScrollView`
+### UI widgets: `Button`, `Slider`, `TextInput`, `ScrollView`, `Checkbox`, `Dropdown`, `Stack`, `Grid`
 
 ```js
 const ui = new Scene();                                            // pass as ExiEngine({ overlayScene: ui })
@@ -253,9 +253,17 @@ ui.add(name, volume, play, list);
 const engine = await ExiEngine.create({ canvas, overlayScene: ui });
 list.camera = engine.overlayCamera;                                // enables clipping to the viewport
 engine.focus(name);
+
+const options = new Stack({ x: 40, y: 220, direction: "column", gap: 12 });   // or direction: "row"
+options.add(
+  new Checkbox({ label: "Fullscreen", checked: false, onChange: (on) => setFullscreen(on) }),
+  new Dropdown({ options: ["Easy", "Normal", { label: "Hard", value: 3 }], value: "Normal", onChange: (value) => setDifficulty(value) }),
+);
+const inventory = new Grid({ x: 360, y: 260, columns: 4, cellWidth: 48, cellHeight: 48, gap: 6 });
+ui.add(options, inventory);
 ```
 
-Canvas-drawn controls built from engine nodes; they use pointer capture, the engine focus order (Tab / Shift+Tab, clicking focuses) and keyboard events, so they work with mouse, touch and keyboard. `Button` fires `onClick` on press+release inside or Enter/Space; `Slider` supports click, drag, arrows, PageUp/PageDown, Home/End, `step` snapping and clamping; `ScrollView` scrolls with the wheel and by dragging, clamps to its content, draws a scrollbar, hides content children that are fully outside the viewport (so they are not drawn or picked) and clips to its rectangle once `camera` is set; `TextInput` edits single-line text with caret, Backspace/Delete/arrows/Home/End, `maxLength` and Enter to submit. When a DOM is available, a focused `TextInput` mirrors its value in a hidden `<input>` so IME composition (Chinese, Japanese, Korean…), paste and mobile virtual keyboards work; pass `domProxy: false` to disable. All widgets take a `theme` (see `UI_THEME`). Limitation: the engine applies pointer input on its fixed step, so mobile Safari may not open the virtual keyboard from a canvas tap; focus the field from a DOM button or accept a hardware keyboard there.
+Canvas-drawn controls built from engine nodes; they use pointer capture, the engine focus order (Tab / Shift+Tab, clicking focuses) and keyboard events, so they work with mouse, touch and keyboard. `Button` fires `onClick` on press+release inside or Enter/Space; `Slider` supports click, drag, arrows, PageUp/PageDown, Home/End, `step` snapping and clamping; `ScrollView` scrolls with the wheel and by dragging, clamps to its content, draws a scrollbar, hides content children that are fully outside the viewport (so they are not drawn or picked) and clips to its rectangle once `camera` is set; `TextInput` edits single-line text with caret, Backspace/Delete/arrows/Home/End, `maxLength` and Enter to submit. When a DOM is available, a focused `TextInput` mirrors its value in a hidden `<input>` so IME composition (Chinese, Japanese, Korean…), paste and mobile virtual keyboards work; pass `domProxy: false` to disable. `Checkbox` toggles on click or Space/Enter and calls `onChange(checked)`. `Dropdown` opens a list on click or Enter/Space, picks with the mouse, arrows + Enter or closes with Escape / focus loss; with the list closed, arrows change the value; options are values or `{ label, value }` (at most 256). `Stack` lays out its visible children in a row or column (`gap`, `padding`, `align`) and `Grid` places them in fixed cells (`columns`, `cellWidth`, `cellHeight`); both re-arrange every update (call `arrange()` to do it immediately), measure children by their local bounds and report their own `width`/`height`, so they nest. All widgets take a `theme` (see `UI_THEME`). Limitation: the engine applies pointer input on its fixed step, so mobile Safari may not open the virtual keyboard from a canvas tap; focus the field from a DOM button or accept a hardware keyboard there.
 
 ### `Graphics`
 

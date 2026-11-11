@@ -1,7 +1,7 @@
 // ExiEngine unit test — UI widgets (Button, Slider, ScrollView, TextInput) with a Canvas 2D stub
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { Button, Camera, Node, Scene, ScrollView, Slider, TextInput } from "../../src/index.js";
+import { Button, Camera, Node, Scene, ScrollView, Slider, Text, TextInput } from "../../src/index.js";
 
 const previous = globalThis.OffscreenCanvas;
 globalThis.OffscreenCanvas = class {
@@ -145,4 +145,94 @@ test("widgets: callbacks are validated", () => {
   assert.throws(() => new Slider({ onChange: "x" }), /function/);
   assert.throws(() => new TextInput({ onSubmit: {} }), /function/);
   assert.ok(new Node() instanceof Node);
+});
+
+test("layout: Stack places children in a row or column with gap, padding and alignment", async () => {
+  const { Stack, Grid } = await import("../../src/index.js");
+  const column = new Stack({ gap: 10, padding: 4, align: "center" });
+  const a = new Button({ width: 100, height: 30 });
+  const b = new Button({ width: 60, height: 20 });
+  const hidden = new Button({ width: 500, height: 500, visible: false });
+  column.add(a, hidden, b);
+  column.arrange();
+  assert.deepEqual([a.position.x, a.position.y, b.position.x, b.position.y], [4, 4, 24, 44]);
+  assert.deepEqual(column.getLocalBounds(), { x: 0, y: 0, width: 108, height: 68 }, "hidden children are skipped");
+  const row = new Stack({ direction: "row", gap: 5, align: "end" });
+  const label = new Text({ text: "Hi", font: "16px sans-serif" }); // anchored at its centre by default
+  row.add(new Button({ width: 40, height: 40 }), label);
+  row.arrange();
+  const labelBox = label.getLocalBounds();
+  assert.equal(label.position.x + labelBox.x, 45, "anchored children are placed by their top-left corner");
+  assert.equal(label.position.y + labelBox.y + labelBox.height, 40, "end-aligned");
+  assert.throws(() => new Stack({ direction: "diagonal" }), /direction/);
+  const grid = new Grid({ columns: 2, cellWidth: 50, cellHeight: 40, gap: 10 });
+  const cells = [0, 1, 2].map(() => new Button({ width: 30, height: 20 }));
+  grid.add(...cells);
+  new Scene().add(grid);
+  grid.update(1 / 60);
+  assert.deepEqual(cells.map((cell) => [cell.position.x, cell.position.y]), [[10, 10], [70, 10], [10, 60]]);
+  assert.deepEqual([grid.width, grid.height], [110, 90]);
+});
+
+test("checkbox: toggles by pointer and keyboard and reports changes", async () => {
+  const { Checkbox } = await import("../../src/index.js");
+  const changes = [];
+  const box = new Checkbox({ label: "Sound", checked: true, onChange: (value) => changes.push(value) });
+  new Scene().add(box);
+  box.updateWorldMatrix();
+  box.onPointerUp(pointer(5, 5));
+  box.onKeyDown(key("Space"));
+  box.onPointerUp(pointer(-50, 5)); // released outside
+  box.checked = true;
+  assert.deepEqual(changes, [false, true]);
+  assert.equal(box.checked, true);
+  assert.ok(box.hitArea.width > 32, "the label is clickable too");
+});
+
+test("dropdown: opens, navigates, picks with pointer or keyboard and closes", async () => {
+  const { Dropdown } = await import("../../src/index.js");
+  const picks = [];
+  const select = new Dropdown({ options: ["Easy", { label: "Normal", value: 2 }, "Hard"], value: 2, width: 120, height: 30, onChange: (value) => picks.push(value) });
+  new Scene().add(select);
+  select.updateWorldMatrix();
+  assert.equal(select.value, 2);
+  assert.equal(select.label.text, "Normal");
+  select.onPointerUp(pointer(10, 10));
+  assert.equal(select.open, true);
+  assert.equal(select.list.visible, true);
+  assert.ok(select.hitArea.height > 30, "the open list can be clicked");
+  select.onPointerUp(pointer(10, 30 + 4 + 2 * 30 + 5)); // third row
+  assert.equal(select.value, "Hard");
+  assert.equal(select.open, false);
+  select.onKeyDown(key("Enter"));
+  select.onKeyDown(key("ArrowDown"));
+  select.onKeyDown(key("Enter"));
+  assert.equal(select.value, "Easy", "wraps around");
+  select.onKeyDown(key("ArrowDown"));
+  assert.equal(select.value, 2, "arrows change the value while closed");
+  select.onKeyDown(key("Enter"));
+  select.onKeyDown(key("Escape"));
+  assert.equal(select.open, false);
+  assert.deepEqual(picks, ["Hard", "Easy", 2]);
+  select.setOptions(["A", "B"], "B");
+  assert.equal(select.value, "B");
+  assert.throws(() => new Dropdown({ options: [] }), /at least one/);
+});
+
+test("widgets: pointer math works when nested in a layout", async () => {
+  const { Stack, Dropdown } = await import("../../src/index.js");
+  const scene = new Scene();
+  const stack = new Stack({ x: 400, y: 84, gap: 12 });
+  const spacer = new Button({ width: 100, height: 60 });
+  const select = new Dropdown({ options: ["a", "b"], width: 200, height: 36 });
+  stack.add(spacer, select);
+  scene.add(stack);
+  scene.update(1 / 60);
+  select.onPointerUp(pointer(450, 84 + 72 + 10));
+  assert.equal(select.open, true, "click on the nested dropdown header opens it");
+  const slider = new Slider({ width: 100, min: 0, max: 10 });
+  stack.add(slider);
+  scene.update(1 / 60);
+  slider.onPointerDown(pointer(400 + 50, 84 + 72 + 36 + 12 + 5));
+  assert.equal(slider.value, 5);
 });

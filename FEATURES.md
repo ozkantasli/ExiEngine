@@ -130,7 +130,7 @@
 - Cheap 2D lighting with `LightLayer`: a low-resolution light map (ambient fill + additive radial point lights) multiplied over a world rectangle, with world-space light objects synced every update
 - Free-form JSON `node.data` metadata stored in scene documents, and `watchScene()` hot reload from a polled file and/or the editor's BroadcastChannel; the editor gains a live Play window with rigid-body preview from `data.body` and direct-to-file saving
 - LDtk project import: `tileMapFromLDtk` (Tiles/AutoLayer with flips, offsets, opacity), `ldtkIntGrid` (collision/pathfinding grid) and `ldtkEntities` (positions, sizes, tags, custom fields)
-- Canvas UI widgets `Button`, `Slider`, `TextInput` (with a hidden DOM input for IME, paste and mobile keyboards) and `ScrollView` (wheel/drag scrolling, clipping, off-screen culling) on the engine's pointer capture and focus order
+- Canvas UI widgets `Button`, `Slider`, `TextInput` (with a hidden DOM input for IME, paste and mobile keyboards) and `ScrollView` (wheel/drag scrolling, clipping, off-screen culling) on the engine's pointer capture and focus order; `Checkbox`, `Dropdown` (mouse and keyboard) and `Stack` / `Grid` layout containers
 - Prefabs: named node trees stored in scene documents, editor make/insert/apply-to-all, and `instantiatePrefab()` for runtime spawning
 - `registerFilter()`: bounded custom filter bodies (GLSL + WGSL) compiled into the engine's shaders, with per-backend compile status and fallback; denied to AI agents
 - A dependency-free TypeScript API contract with the root `index.d.ts`

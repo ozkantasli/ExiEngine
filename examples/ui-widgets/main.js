@@ -1,8 +1,9 @@
 // ExiEngine example: built-in canvas UI widgets in an overlay scene.
-// Shows Button, Slider, TextInput and ScrollView with pointer, wheel, keyboard
+// Shows Button, Slider, TextInput, ScrollView, Checkbox, Dropdown and a Stack
+// layout with pointer, wheel, keyboard
 // focus (Tab / Shift+Tab) and text entry; the world scene behind is a preview
 // whose colour and speed follow the widgets.
-import { Button, Camera, ExiEngine, Graphics, Scene, ScrollView, Slider, Text, TextInput } from "../../src/index.js";
+import { Button, Camera, Checkbox, Dropdown, ExiEngine, Graphics, Scene, ScrollView, Slider, Stack, Text, TextInput } from "../../src/index.js";
 
 const WIDTH = 960;
 const HEIGHT = 540;
@@ -11,9 +12,9 @@ const HEIGHT = 540;
 const world = new Scene();
 const shape = new Graphics({ x: 720, y: 270 }).roundedRect(-80, -80, 160, 160, 28, { fill: 0xffffff });
 world.add(shape);
-const state = { speed: 1, hue: 170, size: 1 };
+const state = { speed: 1, hue: 170, size: 1, spinning: true, corner: 28 };
 shape.onUpdate = (delta, node) => {
-  node.rotation += delta * state.speed;
+  if (state.spinning) node.rotation += delta * state.speed;
   node.scale.set(state.size, state.size);
 };
 function hueToTint(hue) {
@@ -21,7 +22,7 @@ function hueToTint(hue) {
   const [r, g, b] = h < 1 ? [c, x, 0] : h < 2 ? [x, c, 0] : h < 3 ? [0, c, x] : h < 4 ? [0, x, c] : h < 5 ? [x, 0, c] : [c, 0, x];
   return (Math.round((r + 0.15) * 255) << 16) | (Math.round((g + 0.15) * 255) << 8) | Math.round((b + 0.15) * 255);
 }
-const applyColour = () => { shape.clear().roundedRect(-80, -80, 160, 160, 28, { fill: hueToTint(state.hue) }); };
+const applyColour = () => { shape.clear().roundedRect(-80, -80, 160, 160, state.corner, { fill: hueToTint(state.hue) }); };
 applyColour();
 
 // UI overlay.
@@ -54,6 +55,13 @@ const ping = new Button({ label: "Log event", x: 200, y: 370, width: 140, onClic
 ui.add(reset, ping, label("Event log (wheel or drag to scroll)", 400, 356), new Graphics({ x: 400, y: 380 }).roundedRect(0, 0, 520, 130, 8, { fill: 0x0f172a }), logView);
 for (let index = 0; index < 8; index += 1) pushLog(`started widget ${index + 1}`);
 
+// A Stack lays out a label, a checkbox and a dropdown in a column.
+const options = new Stack({ x: 400, y: 84, gap: 12 });
+const spin = new Checkbox({ label: "Spin", checked: true, onChange: (value) => { state.spinning = value; } });
+const corners = new Dropdown({ width: 200, options: [{ label: "Rounded corners", value: 28 }, { label: "Sharp corners", value: 0 }, { label: "Circle", value: 80 }], value: 28, onChange: (value) => { state.corner = value; applyColour(); } });
+options.add(label("Options", 0, 0), spin, corners);
+ui.add(options);
+
 const engine = await ExiEngine.create({
   canvas: document.querySelector("#game"),
   width: WIDTH,
@@ -68,4 +76,4 @@ logView.camera = engine.overlayCamera; // clip the log to its viewport
 engine.start();
 engine.focus(nameInput);
 
-window.game = { engine, ui, state, nameInput, logView, title };
+window.game = { engine, ui, state, nameInput, logView, title, spin, corners, options };

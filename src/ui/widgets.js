@@ -21,7 +21,11 @@ function callback(value, label) {
 }
 // World point -> this node's local coordinates (inverse of its world matrix).
 function toLocal(node, worldX, worldY) {
-  node.updateWorldMatrix?.();
+  // Update from the root: updating the node alone would ignore its parents,
+  // which breaks widgets nested in layouts or groups.
+  let root = node;
+  while (root.parent) root = root.parent;
+  root.updateWorldMatrix?.();
   const m = node.worldMatrix;
   const determinant = m.a * m.d - m.b * m.c || 1;
   const dx = worldX - m.tx; const dy = worldY - m.ty;
@@ -356,3 +360,250 @@ export class TextInput extends Node {
   }
 }
 
+
+// ---------------------------------------------------------------- layout
+// Bounds of a child in its parent's space, used to place it by its top-left
+// corner whatever its anchor is (Sprites/Text are centred by default).
+function childBox(node) {
+  const bounds = node.getLocalBounds?.() || { x: 0, y: 0, width: Number(node.width) || 0, height: Number(node.height) || 0 };
+  return { x: (bounds.x || 0) * node.scale.x, y: (bounds.y || 0) * node.scale.y, width: (bounds.width || 0) * Math.abs(node.scale.x), height: (bounds.height || 0) * Math.abs(node.scale.y) };
+}
+
+// Lays out its visible children in a row or a column, re-run every update
+// (cheap: one pass over the children). `align` places children across the
+// main axis: "start", "center" or "end".
+export class Stack extends Node {
+  constructor({ direction = "column", gap = 8, padding = 0, align = "start", ...options } = {}) {
+    super({ name: "stack", ...options });
+    if (direction !== "row" && direction !== "column") throw new TypeError('Stack direction must be "row" or "column".');
+    if (align !== "start" && align !== "center" && align !== "end") throw new TypeError('Stack align must be "start", "center" or "end".');
+    this.direction = direction;
+    this.gap = Math.max(0, finite(gap, 8));
+    this.padding = Math.max(0, finite(padding, 0));
+    this.align = align;
+    this.width = 0;
+    this.height = 0;
+  }
+
+  getLocalBounds() { return { x: 0, y: 0, width: this.width, height: this.height }; }
+
+  arrange() {
+    const row = this.direction === "row";
+    const boxes = [];
+    let cross = 0;
+    for (const child of this.children) {
+      if (!child.visible) continue;
+      const box = childBox(child);
+      boxes.push([child, box]);
+      cross = Math.max(cross, row ? box.height : box.width);
+    }
+    let cursor = this.padding;
+    for (const [child, box] of boxes) {
+      const size = row ? box.height : box.width;
+      const offset = this.padding + (this.align === "center" ? (cross - size) / 2 : this.align === "end" ? cross - size : 0);
+      if (row) child.position.set(cursor - box.x, offset - box.y);
+      else child.position.set(offset - box.x, cursor - box.y);
+      cursor += (row ? box.width : box.height) + this.gap;
+    }
+    const main = boxes.length ? cursor - this.gap + this.padding : this.padding * 2;
+    this.width = row ? main : cross + this.padding * 2;
+    this.height = row ? cross + this.padding * 2 : main;
+    return this;
+  }
+
+  update(delta, stamp, depth) {
+    this.arrange();
+    super.update(delta, stamp, depth);
+  }
+}
+
+// Places visible children in a grid of fixed cells, left to right, top to bottom.
+export class Grid extends Node {
+  constructor({ columns = 3, cellWidth = 64, cellHeight = 64, gap = 8, padding = 0, ...options } = {}) {
+    super({ name: "grid", ...options });
+    this.columns = Math.max(1, Math.floor(finite(columns, 3)));
+    this.cellWidth = Math.max(1, finite(cellWidth, 64));
+    this.cellHeight = Math.max(1, finite(cellHeight, 64));
+    this.gap = Math.max(0, finite(gap, 8));
+    this.padding = Math.max(0, finite(padding, 0));
+    this.width = 0;
+    this.height = 0;
+  }
+
+  getLocalBounds() { return { x: 0, y: 0, width: this.width, height: this.height }; }
+
+  arrange() {
+    let index = 0;
+    for (const child of this.children) {
+      if (!child.visible) continue;
+      const box = childBox(child);
+      const column = index % this.columns; const row = Math.floor(index / this.columns);
+      // Centre each child in its cell.
+      const x = this.padding + column * (this.cellWidth + this.gap) + (this.cellWidth - box.width) / 2;
+      const y = this.padding + row * (this.cellHeight + this.gap) + (this.cellHeight - box.height) / 2;
+      child.position.set(x - box.x, y - box.y);
+      index += 1;
+    }
+    const rows = Math.ceil(index / this.columns);
+    const usedColumns = Math.min(index, this.columns);
+    this.width = usedColumns ? this.padding * 2 + usedColumns * this.cellWidth + (usedColumns - 1) * this.gap : this.padding * 2;
+    this.height = rows ? this.padding * 2 + rows * this.cellHeight + (rows - 1) * this.gap : this.padding * 2;
+    return this;
+  }
+
+  update(delta, stamp, depth) {
+    this.arrange();
+    super.update(delta, stamp, depth);
+  }
+}
+
+// ---------------------------------------------------------------- checkbox
+export class Checkbox extends Node {
+  constructor({ label = "", checked = false, onChange = null, theme: themeOverrides = null, ...options } = {}) {
+    super({ name: "checkbox", ...options, interactive: true, focusable: true });
+    this.theme = theme(themeOverrides);
+    this.onChange = callback(onChange, "Checkbox onChange");
+    this._checked = Boolean(checked);
+    this.box = new Graphics({ name: "checkbox-box" });
+    this.label = new Text({ name: "checkbox-label", text: String(label), x: 32, y: 12, anchorX: 0, anchorY: 0.5, font: this.theme.font, fill: this.theme.text, resolution: 2 });
+    this.add(this.box, this.label);
+    this.hitArea = { x: 0, y: 0, width: 32 + this.label.width, height: 24 };
+    this.onPointerUp = (event) => { if (!event || this.containsPoint(event.worldX, event.worldY)) this.toggle(); };
+    this.onKeyDown = (event) => { if (event.code === "Space" || event.code === "Enter" || event.code === "NumpadEnter") { event.preventDefault?.(); this.toggle(); } };
+    this.onFocus = () => this.redraw();
+    this.onBlur = () => this.redraw();
+    this.redraw();
+  }
+
+  get checked() { return this._checked; }
+  set checked(value) { this.setChecked(value); }
+  getLocalBounds() { return this.hitArea; }
+
+  setChecked(value) {
+    const next = Boolean(value);
+    if (next === this._checked) return this;
+    this._checked = next;
+    this.redraw();
+    this.onChange?.(next, this);
+    return this;
+  }
+
+  toggle() { return this.setChecked(!this._checked); }
+
+  redraw() {
+    const { theme: style } = this;
+    this.box.clear().roundedRect(0, 0, 24, 24, 5, { fill: this._checked ? style.active : style.background });
+    this.box.strokeRect(1, 1, 22, 22, this.focused ? 2 : 1, { fill: this.focused ? style.accent : style.hover });
+    if (this._checked) this.box.line(6, 12, 10, 17, 3, { fill: 0xffffff }).line(10, 17, 18, 7, 3, { fill: 0xffffff });
+    return this;
+  }
+}
+
+// ---------------------------------------------------------------- dropdown
+// A select box: click/Enter/Space opens the list, arrows move, Enter or a click
+// picks, Escape closes. The open list is drawn above siblings (high zIndex).
+export class Dropdown extends Node {
+  constructor({ options: choices = [], value, width = 200, height = 36, onChange = null, theme: themeOverrides = null, ...options } = {}) {
+    super({ name: "dropdown", zIndex: 0, ...options, interactive: true, focusable: true });
+    this.theme = theme(themeOverrides);
+    this.width = Math.max(1, finite(width, 200));
+    this.height = Math.max(1, finite(height, 36));
+    this.hitArea = { x: 0, y: 0, width: this.width, height: this.height };
+    this.onChange = callback(onChange, "Dropdown onChange");
+    this.choices = Dropdown.normalizeOptions(choices);
+    if (!this.choices.length) throw new RangeError("Dropdown needs at least one option.");
+    this._index = Math.max(0, this.choices.findIndex((choice) => choice.value === value));
+    this.highlight = this._index;
+    this.open = false;
+    this.background = new Graphics({ name: "dropdown-background" });
+    this.label = new Text({ name: "dropdown-label", x: 12, y: this.height / 2, anchorX: 0, anchorY: 0.5, font: this.theme.font, fill: this.theme.text, resolution: 2 });
+    this.list = new Node({ name: "dropdown-list", y: this.height + 4, visible: false, zIndex: 1_000 });
+    this.add(this.background, this.label, this.list);
+    this.buildList();
+    this.onPointerUp = (event) => {
+      if (!event) return;
+      const local = toLocal(this, event.worldX, event.worldY);
+      if (local.y >= 0 && local.y <= this.height && local.x >= 0 && local.x <= this.width) { this.setOpen(!this.open); return; }
+      if (this.open) {
+        const row = Math.floor((local.y - this.height - 4) / this.height);
+        if (row >= 0 && row < this.choices.length && local.x >= 0 && local.x <= this.width) { this.select(row); this.setOpen(false); }
+      }
+    };
+    this.onBlur = () => { this.setOpen(false); this.redraw(); };
+    this.onFocus = () => this.redraw();
+    this.onKeyDown = (event) => {
+      if (event.code === "Escape") { if (this.open) { event.preventDefault?.(); this.setOpen(false); } return; }
+      if (event.code === "Enter" || event.code === "Space" || event.code === "NumpadEnter") {
+        event.preventDefault?.();
+        if (this.open) { this.select(this.highlight); this.setOpen(false); } else this.setOpen(true);
+        return;
+      }
+      if (event.code === "ArrowDown" || event.code === "ArrowUp") {
+        event.preventDefault?.();
+        const step = event.code === "ArrowDown" ? 1 : -1;
+        if (this.open) { this.highlight = (this.highlight + step + this.choices.length) % this.choices.length; this.redraw(); }
+        else this.select((this._index + step + this.choices.length) % this.choices.length);
+      }
+    };
+    this.redraw();
+  }
+
+  static normalizeOptions(choices) {
+    if (!Array.isArray(choices) || choices.length > 256) throw new TypeError("Dropdown options must be an array of at most 256 entries.");
+    return choices.map((choice) => (choice && typeof choice === "object" ? { label: String(choice.label ?? choice.value), value: choice.value } : { label: String(choice), value: choice }));
+  }
+
+  get value() { return this.choices[this._index].value; }
+  set value(next) { const index = this.choices.findIndex((choice) => choice.value === next); if (index >= 0) this.select(index); }
+  get selectedIndex() { return this._index; }
+  getLocalBounds() { return this.hitArea; }
+
+  setOptions(choices, value = this.value) {
+    this.choices = Dropdown.normalizeOptions(choices);
+    if (!this.choices.length) throw new RangeError("Dropdown needs at least one option.");
+    this._index = Math.max(0, this.choices.findIndex((choice) => choice.value === value));
+    this.highlight = this._index;
+    this.buildList();
+    return this.redraw();
+  }
+
+  select(index) {
+    if (!Number.isSafeInteger(index) || index < 0 || index >= this.choices.length) return this;
+    const changed = index !== this._index;
+    this._index = index;
+    this.highlight = index;
+    this.redraw();
+    if (changed) this.onChange?.(this.value, this);
+    return this;
+  }
+
+  setOpen(open) {
+    this.open = Boolean(open);
+    this.list.visible = this.open;
+    // While open, the hit area grows to cover the list so clicks reach it.
+    this.hitArea = { x: 0, y: 0, width: this.width, height: this.open ? this.height + 4 + this.choices.length * this.height : this.height };
+    this.zIndex = this.open ? 1_000 : 0;
+    this.highlight = this._index;
+    return this.redraw();
+  }
+
+  buildList() {
+    for (const child of [...this.list.children]) child.destroy();
+    this.listBackground = new Graphics({ name: "dropdown-list-background" });
+    this.list.add(this.listBackground);
+    this.choices.forEach((choice, index) => this.list.add(new Text({ name: "dropdown-option", text: choice.label, x: 12, y: index * this.height + this.height / 2, anchorX: 0, anchorY: 0.5, font: this.theme.font, fill: this.theme.text, resolution: 2 })));
+  }
+
+  redraw() {
+    const { theme: style } = this;
+    this.background.clear().roundedRect(0, 0, this.width, this.height, style.radius, { fill: this.open ? style.hover : style.background });
+    this.background.strokeRect(1, 1, this.width - 2, this.height - 2, this.focused ? 2 : 1, { fill: this.focused ? style.accent : style.hover });
+    this.background.triangle(this.width - 22, this.height / 2 - 3, this.width - 10, this.height / 2 - 3, this.width - 16, this.height / 2 + 4, { fill: style.text === "#e2e8f0" ? 0xe2e8f0 : 0xffffff });
+    this.label.setText(this.choices[this._index].label);
+    if (this.listBackground) {
+      this.listBackground.clear().roundedRect(0, 0, this.width, this.choices.length * this.height, style.radius, { fill: style.background });
+      this.listBackground.rect(2, this.highlight * this.height + 2, this.width - 4, this.height - 4, { fill: style.active });
+    }
+    return this;
+  }
+}
