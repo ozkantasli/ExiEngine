@@ -513,3 +513,12 @@ const readme = await readFile(path.join(root, "README.md"), "utf8");
 assert.match(readme, /\.github\/workflows\/ci\.yml/);
 assert.match(readme, /npm run test:coverage/);
 console.log("ExiEngine static smoke: passed");
+
+// Release metadata stays in sync: package version, MCP server version and the changelog.
+{
+  const packageVersion = JSON.parse(await readFile(path.join(root, "package.json"), "utf8")).version;
+  const mcpSource = await readFile(path.join(root, "tools", "exi-mcp-server.mjs"), "utf8");
+  assert.match(mcpSource, new RegExp(`const SERVER_VERSION = "${packageVersion.replaceAll(".", "\\.")}";`), "MCP SERVER_VERSION must equal package.json version");
+  const changelog = await readFile(path.join(root, "CHANGELOG.md"), "utf8");
+  assert.match(changelog, new RegExp(`^## \\[?${packageVersion.replaceAll(".", "\\.")}\\]?`, "m"), "CHANGELOG.md must have a section for the package version");
+}

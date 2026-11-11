@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { createInterface } from "node:readline";
@@ -98,7 +99,7 @@ try {
   assert.equal(discovery.result._meta["io.modelcontextprotocol/serverInfo"].name, "exi-engine");
   const modernTools = await modernRequest("tools/list");
   assert.equal(modernTools.result.resultType, "complete");
-  assert.equal(modernTools.result._meta["io.modelcontextprotocol/serverInfo"].version, "0.2.0");
+  assert.equal(modernTools.result._meta["io.modelcontextprotocol/serverInfo"].version, JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version);
   assert.equal(modernTools.result.cacheScope, "private");
   const modernResources = await modernRequest("resources/list");
   assert.equal(modernResources.result.resultType, "complete");

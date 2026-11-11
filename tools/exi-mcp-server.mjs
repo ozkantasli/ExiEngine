@@ -10,7 +10,7 @@ import * as engineExports from "../src/index.js";
 
 const configuredRoot = process.env.EXI_MCP_ROOT || process.env.CLAUDE_PROJECT_DIR;
 const ROOT = path.resolve(configuredRoot || path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."));
-const SERVER_VERSION = "0.2.0";
+const SERVER_VERSION = "0.3.0"; // keep in sync with package.json (checked by test/static-smoke.mjs)
 const MODERN_PROTOCOL_VERSION = "2026-07-28";
 const LEGACY_PROTOCOL_VERSION = "2025-11-25";
 const PROTOCOL_VERSION = MODERN_PROTOCOL_VERSION;

@@ -1,6 +1,6 @@
 {
   "name": "exi-engine",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "license": "MIT",
   "type": "module",
   "main": "./src/index.js",
@@ -52,7 +52,8 @@
     "index.d.ts",
     "README.md",
     "API.md",
-    "LICENSE"
+    "LICENSE",
+    "CHANGELOG.md"
   ],
   "scripts": {
     "dev": "node server.mjs --port 4173",

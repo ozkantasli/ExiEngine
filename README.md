@@ -323,7 +323,7 @@ drive directly, try ExiEngine.
 |---|---|---|
 | MVP | ✅ | Dependency-free 2D core, scene graph, camera, input, MCP bridge |
 | v0.2 | ✅ | Physics/collision, deterministic fixed step, A*, asset pipeline, safety limits, benchmark gate |
-| v0.3 | ✅ (unreleased) | npm-ready package, Tiled import, examples, scene serialization, browser editor (first version), rigid bodies, post-process filters, BitmapText, audio sprites + spatial audio |
+| v0.3 | ✅ (ready to publish, see [RELEASING.md](RELEASING.md)) | npm-ready package, Tiled import, examples, scene serialization, browser editor (first version), rigid bodies, post-process filters, BitmapText, audio sprites + spatial audio |
 | v1.0 | 🛠️ | npm publish, editor v2 (✅ live play + hot reload, prefabs), joints, Spine, lighting, GPU profiling, mobile device matrix |
 
 Details: [ROADMAP.md](ROADMAP.md)
