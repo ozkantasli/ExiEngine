@@ -866,3 +866,26 @@ export class BitmapText extends SpriteBatch {
   setStyle(style: Partial<BitmapTextLayoutOptions & { tint: number | string; anchorX: number; anchorY: number }>): this;
   relayout(): this;
 }
+
+export const MAX_ROLLBACK_PLAYERS: number;
+export const MAX_ROLLBACK_FRAMES: number;
+export interface RollbackMessage { type: "exi-rollback"; player: number; start: number; inputs: unknown[]; acks?: number[]; checksum?: { frame: number; value: unknown }; }
+export interface RollbackSessionOptions<State, Input> {
+  players?: number; localPlayer?: number; inputDelay?: number; maxRollback?: number; defaultInput?: Input;
+  saveState: () => State; loadState: (snapshot: State) => void; step: (inputs: Input[], frame: number) => void;
+  send?: ((message: RollbackMessage) => void) | null;
+  checksum?: ((snapshot: State) => unknown) | null;
+  onDesync?: ((event: { frame: number; local: unknown; remote: unknown; player: number }) => void) | null;
+}
+export class RollbackSession<State = unknown, Input = unknown> {
+  readonly players: number; readonly localPlayer: number; readonly inputDelay: number; readonly maxRollback: number;
+  frame: number;
+  readonly confirmedFrame: number;
+  readonly stats: { rollbacks: number; resimulatedFrames: number; predictions: number; stalls: number; desyncs: number };
+  constructor(options: RollbackSessionOptions<State, Input>);
+  addLocalInput(input: Input): number;
+  flush(): RollbackMessage | null;
+  receive(message: RollbackMessage): void;
+  advance(): boolean;
+  synchronize(): boolean;
+}

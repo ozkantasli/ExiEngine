@@ -414,6 +414,26 @@ const engine = await ExiEngine.create({ canvas, scene, physics: world }); // ste
 
 An optional second physics module next to the axis-aligned `PhysicsWorld`: circles, boxes and convex polygons (up to `MAX_POLYGON_VERTICES`, either winding; concave input is rejected) with rotation, mass/inertia from `density`, Coulomb friction, restitution, damping, `gravityScale`, `fixedRotation`, static bodies, sensors (`isSensor`, reported through `onContact` but never blocking) and 32-bit `layer`/`mask` filtering. Collision uses SAT with up to two contact points, sequential impulses with warm starting, a two-point block solver and direct position correction, so stacks and pyramids settle and stay upright; the same inputs and fixed step give the same results. `onContact(a, b, manifold)` fires when a pair starts touching. Polygon bodies are centered on their centroid: draw them with `body.shape.vertices`. Use `PhysicsWorld` for tile platformers (cheaper, one-way platforms, tile bodies); use `RigidBodyWorld` when objects must tumble, roll or stack. Limits: `MAX_RIGID_BODIES` (2 048) bodies, speeds and coordinates are clamped, and there are no joints or continuous collision yet, so very thin, very fast bodies can tunnel.
 
+### `RollbackSession` (rollback netcode)
+
+```js
+const session = new RollbackSession({
+  players: 2, localPlayer: myIndex, inputDelay: 2, maxRollback: 8, defaultInput: { dx: 0, jump: false },
+  saveState: () => structuredClone(gameState),           // must return an immutable snapshot
+  loadState: (snapshot) => { gameState = structuredClone(snapshot); },
+  step: (inputs, frame) => simulateOneFixedFrame(inputs), // deterministic, no Math.random()/Date.now()
+  send: (message) => socket.send(JSON.stringify(message)),
+  checksum: (snapshot) => hashOf(snapshot),               // optional desync detection
+  onDesync: ({ frame }) => console.warn("desync at", frame),
+});
+socket.onmessage = (event) => session.receive(JSON.parse(event.data));
+// once per fixed tick (e.g. from ExiEngine onUpdate):
+session.addLocalInput(readLocalInput());
+session.advance();                                        // false while waiting for a far-behind peer
+```
+
+Transport-agnostic, GGPO-style rollback for 1-8 players: local inputs are scheduled `inputDelay` frames ahead, missing remote inputs are predicted (the last known input repeats), and when a real input differs from the prediction the session reloads that frame's snapshot and re-simulates to the present. Every message repeats the inputs the peer has not acknowledged, so loss and reordering are tolerated over unreliable channels; peers that fall more than `maxRollback` frames behind make `advance()` return `false` until inputs arrive. `stats` counts predictions, rollbacks, resimulated frames, stalls and desyncs; `synchronize()` applies a pending rollback without stepping (e.g. at the end of a match). Inputs must be JSON data (at most 1 KiB each). Determinism is the game's responsibility: drive `step` from ExiEngine's fixed step and use the deterministic physics modules.
+
 ## 9. Save, audio and profiler
 
 ### `SaveStore`

@@ -48,7 +48,7 @@ Legend: ✅ built in · 🔌 official/common plugin or companion package · ➖ 
 | Hot reload / play-in-editor | — | ➖ (dev servers) | — | — | — | — | ✅ | ✅ | ✅ |
 | Prefabs / asset manager in editor | — | — | — | — | — | — | ✅ | ✅ | ✅ |
 | UI widgets (input, scroll, slider) | ➖ focus/pointer only | ➖ | 🔌 | ➖ | ➖ | ➖ | ✅ | ✅ | ✅ |
-| Netcode helpers | — | — | — | — | — | — | ➖ | ✅ | ✅ |
+| Netcode helpers | ✅ `RollbackSession` (rollback, transport-agnostic) | — | — | — | — | — | ➖ | ✅ | ✅ |
 | npm package + CDN bundle | ✅ ready (not yet published) | ✅ | ✅ | ✅ | ✅ | ✅ | n/a | n/a | n/a |
 | Playable examples | ➖ 4 games + editor | ✅ (hundreds) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Determinism (fixed step, replay-safe physics) | ✅ | ➖ | n/a | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ |
@@ -91,8 +91,8 @@ Legend: ✅ built in · 🔌 official/common plugin or companion package · ➖ 
 8. **Custom shaders.** Deliberately excluded so far (security contract: no remote shaders,
    both GLSL and WGSL needed). A local, allowlisted, bounded filter registration API is the
    likely shape; it needs an explicit design decision.
-9. **Netcode.** The deterministic core suits rollback/lockstep; a small helper module would
-   be unusual among web-2D engines.
+9. **Netcode.** ✅ `RollbackSession` shipped (rollback over any transport). Still open: a
+   reference WebSocket/WebRTC transport, lobby/matchmaking and an example game.
 10. **Real-device evidence.** Mobile/GPU hardware matrix is still mostly empty.
 
 ## 5. Recommended next steps
@@ -105,7 +105,7 @@ Legend: ✅ built in · 🔌 official/common plugin or companion package · ➖ 
 5. Spine runtime adapter as an optional package (keeps the core dependency-free).
 6. Decide the custom-shader policy; if accepted, ship a bounded `registerFilter` API.
 7. Lighting (normal-mapped sprites + point lights) as a RenderGroup-based effect.
-8. Rollback/lockstep netcode helper built on the fixed step.
+8. Netcode example (two browser tabs over a local WebSocket relay) on top of `RollbackSession`.
 
 ## 6. Status of earlier gaps from the previous analysis
 

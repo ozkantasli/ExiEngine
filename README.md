@@ -37,6 +37,7 @@ browser.
 🗺️ Instanced TileMap, Tiled (.tmj) import, collision-rect generation and A* pathfinding</br>
 🧱 Lightweight physics: gravity, one-way and moving platforms, layers/masks, contact events</br>
 🎱 Rigid bodies: rotating circles, boxes and convex polygons with friction, restitution and stable stacking</br>
+🌐 Rollback netcode helper for deterministic multiplayer</br>
 🔤 Bitmap fonts (BMFont .fnt/JSON) and 🔊 audio sprites, pitch and 2D spatial sound</br>
 ✨ Filters and post-processing: grayscale…saturate plus blur, glow, outline, pixelate, vignette on nodes or RenderGroups</br>
 🎮 One action/axis input layer for keyboard, pointer, touch and gamepad</br>

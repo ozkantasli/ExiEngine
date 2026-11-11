@@ -28,3 +28,4 @@ export { Profiler } from "./core/profiler.js";
 export { serializeScene, deserializeScene, SCENE_FORMAT, SCENE_FORMAT_VERSION, SERIALIZABLE_NODE_TYPES, MAX_SERIALIZED_NODES } from "./core/scene-serializer.js";
 export { RigidBody, RigidBodyWorld, collideRigidBodies, MAX_RIGID_BODIES, MAX_POLYGON_VERTICES } from "./core/rigid-body.js";
 export { BitmapFont, BitmapText, parseBitmapFontText, MAX_BITMAP_FONT_GLYPHS, MAX_BITMAP_TEXT_LENGTH } from "./core/bitmap-text.js";
+export { RollbackSession, MAX_ROLLBACK_PLAYERS, MAX_ROLLBACK_FRAMES } from "./net/rollback.js";
