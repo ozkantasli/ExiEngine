@@ -99,7 +99,7 @@ function normalizeTabIndex(value) {
 // Color filters (1-6) work per pixel anywhere; spatial filters (7-10) sample
 // neighbouring texels and are meant for whole textures such as RenderGroup
 // targets; vignette (11) darkens toward the texture edges.
-export const FILTER_TYPES = Object.freeze(["none", "grayscale", "invert", "brightness", "sepia", "contrast", "saturate", "blur", "glow", "outline", "pixelate", "vignette"]);
+export const FILTER_TYPES = Object.freeze(["none", "grayscale", "invert", "brightness", "sepia", "contrast", "saturate", "blur", "glow", "outline", "pixelate", "vignette", "normal-light"]);
 const FILTER_MODES = new Map(FILTER_TYPES.map((name, index) => [name, index]));
 // Used by registerFilter() (src/render/custom-filters.js) to add custom modes.
 export function registerFilterMode(name, mode) { FILTER_MODES.set(name, mode); }

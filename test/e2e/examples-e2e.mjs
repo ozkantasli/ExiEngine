@@ -31,6 +31,7 @@ const inputs = {
   "top-down": [["ArrowDown", 500], ["ArrowRight", 500]],
   "ui-menu": [["Tab", 80], ["Enter", 80]],
   physics: [["Space", 80], ["Space", 80]],
+  lighting: [["ArrowLeft", 300], ["KeyH", 60], ["KeyN", 60], ["KeyN", 60]],
   "ui-widgets": [["KeyE", 60], ["KeyX", 60], ["KeyI", 60], ["Enter", 60], ["Tab", 60], ["ArrowRight", 60]],
 };
 const launchOptions = { args: ["--no-sandbox", "--ignore-gpu-blocklist", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"] };

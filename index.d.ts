@@ -2,7 +2,7 @@ export type RendererKind = "auto" | "webgpu" | "webgl2";
 export type ResizeMode = "resize" | "contain" | "cover";
 export type EngineLifecycleState = "created" | "ready" | "running" | "paused" | "visibility-paused" | "stopped" | "destroyed";
 export type BlendMode = "normal" | "additive" | "multiply";
-export type FilterKind = "none" | "grayscale" | "invert" | "brightness" | "sepia" | "contrast" | "saturate" | "blur" | "glow" | "outline" | "pixelate" | "vignette";
+export type FilterKind = "none" | "grayscale" | "invert" | "brightness" | "sepia" | "contrast" | "saturate" | "blur" | "glow" | "outline" | "pixelate" | "vignette" | "normal-light";
 export const FILTER_TYPES: readonly FilterKind[];
 export type PostProcessEffectKind = Exclude<FilterKind, "none">;
 export interface PostProcessEffect { filter: PostProcessEffectKind; amount?: number; }
@@ -913,11 +913,17 @@ export class RollbackSession<State = unknown, Input = unknown> {
 }
 
 export const MAX_LIGHTS: number;
-export interface Light { x: number; y: number; radius: number; color: number | string; intensity: number; enabled: boolean; readonly sprite: Sprite; }
+export const MAX_NORMAL_SPRITES: number;
+export interface Light {
+  x: number; y: number; radius: number; color: number | string; intensity: number; enabled: boolean;
+  /** 0..1, only used with normal maps: low lights graze surfaces. Default 0.35. */ height: number;
+  readonly sprite: Sprite;
+}
 export interface LightLayerOptions extends Omit<NodeOptions, "x" | "y" | "scaleX" | "scaleY" | "blendMode"> {
   x?: number; y?: number; width: number; height: number;
   /** Light map pixels per world unit, (0, 1]. Default 0.25. */ resolution?: number;
   ambient?: number | string;
+  /** Keep a normal buffer so addNormalMap() sprites shape the lighting. Default false. */ normals?: boolean;
 }
 export class LightLayer extends RenderGroup {
   readonly worldBounds: { x: number; y: number; width: number; height: number };
@@ -929,6 +935,13 @@ export class LightLayer extends RenderGroup {
   removeLight(light: Light): boolean;
   clearLights(): this;
   syncLight(light: Light): void;
+  readonly normals: boolean; readonly normalBuffer: RenderGroup | null; readonly normalSprites: ReadonlyMap<Sprite, Sprite>;
+  /** Mirrors `sprite` into the normal buffer with a tangent-space normal map (rgb = n * 0.5 + 0.5, green up). Returns the mirror sprite. */
+  addNormalMap(sprite: Sprite, normalTexture: Texture): Sprite;
+  removeNormalMap(sprite: Sprite): boolean;
+  syncNormalSprite(sprite: Sprite, mirror: Sprite): void;
+  /** Syncs lights and normal-map mirrors; runs on update and right before rendering. */
+  syncAll(): this;
 }
 
 export const EDITOR_CHANNEL: "exi-editor";

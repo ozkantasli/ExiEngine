@@ -550,8 +550,9 @@ export class Input {
         const previous = Boolean(state.buttons[index]);
         const current = Boolean(buttons[index]?.pressed);
         state.buttons[index] = current;
-        state.pressed[index] = current && !previous;
-        state.released[index] = !current && previous;
+        // OR: edges carried over from a frame without a fixed step stay set.
+        state.pressed[index] = Boolean(state.pressed[index]) || (current && !previous);
+        state.released[index] = Boolean(state.released[index]) || (!current && previous);
       }
       if (!wasConnected) this.onGamepadConnected?.(state);
     }
@@ -598,7 +599,11 @@ export class Input {
     return false;
   }
   beginFrame() { this.updateGamepads(); }
-  endFrame() {
+  // Edge flags (was*Pressed/Released) must be seen by exactly one fixed step.
+  // The engine clears them after the first step of a frame, and keeps key and
+  // gamepad edges through frames that ran no step (high refresh rates), so a
+  // press is neither repeated on slow frames nor lost on fast ones.
+  clearKeyEdges() {
     assertInputCollections(this);
     this.pressedKeys.clear();
     this.releasedKeys.clear();
@@ -606,6 +611,16 @@ export class Input {
       state.pressed.fill(false);
       state.released.fill(false);
     }
+  }
+  clearPointerEdges() {
+    for (const state of this.pointers.values()) {
+      state.pressed = 0; state.released = 0; state.cancelled = 0; state.moved = false; state.wheelX = 0; state.wheelY = 0;
+    }
+    this.pointer.pressed = 0; this.pointer.released = 0; this.pointer.cancelled = 0; this.pointer.moved = false; this.pointer.wheelX = 0; this.pointer.wheelY = 0;
+  }
+  endFrame({ keepKeyEdges = false } = {}) {
+    assertInputCollections(this);
+    if (!keepKeyEdges) this.clearKeyEdges();
     for (const [id, state] of this.pointers) {
       state.pressed = 0;
       state.released = 0;

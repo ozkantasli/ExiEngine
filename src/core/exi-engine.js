@@ -593,10 +593,10 @@ export class ExiEngine {
     const frameTime = Number.isFinite(Number(time)) ? Number(time) : (globalThis.performance?.now?.() || 0);
     this.accumulator += simulationDelta;
     const wasRunning = this.running;
+    let updateSteps = 0;
     try {
       this.input?.beginFrame();
       this.dispatchPointerInput();
-      let updateSteps = 0;
       while (this.accumulator >= this.fixedStep && updateSteps < MAX_UPDATE_STEPS && (!wasRunning || (this.running && !this.destroyed))) {
         if (this.interpolate) this.scene?._captureInterpolation?.();
         if (this.interpolate && this.overlayScene && this.overlayScene !== this.scene) this.overlayScene._captureInterpolation?.();
@@ -606,6 +606,7 @@ export class ExiEngine {
         this.physics?.step(this.fixedStep);
         this.onUpdate(this.fixedStep, this);
         this.accumulator -= this.fixedStep;
+        if (updateSteps === 0) { this.input?.clearKeyEdges?.(); this.input?.clearPointerEdges?.(); }
         updateSteps += 1;
       }
       if (updateSteps === MAX_UPDATE_STEPS && this.accumulator >= this.fixedStep) {
@@ -633,7 +634,7 @@ export class ExiEngine {
       this.reportRuntimeError(error);
       throw error;
     } finally {
-      this.input?.endFrame();
+      this.input?.endFrame({ keepKeyEdges: updateSteps === 0 && this.running && !this.paused && !this.destroyed });
     }
     return this;
   }

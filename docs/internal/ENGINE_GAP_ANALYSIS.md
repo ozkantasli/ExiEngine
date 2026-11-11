@@ -40,7 +40,7 @@ Legend: ✅ built in · 🔌 official/common plugin or companion package · ➖ 
 | Bitmap fonts (BMFont) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Filters / post FX (blur, glow, outline…) | ✅ fixed catalogue | ✅ | ✅ (+custom) | ➖ | ➖ (custom shaders) | ➖ | ✅ | ✅ | ✅ |
 | User-written shaders | ✅ `registerFilter` bodies (local code only) | ✅ | ✅ | ✅ | ✅ | ➖ | ➖ | ✅ | ✅ |
-| 2D lighting / normal maps | ➖ `LightLayer` point lights (no normal maps/shadows) | ✅ | 🔌 | — | — | — | ✅ | ✅ | ✅ |
+| 2D lighting / normal maps | ✅ `LightLayer` point lights + normal maps (no shadows yet) | ✅ | 🔌 | — | — | — | ✅ | ✅ | ✅ |
 | Skeletal animation (Spine/DragonBones) | — | 🔌 | 🔌 | 🔌 | — | 🔌 | ✅ | ✅ | ✅ |
 | Audio sprites / spatial audio | ✅ (2D, deterministic) | ✅ | 🔌 | ✅ | ➖ | ✅ | ✅ | ✅ | ✅ |
 | Scene file format | ✅ `serializeScene` JSON | ➖ | — | — | — | — | ✅ | ✅ | ✅ |
@@ -50,7 +50,7 @@ Legend: ✅ built in · 🔌 official/common plugin or companion package · ➖ 
 | UI widgets (input, scroll, slider, layout) | ✅ Button, Slider, TextInput (IME), ScrollView, Checkbox, Dropdown, Stack/Grid | ➖ | 🔌 | ➖ | ➖ | ➖ | ✅ | ✅ | ✅ |
 | Netcode helpers | ✅ `RollbackSession` (rollback, transport-agnostic) | — | — | — | — | — | ➖ | ✅ | ✅ |
 | npm package + CDN bundle | ✅ ready (not yet published) | ✅ | ✅ | ✅ | ✅ | ✅ | n/a | n/a | n/a |
-| Playable examples | ➖ 4 games + editor | ✅ (hundreds) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Playable examples | ➖ 6 examples + editor | ✅ (hundreds) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Determinism (fixed step, replay-safe physics) | ✅ | ➖ | n/a | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ |
 | Security budgets (asset size/integrity, bounded inputs) | ✅ | — | — | — | — | — | — | — | — |
 | AI-agent API (MCP bridge, runtime telemetry) | ✅ | — | — | — | — | — | — | — | — |
@@ -83,8 +83,8 @@ Legend: ✅ built in · 🔌 official/common plugin or companion package · ➖ 
    runtime adapter.
 4. **More joint types** for `RigidBodyWorld` (✅ revolute and distance/rope joints and
    anti-tunneling via speculative contacts + substeps shipped; prismatic/weld/motor joints open).
-5. **Normal maps and shadows.** ✅ `LightLayer` point lights shipped; normal-mapped sprites and
-   shadow casting are still open.
+5. **Shadows.** ✅ `LightLayer` point lights and normal-mapped sprites shipped; shadow casting is
+   still open.
 6. ~~UI widgets~~ ✅ Button, Slider, TextInput (IME via hidden input), ScrollView, Checkbox,
    Dropdown and Stack/Grid layout containers shipped. Rich text and tooltips remain open.
 7. ~~LDtk import~~ ✅ shipped (tiles, IntGrid, entities).
@@ -104,7 +104,7 @@ Legend: ✅ built in · 🔌 official/common plugin or companion package · ➖ 
 4. More joint types (prismatic, weld, motors) in `RigidBodyWorld`.
 5. Spine runtime adapter as an optional package (keeps the core dependency-free).
 6. ~~Custom-shader policy~~ ✅ decided: local `registerFilter`, denied to agents.
-7. Normal-mapped sprites and simple shadow casting on top of `LightLayer`.
+7. ~~Normal-mapped sprites~~ ✅; simple shadow casting on top of `LightLayer` is next.
 8. Netcode example (two browser tabs over a local WebSocket relay) on top of `RollbackSession`.
 
 ## 6. Status of earlier gaps from the previous analysis

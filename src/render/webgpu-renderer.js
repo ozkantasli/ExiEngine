@@ -117,7 +117,17 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   } else if (filterParams.values.x > 10.5 && filterParams.values.x < 11.5) {
     color = vec4f(color.rgb * (1.0 - filterParams.values.y * smoothstep(0.35, 0.95, length(input.uv - vec2f(0.5)) * 1.41421)), color.a);
   }
-  if (filterParams.maskRect.z > 0.0 && filterParams.maskRect.w > 0.0) {
+  if (mode > 11.5 && mode < 12.5) {
+    // normal-light: see the GLSL shader in webgl2-renderer.js.
+    var surfaceNormal = vec3f(0.0, 0.0, 1.0);
+    if (filterParams.maskRect.z > 0.0 && filterParams.maskRect.w > 0.0) {
+      let lightMaskUv = clamp((input.position.xy - filterParams.maskRect.xy) / filterParams.maskRect.zw, vec2f(0.0), vec2f(1.0));
+      let encoded = textureSampleLevel(maskTexture, maskSampler, lightMaskUv, 0.0);
+      if (encoded.a > 0.05) { surfaceNormal = clamp(encoded.rgb / encoded.a, vec3f(0.0), vec3f(1.0)) * 2.0 - 1.0; }
+    }
+    let toLight = normalize(vec3f((0.5 - input.uv.x) * 2.0, (input.uv.y - 0.5) * 2.0, 0.05 + filterParams.values.y * 0.95));
+    color = vec4f(color.rgb * max(dot(normalize(surfaceNormal + vec3f(0.0, 0.0, 0.0001)), toLight), 0.0), color.a);
+  } else if (filterParams.maskRect.z > 0.0 && filterParams.maskRect.w > 0.0) {
     let maskUv = (input.position.xy - filterParams.maskRect.xy) / filterParams.maskRect.zw;
     if (maskUv.x >= 0.0 && maskUv.x <= 1.0 && maskUv.y >= 0.0 && maskUv.y <= 1.0) {
       color *= textureSampleLevel(maskTexture, maskSampler, maskUv, 0.0).a;
@@ -135,7 +145,7 @@ export function buildShaderSource(customFilters = []) {
   if (!functions) return shaderSource;
   return shaderSource
     .replace("@fragment\nfn fragmentMain", `${functions}\n@fragment\nfn fragmentMain`)
-    .replace("  if (filterParams.maskRect.z > 0.0", `${dispatch}  if (filterParams.maskRect.z > 0.0`);
+    .replace("  if (mode > 11.5 && mode < 12.5) {", `${dispatch}  if (mode > 11.5 && mode < 12.5) {`);
 }
 
 const cullShaderSource = `

@@ -271,3 +271,19 @@ test("input: keydown listener is not passive so engine Tab focus can preventDefa
   assert.equal(windowListenerOptions.get("keyup")?.passive, true);
   input.destroy();
 });
+
+test("input: clearKeyEdges / clearPointerEdges and keepKeyEdges", () => {
+  const input = new Input(makeCanvas());
+  input.bindAction("jump", "Space");
+  windowListeners.get("keydown")({ code: "Space" });
+  input.endFrame({ keepKeyEdges: true });
+  assert.equal(input.wasActionPressed("jump"), true, "kept through a frame without a fixed step");
+  input.clearKeyEdges();
+  assert.equal(input.wasActionPressed("jump"), false);
+  assert.equal(input.isActionDown("jump"), true, "held state is not an edge");
+  input.pointer.pressed = 1; input.pointer.wheelY = 3;
+  input.clearPointerEdges();
+  assert.equal(input.wasPointerPressed(0), false);
+  assert.equal(input.pointer.wheelY, 0);
+  input.destroy();
+});

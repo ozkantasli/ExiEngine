@@ -104,7 +104,20 @@ void main() {
   } else if (u_filter.x > 10.5 && u_filter.x < 11.5) {
     color.rgb *= 1.0 - u_filter.y * smoothstep(0.35, 0.95, length(v_uv - vec2(0.5)) * 1.41421);
   }
-  if (u_mask_rect.z > 0.0 && u_mask_rect.w > 0.0) {
+  if (mode > 11.5 && mode < 12.5) {
+    // normal-light: the sprite is a point light, the mask is a normal buffer
+    // (rgb = normal * 0.5 + 0.5, green up). Empty texels are flat (0, 0, 1).
+    vec3 normal = vec3(0.0, 0.0, 1.0);
+    if (u_mask_rect.z > 0.0 && u_mask_rect.w > 0.0) {
+      vec2 screen = vec2(gl_FragCoord.x, u_resolution.y - gl_FragCoord.y);
+      vec2 maskUv = (screen - u_mask_rect.xy) / u_mask_rect.zw;
+      if (u_filter.w > 0.5) maskUv.y = 1.0 - maskUv.y;
+      vec4 encoded = texture(u_mask, clamp(maskUv, vec2(0.0), vec2(1.0)));
+      if (encoded.a > 0.05) normal = clamp(encoded.rgb / encoded.a, vec3(0.0), vec3(1.0)) * 2.0 - 1.0;
+    }
+    vec3 toLight = normalize(vec3((0.5 - v_uv.x) * 2.0, (v_uv.y - 0.5) * 2.0, 0.05 + u_filter.y * 0.95));
+    color.rgb *= max(dot(normalize(normal + vec3(0.0, 0.0, 1e-4)), toLight), 0.0);
+  } else if (u_mask_rect.z > 0.0 && u_mask_rect.w > 0.0) {
     vec2 screen = vec2(gl_FragCoord.x, u_resolution.y - gl_FragCoord.y);
     vec2 maskUv = (screen - u_mask_rect.xy) / u_mask_rect.zw;
     if (u_filter.w > 0.5) maskUv.y = 1.0 - maskUv.y;
@@ -173,7 +186,7 @@ export function buildFragmentSource(customFilters = []) {
   if (!functions) return fragmentSource;
   return fragmentSource
     .replace("void main() {", `${functions}\nvoid main() {`)
-    .replace("  if (u_mask_rect.z > 0.0", `${dispatch}  if (u_mask_rect.z > 0.0`);
+    .replace("  if (mode > 11.5 && mode < 12.5) {", `${dispatch}  if (mode > 11.5 && mode < 12.5) {`);
 }
 
 function programLocations(gl, program, instancedProgram) {

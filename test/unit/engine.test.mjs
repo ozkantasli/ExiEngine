@@ -378,3 +378,30 @@ test("engine: renderToTexture eşleşme", () => {
   assert.throws(() => engine.renderToTexture(new Texture()), /RenderTexture/);
   engine.destroy();
 });
+
+test("engine: input edges reach exactly one fixed step per press", () => {
+  let seen = 0;
+  const engine = stubEngine({ fixedStep: 1 / 60, onUpdate: (delta, current) => { if (current.input.pressed) seen += 1; } });
+  engine.input = {
+    pressed: false,
+    beginFrame() {}, destroy() {},
+    clearKeyEdges() { this.pressed = false; },
+    clearPointerEdges() {},
+    endFrame({ keepKeyEdges = false } = {}) { if (!keepKeyEdges) this.pressed = false; },
+  };
+  // Slow frame: three fixed steps, the press is seen once.
+  engine.input.pressed = true;
+  engine.step(3 / 60);
+  assert.equal(seen, 1);
+  // Fast frame without a fixed step while running: the press survives to the next step.
+  engine.running = true;
+  engine.accumulator = 0;
+  engine.input.pressed = true;
+  engine._advance(1 / 240, 0);
+  assert.equal(engine.input.pressed, true, "kept through a frame that ran no step");
+  engine._advance(1 / 60, 0);
+  assert.equal(seen, 2);
+  assert.equal(engine.input.pressed, false);
+  engine.running = false;
+  engine.destroy();
+});

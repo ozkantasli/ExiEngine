@@ -7,7 +7,7 @@ import { renderGroupWithPostProcess, TRANSPARENT_CLEAR } from "../../src/render/
 import { readFileSync } from "node:fs";
 
 test("filters: catalogue, normalization and shader modes stay in sync", () => {
-  assert.deepEqual([...FILTER_TYPES], ["none", "grayscale", "invert", "brightness", "sepia", "contrast", "saturate", "blur", "glow", "outline", "pixelate", "vignette"]);
+  assert.deepEqual([...FILTER_TYPES], ["none", "grayscale", "invert", "brightness", "sepia", "contrast", "saturate", "blur", "glow", "outline", "pixelate", "vignette", "normal-light"]);
   FILTER_TYPES.forEach((name, index) => {
     assert.equal(filterMode(name), index);
     assert.equal(normalizeFilterType(name), name);

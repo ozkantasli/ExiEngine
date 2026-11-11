@@ -22,14 +22,14 @@ Content, authoring and game-feature release. Everything stays dependency-free.
   restitution, stable stacking, sensors, layers), `RevoluteJoint`, `DistanceJoint` (rod/rope),
   anti-tunneling (speculative contacts + substeps).
 - **Rendering:** `blur`, `glow`, `outline`, `pixelate`, `vignette` filters (`FILTER_TYPES`),
-  `LightLayer` 2D lighting, `BitmapFont` / `BitmapText` (AngelCode BMFont), `registerFilter` custom
+  `LightLayer` 2D lighting with optional normal maps (`normals: true`, `addNormalMap`), `BitmapFont` / `BitmapText` (AngelCode BMFont), `registerFilter` custom
   filter bodies (GLSL + WGSL, bounded, not reachable by AI agents).
 - **Audio:** audio sprites (`addSprites`), slices and loop regions, `playbackRate`, deterministic 2D
   spatial audio (`setListener`, `configureSpatial`, `setVoicePosition`).
 - **Multiplayer:** `RollbackSession`, transport-agnostic rollback netcode with desync detection.
 - **UI:** `Button`, `Slider`, `TextInput` (IME and mobile keyboards through a hidden input), `ScrollView`,
   `Checkbox`, `Dropdown`, `Stack` and `Grid` layout containers.
-- **Examples:** platformer (Tiled), top-down (A*, lighting), physics sandbox, UI menu, UI widgets;
+- **Examples:** platformer (Tiled), top-down (A*, lighting), normal-mapped lighting, physics sandbox, UI menu, UI widgets;
   `npm run test:e2e:examples` drives them and the editor in Chromium.
 
 ### Changed
@@ -47,6 +47,8 @@ Content, authoring and game-feature release. Everything stays dependency-free.
 - Tab focus navigation could not `preventDefault` inside a passive listener.
 - Double-encoded UTF-8 in several error messages; wrong `TileMap` and `Text` examples in API.md.
 - Widget pointer math ignored parent transforms, so widgets nested in containers or groups missed clicks.
+- A key, action, pointer or gamepad press was reported to every fixed step of a slow frame (toggles fired twice)
+  and key/gamepad presses were dropped in frames that ran no fixed step; each press now reaches exactly one step.
 - `deserializeScene` placeholders now keep missing texture ids instead of rewriting them to `"white"`.
 
 ## [0.2.0]
