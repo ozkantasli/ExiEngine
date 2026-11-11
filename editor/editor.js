@@ -5,7 +5,7 @@
 // exactly what deserializeScene() loads in a game. Drags and tile painting edit
 // the live nodes directly and are committed when the pointer is released.
 import {
-  Camera, ExiEngine, FILTER_TYPES, Graphics, NineSliceSprite, Node, Scene, Sprite, Text, Texture, TileMap,
+  Camera, ExiEngine, FILTER_TYPES, MAX_PREFABS, Graphics, NineSliceSprite, Node, Scene, Sprite, Text, Texture, TileMap,
   SCENE_FORMAT, SCENE_FORMAT_VERSION, deserializeScene, getAABB, serializeScene,
 } from "../src/index.js";
 import { AUTOSAVE_KEY, BUILTIN_TILES_ID, EDITOR_CHANNEL, createBuiltinTiles } from "./shared.js";
@@ -43,7 +43,7 @@ async function importTextures(files) {
   }
   broadcastTextures();
   // Rebuild so nodes that referenced a missing id pick up the real texture.
-  rebuildFrom(serializeScene(docRoot));
+  rebuildFrom(snapshot());
   renderTextures();
   setStatus(`Imported ${files.length} texture(s).`);
 }
@@ -112,7 +112,12 @@ function swapRoot(next) {
   world.add(docRoot);
 }
 
+// Prefab definitions live next to the scene root in the document.
+let prefabs = {};
+function snapshot() { return serializeScene(docRoot, { prefabs }); }
+
 function rebuildFrom(document) {
+  prefabs = document.prefabs ? JSON.parse(JSON.stringify(document.prefabs)) : {};
   const report = {};
   const next = deserializeScene(document, { textures, report });
   missingTextures = report.missingTextures;
@@ -122,7 +127,7 @@ function rebuildFrom(document) {
 }
 
 function commit(label) {
-  const json = JSON.stringify(serializeScene(docRoot));
+  const json = JSON.stringify(snapshot());
   if (history.at(-1) === json) return;
   history.push(json);
   if (history.length > MAX_HISTORY) history.shift();
@@ -135,7 +140,7 @@ function commit(label) {
 
 // Live link to Play windows and games that use watchScene({ channel: EDITOR_CHANNEL }).
 const liveChannel = typeof BroadcastChannel === "function" ? new BroadcastChannel(EDITOR_CHANNEL) : null;
-function broadcastScene(json = JSON.stringify(serializeScene(docRoot))) {
+function broadcastScene(json = JSON.stringify(snapshot())) {
   liveChannel?.postMessage({ type: "exi-scene", name: docRoot.name, document: JSON.parse(json) });
 }
 function broadcastTextures() {
@@ -154,7 +159,7 @@ if (liveChannel) {
 }
 
 function applyDocument(mutate, label) {
-  const document = serializeScene(docRoot);
+  const document = snapshot();
   try {
     const result = mutate(document);
     rebuildFrom(document);
@@ -255,6 +260,93 @@ function setOption(key, value) {
     if (value === undefined) delete entry.options[key];
     else entry.options[key] = value;
   }, `Set ${key}`);
+}
+
+// ---------------------------------------------------------------- prefabs
+const PREFAB_NAME = /^[A-Za-z0-9_.-]{1,64}$/;
+const INSTANCE_KEYS = ["x", "y", "rotation", "scaleX", "scaleY", "name", "zIndex", "visible"];
+
+function makePrefab(rawName) {
+  const name = String(rawName ?? "").trim();
+  if (!selection || selection.length === 0) { setStatus("Select a node (not the root) to make a prefab", true); return false; }
+  if (!PREFAB_NAME.test(name)) { setStatus("Prefab names use 1-64 letters, digits, _ - or .", true); return false; }
+  if (!prefabs[name] && Object.keys(prefabs).length >= MAX_PREFABS) { setStatus(`At most ${MAX_PREFABS} prefabs`, true); return false; }
+  const path = selection;
+  return applyDocument((document) => {
+    const entry = entryAt(document, path);
+    entry.options = entry.options || {};
+    entry.options.data = { ...(entry.options.data || {}), prefab: name };
+    const definition = JSON.parse(JSON.stringify(entry));
+    for (const key of ["x", "y", "rotation"]) delete definition.options[key];
+    document.prefabs = { ...(document.prefabs || {}), [name]: definition };
+  }, `Prefab "${name}" created`);
+}
+
+function insertPrefab(name) {
+  if (!prefabs[name]) return false;
+  const parentPath = selectedContainerPath();
+  return applyDocument((document) => {
+    const parent = entryAt(document, parentPath);
+    const instance = JSON.parse(JSON.stringify(document.prefabs[name]));
+    instance.options = { ...(instance.options || {}), x: Math.round(camera.position.x), y: Math.round(camera.position.y) };
+    instance.options.data = { ...(instance.options.data || {}), prefab: name };
+    parent.children = parent.children || [];
+    parent.children.push(instance);
+    return { select: [...parentPath, parent.children.length - 1] };
+  }, `Inserted ${name}`);
+}
+
+// Copies the selected instance into its prefab and onto every other instance,
+// keeping each instance's own transform, name, z-index and visibility.
+function applyPrefab() {
+  const node = selection ? nodeAt(selection) : null;
+  const name = node?.data?.prefab;
+  if (!name || !prefabs[name]) { setStatus("The selection is not a prefab instance", true); return false; }
+  const path = selection;
+  let updated = 0;
+  const ok = applyDocument((document) => {
+    const source = JSON.parse(JSON.stringify(entryAt(document, path)));
+    for (const key of ["x", "y", "rotation"]) delete source.options[key];
+    document.prefabs[name] = source;
+    const visit = (entry) => {
+      for (let index = 0; index < (entry.children || []).length; index += 1) {
+        const child = entry.children[index];
+        if (child.options?.data?.prefab === name) {
+          const replacement = JSON.parse(JSON.stringify(source));
+          for (const key of INSTANCE_KEYS) if (child.options[key] !== undefined) replacement.options[key] = child.options[key];
+          entry.children[index] = replacement;
+          updated += 1;
+        } else visit(child);
+      }
+    };
+    visit(document.root);
+  }, `Applied "${name}"`);
+  if (ok) setStatus(`Applied "${name}" to ${updated} instance(s)`);
+  return ok;
+}
+
+function deletePrefab(name) {
+  return applyDocument((document) => { delete document.prefabs[name]; }, `Prefab "${name}" removed (instances kept)`);
+}
+
+function renderPrefabs() {
+  const list = $("#prefabs");
+  list.replaceChildren();
+  for (const name of Object.keys(prefabs).sort()) {
+    const item = document.createElement("li");
+    const insert = document.createElement("button");
+    insert.type = "button";
+    insert.textContent = name;
+    insert.title = `Insert ${name} at the view center`;
+    insert.addEventListener("click", () => insertPrefab(name));
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.textContent = "✕";
+    remove.title = `Delete the ${name} definition (instances stay)`;
+    remove.addEventListener("click", () => deletePrefab(name));
+    item.append(insert, remove);
+    list.append(item);
+  }
 }
 
 // ---------------------------------------------------------------- hierarchy + inspector UI
@@ -418,6 +510,20 @@ function renderInspector() {
     setOption("data", parsed);
   }, { multiline: true }), { wide: true });
 
+  if (selection.length > 0) {
+    section("Prefab");
+    if (node.data?.prefab) {
+      field("Instance of", Object.assign(document.createElement("span"), { textContent: node.data.prefab }));
+      const apply = Object.assign(document.createElement("button"), { type: "button", textContent: "Apply to all instances" });
+      apply.addEventListener("click", applyPrefab);
+      field("Changes", apply);
+    }
+    const nameField = Object.assign(document.createElement("input"), { placeholder: "prefab-name", value: node.data?.prefab || node.name || "" });
+    const make = Object.assign(document.createElement("button"), { type: "button", textContent: node.data?.prefab ? "Save as prefab" : "Make prefab" });
+    make.addEventListener("click", () => makePrefab(nameField.value));
+    field("Prefab name", pair(nameField, make));
+  }
+
   if (node instanceof Text) {
     section("Text");
     field("Text", textInput(node.text, (value) => setOption("text", value), { multiline: true }), { wide: true });
@@ -471,6 +577,7 @@ function renderInspector() {
 }
 
 function refreshUi() {
+  renderPrefabs();
   renderTree();
   renderInspector();
   renderTextures();
@@ -687,7 +794,7 @@ window.addEventListener("keyup", (event) => { if (event.code === "Space") spaceH
 // watchScene({ url }) reload. Other browsers download the JSON.
 let fileHandle = null;
 async function saveDocument({ chooseFile = false } = {}) {
-  const json = JSON.stringify(serializeScene(docRoot), null, 2);
+  const json = JSON.stringify(snapshot(), null, 2);
   if (typeof window.showSaveFilePicker === "function") {
     try {
       if (!fileHandle || chooseFile) {
@@ -794,6 +901,10 @@ window.editor = {
   get root() { return docRoot; },
   get selection() { return selection; },
   select, addNode, deleteSelected, duplicateSelected, setOption, undo, redo,
-  serialize: () => serializeScene(docRoot),
+  serialize: () => snapshot(),
+  get prefabs() { return prefabs; },
+  makePrefab: (name) => makePrefab(name),
+  insertPrefab: (name) => insertPrefab(name),
+  applyPrefab: () => applyPrefab(),
   load: (document) => loadDocument(document, "Loaded from script"),
 };

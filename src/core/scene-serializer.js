@@ -141,14 +141,56 @@ function serializeNode(node, state, depth, unsupported) {
   return entry;
 }
 
-export function serializeScene(root, { maxNodes = MAX_SERIALIZED_NODES, unsupported = "throw" } = {}) {
+// Prefabs: reusable node trees stored next to the scene root. Instances in the
+// scene are ordinary nodes tagged with data.prefab = name, so documents stay
+// readable by code that does not know about prefabs.
+export const MAX_PREFABS = 256;
+const PREFAB_NAME = /^[A-Za-z0-9_.-]{1,64}$/;
+
+function normalizePrefabs(prefabs) {
+  if (prefabs === undefined || prefabs === null) return null;
+  if (!isRecord(prefabs)) throw new TypeError("Scene prefabs must be an object of named node entries.");
+  const names = Object.keys(prefabs);
+  if (names.length > MAX_PREFABS) throw new RangeError(`A scene can define at most ${MAX_PREFABS} prefabs.`);
+  const result = {};
+  for (const name of names) {
+    if (!PREFAB_NAME.test(name)) throw new TypeError(`Prefab name "${name.slice(0, 80)}" must be 1-64 letters, digits, "_", "-" or ".".`);
+    if (!isRecord(prefabs[name]) || typeof prefabs[name].type !== "string") throw new TypeError(`Prefab "${name}" must be a serialized node ({ type, options, children }).`);
+    result[name] = JSON.parse(JSON.stringify(prefabs[name]));
+  }
+  return result;
+}
+
+export function serializeScene(root, { maxNodes = MAX_SERIALIZED_NODES, unsupported = "throw", prefabs = null } = {}) {
   if (unsupported !== "throw" && unsupported !== "skip") throw new TypeError('serializeScene unsupported must be "throw" or "skip".');
   if (!Number.isSafeInteger(maxNodes) || maxNodes <= 0 || maxNodes > MAX_SERIALIZED_NODES) throw new RangeError(`serializeScene maxNodes must be between 1 and ${MAX_SERIALIZED_NODES}.`);
   const state = { nodes: 0, maxNodes, skipped: [] };
   const document = { format: SCENE_FORMAT, version: SCENE_FORMAT_VERSION, root: serializeNode(root, state, 0, unsupported) };
   if (!document.root) throw new TypeError("The root node cannot be serialized.");
   if (state.skipped.length) document.skipped = state.skipped;
+  const normalizedPrefabs = normalizePrefabs(prefabs);
+  if (normalizedPrefabs && Object.keys(normalizedPrefabs).length) document.prefabs = normalizedPrefabs;
   return document;
+}
+
+// Builds one new instance of a prefab from a scene document (e.g. to spawn
+// enemies at runtime). The instance gets data.prefab = name and the given
+// transform; textures resolve like deserializeScene.
+export function instantiatePrefab(document, name, { x, y, rotation, textures = null, resolveTexture: resolver = null, strict = false, report = null } = {}) {
+  if (!isRecord(document) || document.format !== SCENE_FORMAT) throw new TypeError(`Scene document format must be "${SCENE_FORMAT}".`);
+  const prefabs = normalizePrefabs(document.prefabs);
+  if (typeof name !== "string" || !prefabs || !Object.hasOwn(prefabs, name)) throw new RangeError(`Prefab "${String(name).slice(0, 80)}" is not defined in this scene document.`);
+  if (resolver !== null && typeof resolver !== "function") throw new TypeError("instantiatePrefab resolveTexture must be a function.");
+  const entry = prefabs[name];
+  entry.options = isRecord(entry.options) ? entry.options : {};
+  entry.options.data = { ...(isRecord(entry.options.data) ? entry.options.data : {}), prefab: name };
+  if (x !== undefined) entry.options.x = Number(x);
+  if (y !== undefined) entry.options.y = Number(y);
+  if (rotation !== undefined) entry.options.rotation = Number(rotation);
+  const context = { textures, resolveTexture: resolver, strict: Boolean(strict), maxNodes: MAX_SERIALIZED_NODES, nodes: 0, missingTextures: new Set(), placeholders: new Map() };
+  const node = buildNode(entry, context, 0, `prefabs.${name}`);
+  if (report) { report.nodes = context.nodes; report.missingTextures = [...context.missingTextures]; }
+  return node;
 }
 
 // ---------------------------------------------------------------------------
@@ -365,6 +407,7 @@ export function deserializeScene(document, { textures = null, resolveTexture: re
   if (!Number.isSafeInteger(maxNodes) || maxNodes <= 0 || maxNodes > MAX_SERIALIZED_NODES) throw new RangeError(`deserializeScene maxNodes must be between 1 and ${MAX_SERIALIZED_NODES}.`);
   if (resolver !== null && typeof resolver !== "function") throw new TypeError("deserializeScene resolveTexture must be a function.");
   if (report !== null && !isRecord(report)) throw new TypeError("deserializeScene report must be an object.");
+  normalizePrefabs(document.prefabs); // validated up front so a bad document fails early
   const context = { textures, resolveTexture: resolver, strict: Boolean(strict), maxNodes, nodes: 0, missingTextures: new Set(), placeholders: new Map() };
   const root = buildNode(document.root, context, 0, "root");
   if (report) {

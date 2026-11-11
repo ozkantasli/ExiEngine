@@ -16,7 +16,8 @@ Content, authoring and game-feature release. Everything stays dependency-free.
 - **Scenes:** `serializeScene` / `deserializeScene` JSON documents (same shape as MCP
   `exi_build_scene`), `node.data` metadata, `watchScene` hot reload (polling and BroadcastChannel).
 - **Editor** (`/editor/`): hierarchy, inspector, drag/snap, tile painting, undo/redo, texture import,
-  autosave, save straight into project files, live **Play** window with physics preview.
+  autosave, save straight into project files, live **Play** window with physics preview, prefabs
+  (`instantiatePrefab` for runtime spawning).
 - **Physics:** `RigidBodyWorld` / `RigidBody` (circles, boxes, convex polygons, rotation, friction,
   restitution, stable stacking, sensors, layers), `RevoluteJoint`, `DistanceJoint` (rod/rope),
   anti-tunneling (speculative contacts + substeps).

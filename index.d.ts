@@ -785,8 +785,10 @@ export const SCENE_FORMAT_VERSION: 1;
 export const MAX_SERIALIZED_NODES: number;
 export const SERIALIZABLE_NODE_TYPES: readonly ("Scene" | "Text" | "NineSliceSprite" | "Sprite" | "TileMap" | "Graphics" | "Node")[];
 export interface SerializedNode { type: "Scene" | "Node" | "Sprite" | "NineSliceSprite" | "Text" | "Graphics" | "TileMap"; options?: Record<string, unknown>; children?: SerializedNode[]; }
-export interface SceneDocument { format: "exi-scene"; version: 1; root: SerializedNode; skipped?: string[]; }
-export interface SerializeSceneOptions { maxNodes?: number; unsupported?: "throw" | "skip"; }
+export interface SceneDocument { format: "exi-scene"; version: 1; root: SerializedNode; skipped?: string[]; prefabs?: Record<string, SerializedNode>; }
+export interface SerializeSceneOptions { maxNodes?: number; unsupported?: "throw" | "skip"; prefabs?: Record<string, SerializedNode> | null; }
+export const MAX_PREFABS: number;
+export function instantiatePrefab(document: SceneDocument, name: string, options?: { x?: number; y?: number; rotation?: number; textures?: ReadonlyMap<string, Texture> | Record<string, Texture> | null; resolveTexture?: ((id: string) => Texture | null | undefined) | null; strict?: boolean; report?: DeserializeSceneReport | null }): Node;
 export interface DeserializeSceneReport { nodes?: number; missingTextures?: string[]; }
 export interface DeserializeSceneOptions {
   textures?: ReadonlyMap<string, Texture> | Record<string, Texture> | null;

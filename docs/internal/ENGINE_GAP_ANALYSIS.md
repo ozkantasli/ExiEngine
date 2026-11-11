@@ -46,7 +46,7 @@ Legend: ✅ built in · 🔌 official/common plugin or companion package · ➖ 
 | Scene file format | ✅ `serializeScene` JSON | ➖ | — | — | — | — | ✅ | ✅ | ✅ |
 | Visual editor | ➖ first browser editor | — (commercial 3rd party) | — | — | — | — | ✅ | ✅ | ✅ |
 | Hot reload / play-in-editor | ✅ `watchScene` + live Play window | ➖ (dev servers) | — | — | — | — | ✅ | ✅ | ✅ |
-| Prefabs / asset manager in editor | — | — | — | — | — | — | ✅ | ✅ | ✅ |
+| Prefabs / asset manager in editor | ➖ prefabs (no asset browser) | — | — | — | — | — | ✅ | ✅ | ✅ |
 | UI widgets (input, scroll, slider) | ✅ Button, Slider, TextInput (IME), ScrollView | ➖ | 🔌 | ➖ | ➖ | ➖ | ✅ | ✅ | ✅ |
 | Netcode helpers | ✅ `RollbackSession` (rollback, transport-agnostic) | — | — | — | — | — | ➖ | ✅ | ✅ |
 | npm package + CDN bundle | ✅ ready (not yet published) | ✅ | ✅ | ✅ | ✅ | ✅ | n/a | n/a | n/a |

@@ -106,6 +106,8 @@ top of the engine (no dependencies) and edits a live ExiEngine scene:
 - **▶ Play** opens a live window that follows every edit; nodes with `data.body` set to
   `"dynamic"` or `"static"` get rigid-body physics there (`data.shape: "circle"` for circles)
 - **Data (JSON)** per node for game metadata (spawn types, hit points…), saved in the scene
+- **Prefabs**: make a prefab from a node, insert it from the left panel, edit one instance and
+  apply it to all; games spawn more at runtime with `instantiatePrefab(document, name, { x, y })`
 - **Save** writes straight into a project file in Chromium (File System Access API), so a game
   running `watchScene({ url })` reloads on every save; other browsers download the JSON
 - **Save/Open** produce and read the same JSON document as `serializeScene()` /
@@ -308,7 +310,7 @@ hidden), but the physical iOS/Android device matrix is not complete yet.
 
 ExiEngine is a **core** with a lightweight scene editor: it edits, saves, previews (live Play
 window with physics) and hot-reloads scenes, but it does not have animation timelines,
-prefabs, an asset browser or a script editor, which full engines provide. Device-loss and fallback flows are verified with simulated smoke
+an asset browser or a script editor, which full engines provide. Device-loss and fallback flows are verified with simulated smoke
 tests; real GPU memory soak, driver resets and physical device testing must be done
 separately. Audio is subject to the browser's user-gesture policy. In production,
 HTTPS and server-side security headers still need to be configured.

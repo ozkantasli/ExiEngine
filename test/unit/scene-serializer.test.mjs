@@ -124,3 +124,26 @@ test("scene serializer: document shape matches the exi_build_scene { type, optio
   assert.equal(root.children[0].type, "Sprite");
   assert.equal(root.children[0].options.texture, "white");
 });
+
+test("scene serializer: prefabs travel with documents and instantiate at runtime", async () => {
+  const { instantiatePrefab, Graphics: G } = await import("../../src/index.js");
+  const enemy = new G({ name: "enemy", data: { hp: 3 } }).rect(-8, -8, 16, 16, { fill: 0xff0000 });
+  const enemyEntry = serializeScene(enemy).root;
+  const scene = new Scene({ name: "level" });
+  const document = serializeScene(scene, { prefabs: { enemy: enemyEntry } });
+  assert.deepEqual(Object.keys(document.prefabs), ["enemy"]);
+  const restored = JSON.parse(JSON.stringify(document));
+  assert.ok(deserializeScene(restored) instanceof Scene);
+  const spawned = instantiatePrefab(restored, "enemy", { x: 100, y: 40 });
+  assert.equal(spawned.position.x, 100);
+  assert.deepEqual(spawned.data, { hp: 3, prefab: "enemy" });
+  assert.equal(spawned.commands.length, 1);
+  const second = instantiatePrefab(restored, "enemy", { x: 5 });
+  assert.notEqual(second, spawned, "every call builds a new node");
+  assert.equal(restored.prefabs.enemy.options.x, enemyEntry.options.x, "the document is not mutated");
+  assert.throws(() => instantiatePrefab(restored, "boss"), /not defined/);
+  assert.throws(() => serializeScene(scene, { prefabs: { "bad name!": enemyEntry } }), /Prefab name/);
+  assert.throws(() => serializeScene(scene, { prefabs: { ok: { nope: 1 } } }), /serialized node/);
+  assert.throws(() => deserializeScene({ ...restored, prefabs: [] }), /prefabs must be an object/);
+  assert.throws(() => instantiatePrefab({ ...restored, prefabs: { evil: { type: "Node", options: { onUpdate: "x" } } } }, "evil"), /unknown option/);
+});

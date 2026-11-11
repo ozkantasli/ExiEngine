@@ -105,11 +105,26 @@ async function checkEditor() {
     await page.mouse.click(cell.x, cell.y);
     result.painted = await page.evaluate(() => window.editor.root.children[0].getTile(0, 0) === 5);
     result.roundTrip = await page.evaluate(() => { const json = JSON.stringify(window.editor.serialize()); window.editor.load(JSON.parse(json)); return JSON.stringify(window.editor.serialize()) === json; });
+    result.prefabs = await page.evaluate(() => {
+      const editor = window.editor;
+      editor.select([1]);                        // the player sprite
+      editor.makePrefab("hero");
+      editor.insertPrefab("hero");
+      const copies = () => editor.root.children.filter((node) => node.data?.prefab === "hero");
+      if (copies().length !== 2) return false;
+      editor.select([editor.root.children.length - 1]);
+      editor.setOption("tint", 0xff0000);
+      editor.applyPrefab();
+      const tints = copies().map((node) => node.tint);
+      const positions = new Set(copies().map((node) => node.position.x));
+      const document = editor.serialize();
+      return tints.every((tint) => tint === 0xff0000) && positions.size === 2 && Boolean(document.prefabs?.hero) && document.prefabs.hero.options.x === undefined;
+    });
   } catch (error) {
     errors.push(error.message);
   }
   await page.close();
-  const ok = errors.length === 0 && Object.values(result).every(Boolean) && Object.keys(result).length === 6;
+  const ok = errors.length === 0 && Object.values(result).every(Boolean) && Object.keys(result).length === 7;
   console.log(`[examples-e2e] ${ok ? "PASS" : "FAIL"} editor ${JSON.stringify(result)}${errors.length ? ` errors=${JSON.stringify(errors)}` : ""}`);
   return ok ? 0 : 1;
 }

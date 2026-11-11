@@ -131,6 +131,7 @@
 - Free-form JSON `node.data` metadata stored in scene documents, and `watchScene()` hot reload from a polled file and/or the editor's BroadcastChannel; the editor gains a live Play window with rigid-body preview from `data.body` and direct-to-file saving
 - LDtk project import: `tileMapFromLDtk` (Tiles/AutoLayer with flips, offsets, opacity), `ldtkIntGrid` (collision/pathfinding grid) and `ldtkEntities` (positions, sizes, tags, custom fields)
 - Canvas UI widgets `Button`, `Slider`, `TextInput` (with a hidden DOM input for IME, paste and mobile keyboards) and `ScrollView` (wheel/drag scrolling, clipping, off-screen culling) on the engine's pointer capture and focus order
+- Prefabs: named node trees stored in scene documents, editor make/insert/apply-to-all, and `instantiatePrefab()` for runtime spawning
 - A dependency-free TypeScript API contract with the root `index.d.ts`
 - Vertex/instance buffers whose capacity is kept in WebGL2, and narrowed in WebGPU according to a 64 MB global limit and the device limit
 

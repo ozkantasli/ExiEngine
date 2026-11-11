@@ -348,6 +348,18 @@ torch.x = player.position.x; torch.y = player.position.y;
 
 A `RenderGroup` covering a world rectangle at reduced resolution: it is filled with the `ambient` color, point lights add soft radial gradients (additive blend, tinted by `color`, scaled by `intensity` 0..1), and the result multiplies the world beneath it, so unlit areas fade to the ambient color and lit areas keep their colors. Lights are plain objects in world coordinates (`x`, `y`, `radius`, `color`, `intensity`, `enabled`); the layer syncs them every update. It costs one extra render pass and one draw for the composite, independent of the screen size. Overlay HUD scenes are not affected. Limits: `MAX_LIGHTS` (256) lights, 4 MPixel light maps; no normal maps or shadow casting yet.
 
+### Prefabs
+
+```js
+const level = await loader.loadJSON("./level1.json");          // saved by the editor, with "prefabs"
+engine.setScene(deserializeScene(level, { textures }));
+// spawn more at runtime:
+const enemy = instantiatePrefab(level, "enemy", { x: 640, y: 120, textures });
+engine.scene.add(enemy);                                        // enemy.data.prefab === "enemy"
+```
+
+A scene document may carry `prefabs`: named node trees (`{ type, options, children }`, up to `MAX_PREFABS`, names of 1-64 letters, digits, `_`, `-`, `.`). Instances inside the scene are ordinary nodes with `data.prefab` set, so code that ignores prefabs still loads the scene. `serializeScene(root, { prefabs })` writes them, `deserializeScene` validates them, and `instantiatePrefab(document, name, { x, y, rotation, textures })` builds a fresh instance (validated like any scene node, the document is not modified). In the editor: **Make prefab** on a selected node, click a prefab in the left panel to insert it, and **Apply to all instances** copies an edited instance into the definition and every other instance while keeping their own position, rotation, scale, name, z-index and visibility.
+
 ### Node data and scene hot reload
 
 ```js
