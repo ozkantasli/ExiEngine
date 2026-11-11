@@ -825,7 +825,9 @@ export class RigidBody {
 export type RigidContactHandler = (a: RigidBody, b: RigidBody, manifold: RigidContactManifold) => void;
 export class RigidBodyWorld {
   gravity: Point; iterations: number; maxBodies: number; bodies: RigidBody[]; onContact: RigidContactHandler | null; scene: Scene | null;
-  constructor(options?: { gravityX?: number; gravityY?: number; iterations?: number; scene?: Scene | null; onContact?: RigidContactHandler | null; maxBodies?: number });
+  constructor(options?: { gravityX?: number; gravityY?: number; iterations?: number; scene?: Scene | null; onContact?: RigidContactHandler | null; maxBodies?: number; maxSubsteps?: number });
+  maxSubsteps: number; readonly lastSubsteps: number; readonly contacts: unknown[];
+  substepsFor(step: number): number;
   add(body: RigidBody): RigidBody;
   remove(body: RigidBody): boolean;
   clear(): void;
@@ -835,7 +837,7 @@ export class RigidBodyWorld {
   removeJoint(joint: RevoluteJoint | DistanceJoint): boolean;
   step(delta: number): this;
 }
-export function collideRigidBodies(a: RigidBody, b: RigidBody, manifold?: RigidContactManifold): RigidContactManifold | null;
+export function collideRigidBodies(a: RigidBody, b: RigidBody, manifold?: RigidContactManifold, margin?: number): RigidContactManifold | null;
 export const MAX_RIGID_JOINTS: number;
 export class RevoluteJoint {
   readonly a: RigidBody; readonly b: RigidBody; readonly collideConnected: boolean; world: RigidBodyWorld | null;

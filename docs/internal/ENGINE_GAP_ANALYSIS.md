@@ -81,8 +81,8 @@ Legend: ✅ built in · 🔌 official/common plugin or companion package · ➖ 
 **P1 — common feature requests**
 3. **Skeletal animation (Spine/DragonBones).** Expected by artists; usually solved with a
    runtime adapter.
-4. **Continuous collision** for `RigidBodyWorld` (✅ revolute and distance/rope joints shipped;
-   CCD for fast thin bodies, prismatic/weld/motor joints still open).
+4. **More joint types** for `RigidBodyWorld` (✅ revolute and distance/rope joints and
+   anti-tunneling via speculative contacts + substeps shipped; prismatic/weld/motor joints open).
 5. **Normal maps and shadows.** ✅ `LightLayer` point lights shipped; normal-mapped sprites and
    shadow casting are still open.
 6. **UI widgets:** ✅ Button, Slider, TextInput (IME via hidden input), ScrollView shipped;
@@ -102,7 +102,7 @@ Legend: ✅ built in · 🔌 official/common plugin or companion package · ➖ 
 1. Publish to npm (owner action) and announce the CDN path.
 2. Grow examples: shooter, puzzle, endless runner, physics puzzle; one tutorial per example.
 3. Editor v3: prefabs, asset browser, simple data-driven behaviours (play/hot reload ✅).
-4. CCD and more joint types in `RigidBodyWorld`.
+4. More joint types (prismatic, weld, motors) in `RigidBodyWorld`.
 5. Spine runtime adapter as an optional package (keeps the core dependency-free).
 6. Decide the custom-shader policy; if accepted, ship a bounded `registerFilter` API.
 7. Normal-mapped sprites and simple shadow casting on top of `LightLayer`.

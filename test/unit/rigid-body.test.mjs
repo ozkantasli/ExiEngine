@@ -225,3 +225,22 @@ test("rigid joints: jointed bodies do not collide, removal and validation", asyn
   assert.throws(() => world.addJoint(new DistanceJoint({ a, b: fixed })), /both joint bodies/);
   assert.throws(() => world.addJoint({}), /RevoluteJoint or DistanceJoint/);
 });
+
+test("rigid: fast thin bodies do not tunnel through thin walls (speculative contacts + substeps)", () => {
+  for (const speed of [3_000, 12_000]) {
+    const world = new RigidBodyWorld({ gravityY: 0 });
+    world.add(new RigidBody({ shape: { type: "box", width: 4, height: 200 }, x: 300, y: 0, static: true }));
+    const bullet = world.add(new RigidBody({ shape: { type: "circle", radius: 3 }, x: 0, y: 0, velocityX: speed, restitution: 0 }));
+    const shard = world.add(new RigidBody({ shape: { type: "box", width: 6, height: 2 }, x: 0, y: 50, velocityX: speed, restitution: 0 }));
+    for (let index = 0; index < 30; index += 1) world.step(1 / 60);
+    assert.ok(bullet.position.x < 298, `bullet at ${speed} px/s stopped at the wall (${bullet.position.x})`);
+    assert.ok(shard.position.x < 298, `shard at ${speed} px/s stopped at the wall (${shard.position.x})`);
+  }
+  const falling = new RigidBodyWorld({ gravityY: 980, maxSubsteps: 16 });
+  falling.add(new RigidBody({ shape: { type: "box", width: 400, height: 2 }, x: 200, y: 400, static: true }));
+  const coin = falling.add(new RigidBody({ shape: { type: "circle", radius: 2 }, x: 200, y: -4_000, velocityY: 4_000 }));
+  for (let index = 0; index < 240; index += 1) falling.step(1 / 60);
+  assert.ok(coin.position.y < 400, "a coin dropped from high up lands on a 2 px floor");
+  assert.ok(falling.lastSubsteps >= 1 && falling.lastSubsteps <= 16);
+  assert.throws(() => new RigidBodyWorld({ maxSubsteps: 0 }), /maxSubsteps/);
+});

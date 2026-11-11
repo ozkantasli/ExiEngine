@@ -13,6 +13,7 @@ export const MAX_POLYGON_VERTICES = 32;
 const MAX_COORDINATE = 1e7;
 const MAX_SPEED = 1e5;
 const MAX_ITERATIONS = 64;
+const MAX_SUBSTEPS = 32;
 const LINEAR_SLOP = 0.05;
 // Overlap is removed by moving positions directly after the velocity solve
 // (not by adding velocity), so warm-started impulses carry no correction energy.
@@ -22,6 +23,7 @@ const POSITION_CORRECTION = 0.4;
 // losing contact every other step. Restitution only applies to impacts faster
 // than the larger of RESTITUTION_THRESHOLD and two steps of gravity.
 const CONTACT_MARGIN = 1;
+const MAX_SPECULATIVE_DISTANCE = 256;
 const RESTITUTION_THRESHOLD = 60;
 const WARM_START_DISTANCE_SQUARED = 4;
 
@@ -211,11 +213,11 @@ export class RigidBody {
 // Each function fills `manifold` with a normal pointing from A to B, a
 // penetration depth and 1-2 world contact points, or returns false.
 
-function collideCircles(a, b, manifold) {
+function collideCircles(a, b, manifold, margin = CONTACT_MARGIN) {
   const dx = b.position.x - a.position.x; const dy = b.position.y - a.position.y;
   const radius = a.shape.radius + b.shape.radius;
   const distanceSquared = dx * dx + dy * dy;
-  if (distanceSquared >= (radius + CONTACT_MARGIN) * (radius + CONTACT_MARGIN)) return false;
+  if (distanceSquared >= (radius + margin) * (radius + margin)) return false;
   const distance = Math.sqrt(distanceSquared);
   const nx = distance > 1e-9 ? dx / distance : 0; const ny = distance > 1e-9 ? dy / distance : 1;
   manifold.normalX = nx; manifold.normalY = ny;
@@ -226,13 +228,13 @@ function collideCircles(a, b, manifold) {
   return true;
 }
 
-function collidePolygonCircle(polygon, circle, manifold, flip) {
+function collidePolygonCircle(polygon, circle, manifold, flip, margin = CONTACT_MARGIN) {
   const cx = circle.position.x; const cy = circle.position.y; const radius = circle.shape.radius;
   const vertices = polygon.worldVertices; const normals = polygon.worldNormals;
   let separation = -Infinity; let face = 0;
   for (let index = 0; index < vertices.length; index += 1) {
     const value = (cx - vertices[index].x) * normals[index].x + (cy - vertices[index].y) * normals[index].y;
-    if (value > radius + CONTACT_MARGIN) return false;
+    if (value > radius + margin) return false;
     if (value > separation) { separation = value; face = index; }
   }
   const v1 = vertices[face]; const v2 = vertices[(face + 1) % vertices.length];
@@ -246,7 +248,7 @@ function collidePolygonCircle(polygon, circle, manifold, flip) {
     px = v1.x + edgeX * t; py = v1.y + edgeY * t;
     const dx = cx - px; const dy = cy - py;
     const distance = Math.hypot(dx, dy);
-    if (distance > radius + CONTACT_MARGIN) return false;
+    if (distance > radius + margin) return false;
     nx = distance > 1e-9 ? dx / distance : normals[face].x; ny = distance > 1e-9 ? dy / distance : normals[face].y;
     depth = radius - distance;
   }
@@ -291,11 +293,11 @@ const clipIn = [{ x: 0, y: 0 }, { x: 0, y: 0 }];
 const clipMid = [{ x: 0, y: 0 }, { x: 0, y: 0 }, { x: 0, y: 0 }];
 const clipOut = [{ x: 0, y: 0 }, { x: 0, y: 0 }, { x: 0, y: 0 }];
 
-function collidePolygons(a, b, manifold) {
+function collidePolygons(a, b, manifold, margin = CONTACT_MARGIN) {
   const separationA = maxSeparation(a, b);
-  if (separationA.separation > CONTACT_MARGIN) return false;
+  if (separationA.separation > margin) return false;
   const separationB = maxSeparation(b, a);
-  if (separationB.separation > CONTACT_MARGIN) return false;
+  if (separationB.separation > margin) return false;
   // Prefer A as reference unless B is clearly better (keeps results stable).
   let reference = a; let incident = b; let face = separationA.face; let flip = false;
   if (separationB.separation > separationA.separation + 0.0005) { reference = b; incident = a; face = separationB.face; flip = true; }
@@ -321,7 +323,7 @@ function collidePolygons(a, b, manifold) {
   let count = 0; let depth = -Infinity;
   for (let index = 0; index < 2; index += 1) {
     const separation = clipOut[index].x * nx + clipOut[index].y * ny - faceOffset;
-    if (separation <= CONTACT_MARGIN) {
+    if (separation <= margin) {
       manifold.points[count].x = clipOut[index].x - nx * separation * 0.5;
       manifold.points[count].y = clipOut[index].y - ny * separation * 0.5;
       manifold.separations[count] = -separation;
@@ -340,15 +342,15 @@ function createManifold() {
   return { normalX: 0, normalY: 0, depth: 0, count: 0, points: [{ x: 0, y: 0 }, { x: 0, y: 0 }], separations: [0, 0] };
 }
 
-export function collideRigidBodies(a, b, manifold = createManifold()) {
+export function collideRigidBodies(a, b, manifold = createManifold(), margin = CONTACT_MARGIN) {
   if (!(a instanceof RigidBody) || !(b instanceof RigidBody)) throw new TypeError("collideRigidBodies expects two RigidBody instances.");
   manifold.separations[0] = 0; manifold.separations[1] = 0;
   const typeA = a.shape.type; const typeB = b.shape.type;
   let hit;
-  if (typeA === "circle" && typeB === "circle") hit = collideCircles(a, b, manifold);
-  else if (typeA === "polygon" && typeB === "circle") hit = collidePolygonCircle(a, b, manifold, false);
-  else if (typeA === "circle" && typeB === "polygon") hit = collidePolygonCircle(b, a, manifold, true);
-  else hit = collidePolygons(a, b, manifold);
+  if (typeA === "circle" && typeB === "circle") hit = collideCircles(a, b, manifold, margin);
+  else if (typeA === "polygon" && typeB === "circle") hit = collidePolygonCircle(a, b, manifold, false, margin);
+  else if (typeA === "circle" && typeB === "polygon") hit = collidePolygonCircle(b, a, manifold, true, margin);
+  else hit = collidePolygons(a, b, manifold, margin);
   if (hit && manifold.count === 1) manifold.separations[0] = manifold.depth;
   return hit ? manifold : null;
 }
@@ -537,7 +539,10 @@ export class DistanceJoint extends RigidJoint {
 // ---------------------------------------------------------------- world
 
 export class RigidBodyWorld {
-  constructor({ gravityX = 0, gravityY = 980, iterations = 10, scene = null, onContact = null, maxBodies = MAX_RIGID_BODIES } = {}) {
+  constructor({ gravityX = 0, gravityY = 980, iterations = 10, scene = null, onContact = null, maxBodies = MAX_RIGID_BODIES, maxSubsteps = 4 } = {}) {
+    if (!Number.isSafeInteger(maxSubsteps) || maxSubsteps < 1 || maxSubsteps > MAX_SUBSTEPS) throw new RangeError(`RigidBodyWorld maxSubsteps must be between 1 and ${MAX_SUBSTEPS}.`);
+    this.maxSubsteps = maxSubsteps;
+    this.lastSubsteps = 1;
     this.gravity = { x: finite(gravityX, 0, "RigidBodyWorld gravityX"), y: finite(gravityY, 980, "RigidBodyWorld gravityY") };
     if (!Number.isSafeInteger(iterations) || iterations < 1 || iterations > MAX_ITERATIONS) throw new RangeError(`RigidBodyWorld iterations must be between 1 and ${MAX_ITERATIONS}.`);
     this.iterations = iterations;
@@ -632,13 +637,13 @@ export class RigidBodyWorld {
   _contact(index) {
     let contact = this._contactPool[index];
     if (!contact) {
-      contact = { a: null, b: null, manifold: createManifold(), normalImpulse: [0, 0], tangentImpulse: [0, 0], normalMass: [0, 0], tangentMass: [0, 0], bias: [0, 0], ra: [{ x: 0, y: 0 }, { x: 0, y: 0 }], rb: [{ x: 0, y: 0 }, { x: 0, y: 0 }], friction: 0, restitution: 0 };
+      contact = { a: null, b: null, manifold: createManifold(), normalImpulse: [0, 0], tangentImpulse: [0, 0], relativeVelocity: [0, 0], normalMass: [0, 0], tangentMass: [0, 0], bias: [0, 0], ra: [{ x: 0, y: 0 }, { x: 0, y: 0 }], rb: [{ x: 0, y: 0 }, { x: 0, y: 0 }], friction: 0, restitution: 0 };
       this._contactPool[index] = contact;
     }
     return contact;
   }
 
-  _detect() {
+  _detect(step = 0) {
     const bodies = this.bodies;
     for (const body of bodies) body.updateGeometry();
     // Sort-and-sweep broadphase along x; ties broken by insertion id for determinism.
@@ -648,20 +653,26 @@ export class RigidBodyWorld {
     order.sort((left, right) => (left.bounds.left - right.bounds.left) || (left.id - right.id));
     let count = 0;
     this._pairs.clear();
+    let fastest = 0;
+    for (const body of bodies) fastest = Math.max(fastest, Math.hypot(body.velocity.x, body.velocity.y));
+    const maxMargin = CONTACT_MARGIN + Math.min(MAX_SPECULATIVE_DISTANCE, fastest * 2 * step);
     for (let i = 0; i < order.length; i += 1) {
       const a = order[i];
       for (let j = i + 1; j < order.length; j += 1) {
         const b = order[j];
         // Bounds are compared with the speculative margin so near-touching pairs
         // (resting stacks after position correction) keep their contacts.
-        if (b.bounds.left > a.bounds.right + CONTACT_MARGIN) break;
+        // Speculative margin grows with how far the pair can travel this step,
+        // so fast bodies are caught before they pass through thin geometry.
+        const margin = CONTACT_MARGIN + Math.min(MAX_SPECULATIVE_DISTANCE, (Math.hypot(a.velocity.x, a.velocity.y) + Math.hypot(b.velocity.x, b.velocity.y)) * step);
+        if (b.bounds.left > a.bounds.right + maxMargin) break;
         if (a.invMass === 0 && b.invMass === 0) continue;
-        if (b.bounds.top > a.bounds.bottom + CONTACT_MARGIN || b.bounds.bottom < a.bounds.top - CONTACT_MARGIN) continue;
+        if (b.bounds.left > a.bounds.right + margin || b.bounds.top > a.bounds.bottom + margin || b.bounds.bottom < a.bounds.top - margin) continue;
         if ((a.layer & b.mask) === 0 || (b.layer & a.mask) === 0) continue;
         if (this._noCollidePairs.size && this._noCollidePairs.has(a.id < b.id ? `${a.id}:${b.id}` : `${b.id}:${a.id}`)) continue;
         const first = a.id < b.id ? a : b; const second = first === a ? b : a;
         const contact = this._contact(count);
-        if (!collideRigidBodies(first, second, contact.manifold)) continue;
+        if (!collideRigidBodies(first, second, contact.manifold, margin)) continue;
         contact.a = first; contact.b = second;
         const key = `${first.id}:${second.id}`;
         contact.key = key;
@@ -679,7 +690,7 @@ export class RigidBodyWorld {
   }
 
   _prepare(delta) {
-    const restitutionThreshold = Math.max(RESTITUTION_THRESHOLD, 2 * Math.hypot(this.gravity.x, this.gravity.y) * delta);
+    this.restitutionThreshold = Math.max(RESTITUTION_THRESHOLD, 2 * Math.hypot(this.gravity.x, this.gravity.y) * delta);
     for (const contact of this.contacts) {
       const { a, b, manifold } = contact;
       const nx = manifold.normalX; const ny = manifold.normalY;
@@ -701,8 +712,10 @@ export class RigidBodyWorld {
         // separations[] holds signed depth: positive = overlap, negative = gap.
         const depth = manifold.separations[index];
         // A speculative contact (gap) may still close the gap within this step.
-        const speculative = depth < 0 ? depth / delta : 0;
-        contact.bias[index] = speculative + (normalVelocity < -restitutionThreshold ? -contact.restitution * normalVelocity : 0);
+        contact.bias[index] = depth < 0 ? depth / delta : 0;
+        // Approach speed before this step's impulses; restitution is applied in
+        // a separate pass from it, so speculative contacts do not eat bounces.
+        contact.relativeVelocity[index] = normalVelocity;
         contact.normalImpulse[index] = 0;
         contact.tangentImpulse[index] = 0;
       }
@@ -741,6 +754,26 @@ export class RigidBodyWorld {
           applyPairImpulse(a, b, contact.ra[index], contact.rb[index], nx * cached.normal[previous] + tx * cached.tangent[previous], ny * cached.normal[previous] + ty * cached.tangent[previous]);
           break;
         }
+      }
+    }
+  }
+
+  _applyRestitution() {
+    const threshold = this.restitutionThreshold;
+    for (const contact of this.contacts) {
+      if (contact.restitution === 0) continue;
+      const { a, b, manifold } = contact;
+      const nx = manifold.normalX; const ny = manifold.normalY;
+      for (let index = 0; index < manifold.count; index += 1) {
+        if (contact.relativeVelocity[index] > -threshold || contact.normalImpulse[index] === 0) continue;
+        const ra = contact.ra[index]; const rb = contact.rb[index];
+        const vn = (b.velocity.x - b.angularVelocity * rb.y - a.velocity.x + a.angularVelocity * ra.y) * nx
+          + (b.velocity.y + b.angularVelocity * rb.x - a.velocity.y - a.angularVelocity * ra.x) * ny;
+        let impulse = -contact.normalMass[index] * (vn + contact.restitution * contact.relativeVelocity[index]);
+        const previous = contact.normalImpulse[index];
+        contact.normalImpulse[index] = Math.max(previous + impulse, 0);
+        impulse = contact.normalImpulse[index] - previous;
+        applyPairImpulse(a, b, ra, rb, nx * impulse, ny * impulse);
       }
     }
   }
@@ -844,10 +877,44 @@ export class RigidBodyWorld {
     contact.normalImpulse[0] = x1; contact.normalImpulse[1] = x2;
   }
 
+  // Anti-tunneling: when the fastest body would move more than half of its
+  // thinnest extent in one step, the step is split into equal sub-steps (up to
+  // maxSubsteps). The split depends only on the state, so it is deterministic.
+  substepsFor(step) {
+    let needed = 1;
+    for (const body of this.bodies) {
+      if (body.invMass === 0) continue;
+      const travel = Math.hypot(body.velocity.x + this.gravity.x * body.gravityScale * step, body.velocity.y + this.gravity.y * body.gravityScale * step) * step;
+      const thickness = body.shape.type === "circle" ? body.shape.radius * 2 : Math.min(body.bounds.right - body.bounds.left, body.bounds.bottom - body.bounds.top);
+      if (thickness > 0) needed = Math.max(needed, Math.ceil(travel / (thickness * 0.5)));
+    }
+    let thinnestStatic = Infinity;
+    for (const body of this.bodies) {
+      if (body.invMass !== 0) continue;
+      const thickness = body.shape.type === "circle" ? body.shape.radius * 2 : Math.min(body.bounds.right - body.bounds.left, body.bounds.bottom - body.bounds.top);
+      if (thickness > 0) thinnestStatic = Math.min(thinnestStatic, thickness);
+    }
+    if (Number.isFinite(thinnestStatic)) {
+      for (const body of this.bodies) {
+        if (body.invMass === 0) continue;
+        const travel = Math.hypot(body.velocity.x, body.velocity.y) * step;
+        needed = Math.max(needed, Math.ceil(travel / (thinnestStatic * 0.5)));
+      }
+    }
+    return Math.max(1, Math.min(this.maxSubsteps, needed));
+  }
+
   step(delta) {
     const dt = Number(delta);
     if (!Number.isFinite(dt) || dt <= 0) return this;
-    const step = Math.min(dt, 0.1);
+    const total = Math.min(dt, 0.1);
+    const substeps = this.substepsFor(total);
+    this.lastSubsteps = substeps;
+    for (let index = 0; index < substeps; index += 1) this.stepOnce(total / substeps);
+    return this;
+  }
+
+  stepOnce(step) {
     for (const body of this.bodies) {
       if (body.invMass === 0) { body.force.x = 0; body.force.y = 0; body.torque = 0; continue; }
       body.velocity.x += (this.gravity.x * body.gravityScale + body.force.x * body.invMass) * step;
@@ -857,13 +924,14 @@ export class RigidBodyWorld {
       body.velocity.x *= linear; body.velocity.y *= linear; body.angularVelocity *= angular;
       body.force.x = 0; body.force.y = 0; body.torque = 0;
     }
-    this._detect();
+    this._detect(step);
     this._prepare(step);
     for (const joint of this.joints) joint.prepare(step);
     for (let iteration = 0; iteration < this.iterations; iteration += 1) {
       for (const joint of this.joints) joint.solve();
       this._solve();
     }
+    this._applyRestitution();
     this._storeImpulses();
     this._correctPositions();
     for (const body of this.bodies) {
