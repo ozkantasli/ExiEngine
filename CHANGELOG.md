@@ -19,7 +19,8 @@ Content, authoring and game-feature release. Everything stays dependency-free.
   autosave, save straight into project files, live **Play** window with physics preview, prefabs
   (`instantiatePrefab` for runtime spawning).
 - **Physics:** `RigidBodyWorld` / `RigidBody` (circles, boxes, convex polygons, rotation, friction,
-  restitution, stable stacking, sensors, layers), `RevoluteJoint`, `DistanceJoint` (rod/rope),
+  restitution, stable stacking, sensors, layers), `RevoluteJoint` (with motor), `WeldJoint`,
+  `PrismaticJoint` (limits, motor), `DistanceJoint` (rod/rope),
   anti-tunneling (speculative contacts + substeps).
 - **Rendering:** `blur`, `glow`, `outline`, `pixelate`, `vignette` filters (`FILTER_TYPES`),
   `LightLayer` 2D lighting with optional normal maps (`normals: true`, `addNormalMap`), `BitmapFont` / `BitmapText` (AngelCode BMFont), `registerFilter` custom
@@ -37,6 +38,8 @@ Content, authoring and game-feature release. Everything stays dependency-free.
 - RenderGroup targets are cleared to transparent, so a group no longer covers the scene behind
   its empty area.
 - `Input` registers `keydown` as a non-passive listener.
+- MCP `exi_api` has its own 256 KiB output bound (`limits.maxApiOutputBytes`) so the growing manifest fits;
+  every other tool output stays at 64 KiB.
 - The competitor analysis now targets web 2D engines (Phaser, PixiJS, Excalibur, KAPLAY,
   melonJS, GDevelop, Construct, Godot web).
 

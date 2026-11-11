@@ -48,6 +48,9 @@ const MAX_HANDLES = 4096;
 const MAX_SCENE_NODES = 1024;
 const MAX_SCENE_DEPTH = 32;
 const MAX_OUTPUT_BYTES = 64 * 1024;
+// exi_api returns the engine's own reflection manifest (no caller or project
+// data), which grows with the public API; it gets a separate, larger bound.
+const MAX_API_OUTPUT_BYTES = 256 * 1024;
 const MAX_RUNTIME_TELEMETRY_BYTES = 4 * 1024;
 const MAX_RUNTIME_COMMAND_BYTES = 768 * 1024;
 const MAX_RUNTIME_RESULT_BYTES = 64 * 1024;
@@ -1105,6 +1108,7 @@ const apiLimits = Object.freeze({
   maxSceneDepth: MAX_SCENE_DEPTH,
   maxGridPathCells: engineExports.MAX_GRID_PATH_CELLS,
   maxOutputBytes: MAX_OUTPUT_BYTES,
+  maxApiOutputBytes: MAX_API_OUTPUT_BYTES,
   maxRuntimeTelemetryBytes: MAX_RUNTIME_TELEMETRY_BYTES,
   maxRuntimeCommandBytes: MAX_RUNTIME_COMMAND_BYTES,
   maxRuntimeResultBytes: MAX_RUNTIME_RESULT_BYTES,
@@ -2303,9 +2307,9 @@ function response(id, result, modern = false) {
   send({ jsonrpc: "2.0", id, result: modern ? modernResult(result) : result });
 }
 
-function assertOutputSize(value) {
+function assertOutputSize(value, limit = MAX_OUTPUT_BYTES) {
   const bytes = Buffer.byteLength(JSON.stringify(value), "utf8");
-  if (bytes > MAX_OUTPUT_BYTES) fail("MCP tool output size limit exceeded.", "EXI_MCP_OUTPUT_LIMIT");
+  if (bytes > limit) fail("MCP tool output size limit exceeded.", "EXI_MCP_OUTPUT_LIMIT");
   return value;
 }
 
@@ -2400,7 +2404,7 @@ async function handleMessage(line) {
       try {
         throwIfCancelled(request.controller.signal);
         const rawArguments = message.params && Object.hasOwn(message.params, "arguments") ? message.params.arguments : {};
-        const result = assertOutputSize(await callTool(message.params?.name, rawArguments, { signal: request.controller.signal, progressToken }));
+        const result = assertOutputSize(await callTool(message.params?.name, rawArguments, { signal: request.controller.signal, progressToken }), message.params?.name === "exi_api" ? MAX_API_OUTPUT_BYTES : MAX_OUTPUT_BYTES);
         throwIfCancelled(request.controller.signal);
         if (request.cancelled) return;
         const text = JSON.stringify(result);

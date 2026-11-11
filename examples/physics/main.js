@@ -1,10 +1,12 @@
 // ExiEngine example: rigid-body sandbox.
 // Shows RigidBodyWorld with boxes, circles and convex polygons: rotation,
 // friction, restitution, a pyramid that stays standing, static ramps, a plank
-// bridge on revolute joints, a pendulum on a distance joint, and
+// bridge on revolute joints, a pendulum on a distance joint, a motorized
+// windmill (two welded blades on a revolute motor), a piston on a prismatic
+// joint with limits and a reversing motor, and
 // RigidBody.node keeping Graphics nodes in sync. Passed to ExiEngine as
 // `physics`, so the engine steps it on its fixed timestep.
-import { Camera, DistanceJoint, ExiEngine, Graphics, RevoluteJoint, RigidBody, RigidBodyWorld, Scene, Text } from "../../src/index.js";
+import { Camera, DistanceJoint, ExiEngine, Graphics, PrismaticJoint, RevoluteJoint, RigidBody, RigidBodyWorld, Scene, Text, WeldJoint } from "../../src/index.js";
 
 const WIDTH = 960;
 const HEIGHT = 540;
@@ -13,6 +15,8 @@ const COLORS = [0x5eead4, 0x60a5fa, 0xf472b6, 0xfacc15, 0xa78bfa, 0xfb923c];
 const scene = new Scene();
 const world = new RigidBodyWorld({ gravityY: 980, iterations: 10 });
 let spawned = 0;
+let piston = null;
+let pistonTimer = 0;
 
 // Draws a body's shape around its center of mass so node rotation matches.
 function createBody(options, color) {
@@ -63,6 +67,18 @@ function buildLevel() {
   world.addJoint(new DistanceJoint({ a: pivot, b: ball }));
   const rope = new Graphics({ name: "rope", zIndex: -1, onUpdate: (delta, node) => { node.clear().line(pivot.position.x, pivot.position.y, ball.position.x, ball.position.y, 2, { fill: 0x94a3b8 }); } });
   scene.add(rope);
+  // A windmill: two blades welded into a cross, spun by a revolute motor.
+  // The hub is a sensor: only directly jointed bodies skip collision, and blade B overlaps it.
+  const hub = createBody({ shape: { type: "circle", radius: 6 }, x: 740, y: 430, static: true, isSensor: true }, 0x94a3b8);
+  const bladeA = createBody({ shape: { type: "box", width: 130, height: 10 }, x: 740, y: 430, density: 0.5 }, 0x38bdf8);
+  const bladeB = createBody({ shape: { type: "box", width: 10, height: 130 }, x: 740, y: 430, density: 0.5 }, 0x38bdf8);
+  world.addJoint(new WeldJoint({ a: bladeA, b: bladeB, x: 740, y: 430 }));
+  world.addJoint(new RevoluteJoint({ a: hub, b: bladeA, x: 740, y: 430, motorSpeed: 1.6, maxMotorTorque: 4e7 }));
+  // A piston: a platform that slides up and down a vertical axis between limits.
+  const base = createBody({ shape: { type: "box", width: 70, height: 12 }, x: 880, y: HEIGHT - 46, static: true }, 0x475569);
+  const platform = createBody({ shape: { type: "box", width: 70, height: 12 }, x: 880, y: HEIGHT - 70, friction: 0.9 }, 0xf59e0b);
+  piston = world.addJoint(new PrismaticJoint({ a: base, b: platform, x: 880, y: HEIGHT - 70, axisX: 0, axisY: 1, lowerLimit: -150, upperLimit: 0, motorSpeed: -120, maxMotorForce: 5e7 }));
+  pistonTimer = 0;
   // A pyramid that stays standing until something hits it.
   for (let row = 0; row < 7; row += 1) {
     for (let index = 0; index < 7 - row; index += 1) {
@@ -99,6 +115,8 @@ const engine = await ExiEngine.create({
       input.getPointerWorld(camera, pointerWorld);
       if (world.bodies.length < 400) spawnShape(pointerWorld.x, pointerWorld.y);
     }
+    pistonTimer += delta;
+    if (piston && pistonTimer > 1.6) { pistonTimer = 0; piston.setMotor(-piston.motorSpeed); }
     if (input.wasActionPressed("slow")) { slowMotion = !slowMotion; currentEngine.setTimeScale(slowMotion ? 0.25 : 1); }
     if (input.wasActionPressed("reset")) buildLevel();
     label.setText(`${world.bodies.length} bodies · ${world.joints.length} joints · ${world.contacts.length} contacts${slowMotion ? " · slow motion" : ""}`);
@@ -106,4 +124,4 @@ const engine = await ExiEngine.create({
 });
 engine.start();
 
-window.game = { engine, scene, world };
+window.game = { engine, scene, world, get piston() { return piston; } };

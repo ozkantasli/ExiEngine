@@ -223,7 +223,7 @@ test("rigid joints: jointed bodies do not collide, removal and validation", asyn
   assert.throws(() => new RevoluteJoint({ a, b: fixed, x: NaN, y: 0 }), /finite/);
   assert.throws(() => new DistanceJoint({ a, b: fixed, length: -1 }), /length/);
   assert.throws(() => world.addJoint(new DistanceJoint({ a, b: fixed })), /both joint bodies/);
-  assert.throws(() => world.addJoint({}), /RevoluteJoint or DistanceJoint/);
+  assert.throws(() => world.addJoint({}), /PrismaticJoint or DistanceJoint/);
 });
 
 test("rigid: fast thin bodies do not tunnel through thin walls (speculative contacts + substeps)", () => {
@@ -243,4 +243,63 @@ test("rigid: fast thin bodies do not tunnel through thin walls (speculative cont
   assert.ok(coin.position.y < 400, "a coin dropped from high up lands on a 2 px floor");
   assert.ok(falling.lastSubsteps >= 1 && falling.lastSubsteps <= 16);
   assert.throws(() => new RigidBodyWorld({ maxSubsteps: 0 }), /maxSubsteps/);
+});
+
+test("rigid joints: a weld keeps a cantilever rigid, a motor spins a wheel", async () => {
+  const { RevoluteJoint, WeldJoint } = await import("../../src/index.js");
+  const world = new RigidBodyWorld({ gravityY: 980 });
+  const wall = world.add(new RigidBody({ shape: { type: "box", width: 20, height: 200 }, x: 0, y: 0, static: true }));
+  const beam = world.add(new RigidBody({ shape: { type: "box", width: 100, height: 10 }, x: 60, y: 0 }));
+  const tip = world.add(new RigidBody({ shape: { type: "box", width: 20, height: 20 }, x: 120, y: 0 }));
+  world.addJoint(new WeldJoint({ a: wall, b: beam, x: 10, y: 0 }));
+  const weld = world.addJoint(new WeldJoint({ a: beam, b: tip }));
+  assert.deepEqual([weld.worldAnchors().ax, weld.worldAnchors().ay], [90, 0], "defaults to the midpoint");
+  assert.throws(() => weld.setMotor(1, 1), /no motor/);
+  for (let index = 0; index < 300; index += 1) world.step(1 / 60);
+  assert.ok(Math.abs(beam.angle) < 0.05 && Math.abs(tip.angle) < 0.05, `stays level (${beam.angle}, ${tip.angle})`);
+  assert.ok(Math.abs(tip.position.y) < 6 && Math.abs(tip.position.x - 120) < 2, `does not sag or drift (${tip.position.x}, ${tip.position.y})`);
+
+  const motorWorld = new RigidBodyWorld();
+  const axle = motorWorld.add(new RigidBody({ shape: { type: "circle", radius: 2 }, x: 0, y: 0, static: true }));
+  const wheel = motorWorld.add(new RigidBody({ shape: { type: "circle", radius: 30 }, x: 0, y: 0 }));
+  const motor = motorWorld.addJoint(new RevoluteJoint({ a: axle, b: wheel, x: 0, y: 0, motorSpeed: 3, maxMotorTorque: 1e9 }));
+  for (let index = 0; index < 30; index += 1) motorWorld.step(1 / 60);
+  assert.ok(Math.abs(wheel.angularVelocity - 3) < 0.01, `reaches motor speed (${wheel.angularVelocity})`);
+  assert.ok(Math.abs(motor.angle - wheel.angle) < 1e-9);
+  motor.setMotor(-1, 1);
+  motorWorld.step(1 / 60);
+  assert.ok(wheel.angularVelocity > 2.9, "a weak motor cannot stop the wheel at once");
+  assert.throws(() => new RevoluteJoint({ a: axle, b: wheel, x: 0, y: 0, maxMotorTorque: -1 }), /negative/);
+});
+
+test("rigid joints: a prismatic slider stays on its axis, honours limits and its motor", async () => {
+  const { PrismaticJoint } = await import("../../src/index.js");
+  const world = new RigidBodyWorld({ gravityY: 980 });
+  const rail = world.add(new RigidBody({ shape: { type: "box", width: 400, height: 4 }, x: 0, y: 0, static: true }));
+  // Diagonal axis: gravity pulls the slider down-right along it.
+  const slider = world.add(new RigidBody({ shape: { type: "box", width: 20, height: 20 }, x: 0, y: 0 }));
+  const joint = world.addJoint(new PrismaticJoint({ a: rail, b: slider, axisX: 1, axisY: 1, lowerLimit: -50, upperLimit: 80 }));
+  for (let index = 0; index < 240; index += 1) {
+    world.step(1 / 60);
+    assert.ok(Math.abs(slider.position.x - slider.position.y) < 0.5, "stays on the diagonal");
+    assert.ok(Math.abs(slider.angle) < 0.01, "does not rotate");
+  }
+  assert.ok(Math.abs(joint.translation - 80) < 1, `stops at the upper limit (${joint.translation})`);
+  joint.setMotor(-100, 1e6);
+  for (let index = 0; index < 180; index += 1) world.step(1 / 60);
+  assert.ok(Math.abs(joint.translation + 50) < 1, `the motor drives it to the lower limit (${joint.translation})`);
+  joint.setLimits(null, null).setMotor(0, 0);
+  assert.throws(() => joint.setLimits(10, -10), /lowerLimit/);
+  assert.throws(() => new PrismaticJoint({ a: rail, b: slider, axisX: 0, axisY: 0 }), /axis/);
+
+  const elevatorWorld = new RigidBodyWorld({ gravityY: 980 });
+  const shaft = elevatorWorld.add(new RigidBody({ shape: { type: "box", width: 10, height: 10 }, x: 0, y: 0, static: true }));
+  const cabin = elevatorWorld.add(new RigidBody({ shape: { type: "box", width: 60, height: 10 }, x: 0, y: 200 }));
+  const lift = elevatorWorld.addJoint(new PrismaticJoint({ a: shaft, b: cabin, axisX: 0, axisY: 1, motorSpeed: -60, maxMotorForce: 1e8 })); // weight is ~1e6
+  const crate = elevatorWorld.add(new RigidBody({ shape: { type: "box", width: 20, height: 20 }, x: 0, y: 185 }));
+  for (let index = 0; index < 120; index += 1) elevatorWorld.step(1 / 60);
+  assert.ok(Math.abs(cabin.velocity.y + 60) < 1, `the elevator rises at motor speed (${cabin.velocity.y})`);
+  assert.ok(cabin.position.y < 90 && crate.position.y < cabin.position.y, "and carries the crate");
+  assert.ok(Math.abs(cabin.position.x) < 0.01 && Math.abs(cabin.angle) < 0.001);
+  void lift;
 });

@@ -834,16 +834,37 @@ export class RigidBodyWorld {
   remove(body: RigidBody): boolean;
   clear(): void;
   queryPoint(x: number, y: number, out?: RigidBody[]): RigidBody[];
-  readonly joints: Array<RevoluteJoint | DistanceJoint>;
-  addJoint<T extends RevoluteJoint | DistanceJoint>(joint: T): T;
-  removeJoint(joint: RevoluteJoint | DistanceJoint): boolean;
+  readonly joints: RigidJointKind[];
+  addJoint<T extends RigidJointKind>(joint: T): T;
+  removeJoint(joint: RigidJointKind): boolean;
   step(delta: number): this;
 }
 export function collideRigidBodies(a: RigidBody, b: RigidBody, manifold?: RigidContactManifold, margin?: number): RigidContactManifold | null;
 export const MAX_RIGID_JOINTS: number;
+export type RigidJointKind = RevoluteJoint | WeldJoint | PrismaticJoint | DistanceJoint;
 export class RevoluteJoint {
   readonly a: RigidBody; readonly b: RigidBody; readonly collideConnected: boolean; world: RigidBodyWorld | null;
-  constructor(options: { a: RigidBody; b: RigidBody; x: number; y: number; collideConnected?: boolean });
+  /** Target angular velocity of b relative to a (rad/s); used while maxMotorTorque > 0. */ motorSpeed: number;
+  maxMotorTorque: number;
+  /** b.angle - a.angle */ readonly angle: number;
+  constructor(options: { a: RigidBody; b: RigidBody; x: number; y: number; collideConnected?: boolean; motorSpeed?: number; maxMotorTorque?: number });
+  setMotor(speed: number, maxTorque?: number): this;
+  worldAnchors(): { ax: number; ay: number; bx: number; by: number };
+}
+/** Locks position and relative angle; x/y default to the midpoint of the two bodies. */
+export class WeldJoint extends RevoluteJoint {
+  readonly referenceAngle: number;
+  constructor(options: { a: RigidBody; b: RigidBody; x?: number; y?: number; collideConnected?: boolean });
+  /** Always throws: a weld has no motor. */ setMotor(speed: number, maxTorque?: number): never;
+}
+/** b slides along an axis fixed in a's frame and keeps its angle relative to a. */
+export class PrismaticJoint {
+  readonly a: RigidBody; readonly b: RigidBody; readonly collideConnected: boolean; world: RigidBodyWorld | null;
+  lowerLimit: number | null; upperLimit: number | null; motorSpeed: number; maxMotorForce: number; readonly referenceAngle: number;
+  /** Signed offset of b's anchor from a's anchor along the axis. */ readonly translation: number;
+  constructor(options: { a: RigidBody; b: RigidBody; x?: number; y?: number; axisX?: number; axisY?: number; lowerLimit?: number | null; upperLimit?: number | null; motorSpeed?: number; maxMotorForce?: number; collideConnected?: boolean });
+  setLimits(lower?: number | null, upper?: number | null): this;
+  setMotor(speed: number, maxForce?: number): this;
   worldAnchors(): { ax: number; ay: number; bx: number; by: number };
 }
 export class DistanceJoint {
