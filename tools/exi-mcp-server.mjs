@@ -5,7 +5,7 @@ import { createServer as createNetServer } from "node:net";
 import path from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
-import { isPublicMethod } from "../src/ai/public-methods.js";
+import { isAgentCallableExport, isPublicMethod } from "../src/ai/public-methods.js";
 import * as engineExports from "../src/index.js";
 
 const configuredRoot = process.env.EXI_MCP_ROOT || process.env.CLAUDE_PROJECT_DIR;
@@ -1060,7 +1060,7 @@ function publicStaticProperties(value) {
 
 function manifest() {
   return Object.entries(engineExports)
-    .filter(([name]) => !name.startsWith("_") && !forbiddenKeys.has(name))
+    .filter(([name]) => !name.startsWith("_") && !forbiddenKeys.has(name) && isAgentCallableExport(name))
     .map(([name, value]) => {
       const kind = typeof value === "function" ? (isClass(value) ? "class" : "function") : typeof value;
       const methods = publicPrototypeMethods(value);
@@ -1147,7 +1147,7 @@ function assertPublicPath(value, label = "path") {
 
 function resolveExportPath(value) {
   const segments = assertPublicPath(value);
-  let current = engineExports[segments[0]];
+  let current = isAgentCallableExport(segments[0]) ? engineExports[segments[0]] : undefined;
   if (current === undefined) fail(`Public export not found: ${value}`);
   let parent = null;
   for (const segment of segments.slice(1)) {
@@ -2159,7 +2159,8 @@ async function callTool(name, rawArguments = {}, context = {}) {
   }
   if (name === "exi_create") return resultValue(await createExported(args.type, resolveArgs(args.args)));
   if (name === "exi_function") {
-    const fn = engineExports[assertPublicName(args.name, "name")];
+    const functionName = assertPublicName(args.name, "name");
+    const fn = isAgentCallableExport(functionName) ? engineExports[functionName] : undefined;
     if (typeof fn !== "function" || isClass(fn)) fail(`Public function not found: ${args.name}`);
     return resultValue(await fn(...resolveArgs(args.args)));
   }

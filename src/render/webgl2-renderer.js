@@ -2,6 +2,7 @@ import { buildRenderBatches, collectRenderGroups, createRenderBatchState } from 
 import { getScissorRect } from "./scissor.js";
 import { INSTANCE_STRIDE } from "./instanced.js";
 import { renderGroupWithPostProcess, TRANSPARENT_CLEAR, TRANSPARENT_RGBA } from "./post-process.js";
+import { customFilterVersion, getCustomFilters, glslCustomFilterCode } from "./custom-filters.js";
 import { filterMode } from "../core/node.js";
 import { clearColorChannels, DEFAULT_CLEAR_COLOR, normalizeClearAlpha, normalizeClearColor } from "./clear.js";
 
@@ -166,6 +167,31 @@ function compileShader(gl, type, source) {
   }
 }
 
+// The built-in fragment shader plus registered custom filter functions/branches.
+export function buildFragmentSource(customFilters = []) {
+  const { functions, dispatch } = glslCustomFilterCode(customFilters);
+  if (!functions) return fragmentSource;
+  return fragmentSource
+    .replace("void main() {", `${functions}\nvoid main() {`)
+    .replace("  if (u_mask_rect.z > 0.0", `${dispatch}  if (u_mask_rect.z > 0.0`);
+}
+
+function programLocations(gl, program, instancedProgram) {
+  const locations = {
+    filterLocation: gl.getUniformLocation(program, "u_filter"), resolutionLocation: gl.getUniformLocation(program, "u_resolution"),
+    textureLocation: gl.getUniformLocation(program, "u_texture"), maskLocation: gl.getUniformLocation(program, "u_mask"), maskRectLocation: gl.getUniformLocation(program, "u_mask_rect"),
+    positionLocation: gl.getAttribLocation(program, "a_position"), uvLocation: gl.getAttribLocation(program, "a_uv"), colorLocation: gl.getAttribLocation(program, "a_color"),
+    instanceFilterLocation: gl.getUniformLocation(instancedProgram, "u_filter"), instanceResolutionLocation: gl.getUniformLocation(instancedProgram, "u_resolution"),
+    instanceTextureLocation: gl.getUniformLocation(instancedProgram, "u_texture"), instanceMaskLocation: gl.getUniformLocation(instancedProgram, "u_mask"), instanceMaskRectLocation: gl.getUniformLocation(instancedProgram, "u_mask_rect"),
+    instanceOriginLocation: gl.getAttribLocation(instancedProgram, "a_origin"), instanceAxisXLocation: gl.getAttribLocation(instancedProgram, "a_axis_x"),
+    instanceAxisYLocation: gl.getAttribLocation(instancedProgram, "a_axis_y"), instanceUvRectLocation: gl.getAttribLocation(instancedProgram, "a_uv_rect"), instanceColorLocation: gl.getAttribLocation(instancedProgram, "a_color"),
+  };
+  for (const [key, value] of Object.entries(locations)) {
+    if (value === null || value === undefined || value === -1) throw new Error(`WebGL shader location ${key} could not be resolved.`);
+  }
+  return locations;
+}
+
 // 1 when the texture (or the atlas it belongs to) is a RenderTexture target.
 export function isRenderTargetTexture(texture) {
   return texture?.renderTarget || texture?.baseTexture?.renderTarget ? 1 : 0;
@@ -262,6 +288,9 @@ export class WebGL2Renderer {
     this.renderGroups = this.batchState.renderGroups;
     this.metrics = { drawCalls: 0, batchCount: 0, vertexCount: 0, instanceCount: 0, instancedBatchCount: 0, instanceDataBytes: 0, nodeCount: 0, culledCount: 0, scissorCount: 0, staticBufferCount: 0, renderGroupPassCount: 0, postProcessPassCount: 0 };
     this.info = {};
+    this.customFilterVersion = 0;
+    this.customFilterStatus = new Map();
+    this.customFilterErrors = new Map();
     this.handleContextLost = (event) => {
       if (this.destroyed) return;
       event.preventDefault();
@@ -276,6 +305,7 @@ export class WebGL2Renderer {
       if (this.destroyed) return;
       try {
         this.buildResources();
+        this.customFilterVersion = 0;
         this.lost = false;
         this.onStatus({ type: "context-restored", backend: "webgl2" });
       } catch (error) {
@@ -443,6 +473,50 @@ export class WebGL2Renderer {
       this.textureUploadBytes += baseTexture.sourceWidth * baseTexture.sourceHeight * 4;
     }
     this.textureVersions.set(baseTexture, baseTexture.version);
+  }
+
+  // Recompiles the programs when custom filters were registered. A filter that
+  // does not compile is disabled (status "error") and the rest keep working.
+  syncCustomFilters() {
+    const version = customFilterVersion();
+    if (version === this.customFilterVersion || !this.gl || this.lost) return;
+    this.customFilterVersion = version;
+    const gl = this.gl;
+    let candidates = getCustomFilters().filter((filter) => this.customFilterStatus.get(filter.name) !== "error");
+    const build = (list) => {
+      const fragment = buildFragmentSource(list);
+      let program = null; let instancedProgram = null;
+      try {
+        program = createProgram(gl, vertexSource, fragment);
+        instancedProgram = createProgram(gl, instancedVertexSource, fragment);
+        const locations = programLocations(gl, program, instancedProgram);
+        if (this.program) gl.deleteProgram(this.program);
+        if (this.instancedProgram) gl.deleteProgram(this.instancedProgram);
+        this.program = program; this.instancedProgram = instancedProgram;
+        Object.assign(this, locations);
+      } catch (error) {
+        if (program) gl.deleteProgram(program);
+        if (instancedProgram) gl.deleteProgram(instancedProgram);
+        throw error;
+      }
+    };
+    try {
+      build(candidates);
+    } catch {
+      // Find the filters that do not compile on their own and drop them.
+      candidates = candidates.filter((filter) => {
+        try { const shader = compileShader(gl, gl.FRAGMENT_SHADER, buildFragmentSource([filter])); gl.deleteShader(shader); return true; }
+        catch (error) { this.customFilterStatus.set(filter.name, "error"); this.customFilterErrors.set(filter.name, String(error.message || error).slice(0, 512)); return false; }
+      });
+      try { build(candidates); } catch { candidates = []; }
+    }
+    for (const filter of candidates) this.customFilterStatus.set(filter.name, "ok");
+  }
+
+  getCustomFilterStatus() {
+    const result = {};
+    for (const filter of getCustomFilters()) result[filter.name] = { status: this.customFilterStatus.get(filter.name) || "pending", error: this.customFilterErrors.get(filter.name) || null };
+    return result;
   }
 
   getTexture(texture) {
@@ -733,6 +807,7 @@ export class WebGL2Renderer {
   }
 
   render(time, scene, camera, target = null, processGroups = true, offscreenRoot = false, clear = this.clearBeforeRender, accumulateMetrics = false) {
+    if (this.customFilterVersion !== customFilterVersion()) this.syncCustomFilters();
     if (this.destroyed || this.lost || !this.gl) return;
     this.assertResourceBudget();
     if (processGroups && !accumulateMetrics) { this.metrics.renderGroupPassCount = 0; this.metrics.postProcessPassCount = 0; }

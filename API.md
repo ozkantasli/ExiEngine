@@ -226,6 +226,20 @@ score.setStyle({ align: "center", maxWidth: 240, anchorX: 0.5 });
 
 Reads AngelCode BMFont data (BMFont, Hiero, msdf-bmfont, Littera ...) in the text `.fnt` form or the common JSON shape, with kerning pairs. `BitmapText` extends `SpriteBatch`, so a label is one batched draw with no Canvas 2D rasterization at runtime, ideal for pixel fonts and frequently changing HUD numbers. Options: `align` (`left`/`center`/`right`), `maxWidth` word wrap (long words are broken), `letterSpacing`, `lineHeight`, `anchorX`/`anchorY`, `tint`; `textWidth`, `textHeight` and `missingGlyphs` describe the last layout, and missing glyphs fall back to `?` when the font has one. `font.layout()`/`measure()` give the same placements without a node. Limits: single-page fonts (pack multi-page fonts into one texture), `MAX_BITMAP_FONT_GLYPHS` glyphs, `MAX_BITMAP_TEXT_LENGTH` characters; glyph rectangles must lie inside the texture. Use `Text` instead when you need system fonts or complex script shaping.
 
+### Custom filters: `registerFilter`
+
+```js
+registerFilter("scanlines", {
+  glsl: "float line = mod(floor(uv.y / texel.y), 4.0) < 2.0 ? 1.0 - 0.6 * amount : 1.0; return vec4(color.rgb * line, color.a);",
+  wgsl: "let line = select(1.0, 1.0 - 0.6 * amount, (floor(uv.y / texel.y) % 4.0) < 2.0); return vec4f(color.rgb * line, color.a);",
+});
+const crt = new RenderGroup({ width: 960, height: 540, effects: [{ filter: "scanlines", amount: 0.8 }] });
+sprite.setFilter("scanlines", 0.5);                          // also usable on nodes
+engine.renderer.getCustomFilterStatus();                     // { scanlines: { status: "ok", error: null } }
+```
+
+Registers a filter written as a **function body** for both backends (GLSL ES 3.0 and WGSL) that receives the tinted `color`, the texture `uv`, the filter `amount` (0..1) and the `texel` size and returns the new color; `exiSample(uv)` samples the texture. Registered names work everywhere built-in filters do (`node.filter`, RenderGroup effects, the editor). Guard rails: 2-32 character lowercase names, at most `MAX_CUSTOM_FILTERS` (16) filters and 4 KiB per body; bodies must return a value, keep their braces balanced and cannot use preprocessor directives, `uniform`/`layout`/`precision`, WGSL attributes (`@`) or `enable`/`requires`/`diagnostic`, so they cannot declare anything outside their function. Renderers recompile on the next frame (WebGPU in the background; until then the filter draws unfiltered). A body that fails to compile is disabled on that backend with `status: "error"` and the compiler message, and the rest keeps rendering. `registerFilter` is a local game-code API: the MCP bridge and the browser RuntimeAgent can neither see nor call it, because it compiles caller-supplied shader code (`SECURITY.md`).
+
 ### UI widgets: `Button`, `Slider`, `TextInput`, `ScrollView`
 
 ```js

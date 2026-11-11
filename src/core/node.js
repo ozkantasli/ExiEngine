@@ -101,6 +101,8 @@ function normalizeTabIndex(value) {
 // targets; vignette (11) darkens toward the texture edges.
 export const FILTER_TYPES = Object.freeze(["none", "grayscale", "invert", "brightness", "sepia", "contrast", "saturate", "blur", "glow", "outline", "pixelate", "vignette"]);
 const FILTER_MODES = new Map(FILTER_TYPES.map((name, index) => [name, index]));
+// Used by registerFilter() (src/render/custom-filters.js) to add custom modes.
+export function registerFilterMode(name, mode) { FILTER_MODES.set(name, mode); }
 
 export function normalizeFilterType(value) {
   return value !== "none" && FILTER_MODES.has(value) ? value : "none";

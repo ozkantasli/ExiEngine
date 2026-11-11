@@ -285,8 +285,14 @@ try {
   assert.equal(missingResource.error.data.code, "EXI_MCP_RESOURCE_NOT_FOUND");
 
   const api = toolResult(await request("tools/call", { name: "exi_api", arguments: {} }));
-  const runtimeExportNames = Object.keys(engineExports).filter((name) => !name.startsWith("_")).sort();
+  const runtimeExportNames = Object.keys(engineExports).filter((name) => !name.startsWith("_") && name !== "registerFilter").sort();
   assert.deepEqual(api.exports.map((entry) => entry.name).sort(), runtimeExportNames);
+  // registerFilter compiles caller-supplied shader code: hidden from and not callable by agents.
+  assert.ok(!api.exports.some((entry) => entry.name === "registerFilter"));
+  const deniedFunction = await request("tools/call", { name: "exi_function", arguments: { name: "registerFilter", args: ["evil", { glsl: "return color;", wgsl: "return color;" }] } });
+  assert.match(deniedFunction.result.content[0].text, /Public function not found/);
+  const deniedExport = await request("tools/call", { name: "exi_export_call", arguments: { path: "registerFilter", args: [] } });
+  assert.match(deniedExport.result.content[0].text, /Public export not found/);
   assert.ok(api.exports.some((entry) => entry.name === "Scene" && entry.route === "exi_create" && entry.methods.includes("add")));
   assert.ok(api.exports.some((entry) => entry.name === "TextureAtlas" && entry.staticMethods.includes("fromGrid")));
   assert.ok(api.exports.some((entry) => entry.name === "clamp" && entry.route === "exi_function"));
@@ -352,6 +358,7 @@ try {
     .filter((name) => typeof Object.getOwnPropertyDescriptor(value, name)?.value === "function")
     .sort();
   for (const [name, value] of Object.entries(engineExports)) {
+    if (name === "registerFilter") continue; // agent-denied, checked above
     const entry = api.exports.find((candidate) => candidate.name === name);
     assert.ok(entry, `MCP manifest export missing: ${name}`);
     const kind = typeof value === "function" ? (Function.prototype.toString.call(value).startsWith("class ") ? "class" : "function") : typeof value;

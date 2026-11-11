@@ -22,7 +22,8 @@ Content, authoring and game-feature release. Everything stays dependency-free.
   restitution, stable stacking, sensors, layers), `RevoluteJoint`, `DistanceJoint` (rod/rope),
   anti-tunneling (speculative contacts + substeps).
 - **Rendering:** `blur`, `glow`, `outline`, `pixelate`, `vignette` filters (`FILTER_TYPES`),
-  `LightLayer` 2D lighting, `BitmapFont` / `BitmapText` (AngelCode BMFont).
+  `LightLayer` 2D lighting, `BitmapFont` / `BitmapText` (AngelCode BMFont), `registerFilter` custom
+  filter bodies (GLSL + WGSL, bounded, not reachable by AI agents).
 - **Audio:** audio sprites (`addSprites`), slices and loop regions, `playbackRate`, deterministic 2D
   spatial audio (`setListener`, `configureSpatial`, `setVoicePosition`).
 - **Multiplayer:** `RollbackSession`, transport-agnostic rollback netcode with desync detection.

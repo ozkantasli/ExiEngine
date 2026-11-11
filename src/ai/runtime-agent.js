@@ -1,4 +1,4 @@
-import { isPublicMethod } from "./public-methods.js";
+import { isAgentCallableExport, isPublicMethod } from "./public-methods.js";
 import { StateMachine } from "../core/state-machine.js";
 
 // Poll phase machine: idle (not running) → armed (running, timer set) → polling (poll in flight).
@@ -608,7 +608,7 @@ export class RuntimeAgent {
 
   resolveExportPath(value) {
     const segments = assertPublicPath(value);
-    let current = this.api[segments[0]];
+    let current = isAgentCallableExport(segments[0]) ? this.api[segments[0]] : undefined;
     if (current === undefined) fail(`Public export not found: ${value}`);
     let parent = null;
     for (const segment of segments.slice(1)) {
@@ -800,7 +800,8 @@ export class RuntimeAgent {
     }
     if (command.operation === "scenario") return this.serialize(await this.executeScenario(command, args));
     if (command.operation === "function") {
-      const fn = this.api[assertPublicName(command.name, "name")];
+      const functionName = assertPublicName(command.name, "name");
+      const fn = isAgentCallableExport(functionName) ? this.api[functionName] : undefined;
       if (typeof fn !== "function" || isClass(fn)) fail(`Public function not found: ${command.name}`);
       return this.serialize(await fn(...args));
     }

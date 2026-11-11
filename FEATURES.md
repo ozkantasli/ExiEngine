@@ -132,6 +132,7 @@
 - LDtk project import: `tileMapFromLDtk` (Tiles/AutoLayer with flips, offsets, opacity), `ldtkIntGrid` (collision/pathfinding grid) and `ldtkEntities` (positions, sizes, tags, custom fields)
 - Canvas UI widgets `Button`, `Slider`, `TextInput` (with a hidden DOM input for IME, paste and mobile keyboards) and `ScrollView` (wheel/drag scrolling, clipping, off-screen culling) on the engine's pointer capture and focus order
 - Prefabs: named node trees stored in scene documents, editor make/insert/apply-to-all, and `instantiatePrefab()` for runtime spawning
+- `registerFilter()`: bounded custom filter bodies (GLSL + WGSL) compiled into the engine's shaders, with per-backend compile status and fallback; denied to AI agents
 - A dependency-free TypeScript API contract with the root `index.d.ts`
 - Vertex/instance buffers whose capacity is kept in WebGL2, and narrowed in WebGPU according to a 64 MB global limit and the device limit
 

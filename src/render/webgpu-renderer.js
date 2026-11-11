@@ -5,6 +5,7 @@ import { clearColorChannels, DEFAULT_CLEAR_COLOR, normalizeClearAlpha, normalize
 import { filterMode } from "../core/node.js";
 import { Texture } from "../assets/texture.js";
 import { renderGroupWithPostProcess, TRANSPARENT_CLEAR, TRANSPARENT_RGBA } from "./post-process.js";
+import { customFilterVersion, getCustomFilters, wgslCustomFilterCode } from "./custom-filters.js";
 
 const shaderSource = `
 struct Frame { values: vec4f, };
@@ -128,6 +129,15 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
 }
 `;
 
+// The built-in WGSL module plus registered custom filter functions/branches.
+export function buildShaderSource(customFilters = []) {
+  const { functions, dispatch } = wgslCustomFilterCode(customFilters);
+  if (!functions) return shaderSource;
+  return shaderSource
+    .replace("@fragment\nfn fragmentMain", `${functions}\n@fragment\nfn fragmentMain`)
+    .replace("  if (filterParams.maskRect.z > 0.0", `${dispatch}  if (filterParams.maskRect.z > 0.0`);
+}
+
 const cullShaderSource = `
 struct Params {
   viewport: vec4f,
@@ -241,6 +251,10 @@ export class WebGPURenderer {
     this.filterBufferResizes = 0;
     this.filterBindGroup = null;
     this.filterValues = new Float32Array(8);
+    this.customFilterVersion = 0;
+    this.customFilterSync = null;
+    this.customFilterStatus = new Map();
+    this.customFilterErrors = new Map();
     this.vertexBuffer = null;
     this.vertexBufferSize = 0;
     this.vertexBufferResizes = 0;
@@ -399,7 +413,8 @@ export class WebGPURenderer {
       this.pipelines[mode] = this.device.createRenderPipeline({ layout: pipelineLayout, vertex: regularVertex, fragment: { module, entryPoint: "fragmentMain", targets: [{ format: this.format, blend }] }, primitive: { topology: "triangle-list" } });
       this.instancedPipelines[mode] = this.device.createRenderPipeline({ layout: pipelineLayout, vertex: instancedVertex, fragment: { module, entryPoint: "fragmentMain", targets: [{ format: this.format, blend }] }, primitive: { topology: "triangle-list" } });
     }
-    // pipeline/instancedPipeline alias'ları kaldırıldı: getPipeline() ile tablodan türetiliyor (#62 denetimi).
+    this.pipelineConfig = { pipelineLayout, blendStates, regularBuffers: regularVertex.buffers, instancedBuffers: instancedVertex.buffers };
+    // pipeline/instancedPipeline aliases were removed: getPipeline() derives them from the table (#62 audit).
     const cullModule = this.device.createShaderModule({ code: cullShaderSource });
     const indirectModule = this.device.createShaderModule({ code: indirectShaderSource });
     this.cullLayout = this.device.createBindGroupLayout({ entries: [
@@ -442,6 +457,58 @@ export class WebGPURenderer {
       this.textureBytes = Math.max(0, this.textureBytes - (this.textureByteSizes.get(texture) || 0));
       this.textureByteSizes.delete(texture);
     }
+  }
+
+  createFilterPipelines(module) {
+    const { pipelineLayout, blendStates, regularBuffers, instancedBuffers } = this.pipelineConfig;
+    const pipelines = {}; const instancedPipelines = {};
+    for (const [mode, blend] of Object.entries(blendStates)) {
+      pipelines[mode] = this.device.createRenderPipeline({ layout: pipelineLayout, vertex: { module, entryPoint: "vertexMain", buffers: regularBuffers }, fragment: { module, entryPoint: "fragmentMain", targets: [{ format: this.format, blend }] }, primitive: { topology: "triangle-list" } });
+      instancedPipelines[mode] = this.device.createRenderPipeline({ layout: pipelineLayout, vertex: { module, entryPoint: "instancedVertexMain", buffers: instancedBuffers }, fragment: { module, entryPoint: "fragmentMain", targets: [{ format: this.format, blend }] }, primitive: { topology: "triangle-list" } });
+    }
+    return { pipelines, instancedPipelines };
+  }
+
+  async compiles(code) {
+    const module = this.device.createShaderModule({ code });
+    const info = await module.getCompilationInfo?.();
+    return !(info?.messages || []).some((message) => message.type === "error");
+  }
+
+  // Rebuilds the render pipelines in the background when custom filters were
+  // registered; until it finishes the previous pipelines keep drawing (new
+  // filters render unfiltered). Filters that do not compile are disabled.
+  syncCustomFilters() {
+    const version = customFilterVersion();
+    if (version === this.customFilterVersion || this.customFilterSync || !this.device || !this.pipelineConfig) return;
+    const target = version;
+    this.customFilterSync = (async () => {
+      const good = [];
+      for (const filter of getCustomFilters()) {
+        if (this.customFilterStatus.get(filter.name) === "error") continue;
+        if (this.customFilterStatus.get(filter.name) === "ok" || await this.compiles(buildShaderSource([filter]))) good.push(filter);
+        else { this.customFilterStatus.set(filter.name, "error"); this.customFilterErrors.set(filter.name, "WGSL body did not compile."); }
+      }
+      if (this.destroyed || !this.device) return;
+      this.device.pushErrorScope("validation");
+      let built = null;
+      try { built = this.createFilterPipelines(this.device.createShaderModule({ code: buildShaderSource(good) })); }
+      finally {
+        const error = await this.device.popErrorScope();
+        if (!error && built && !this.destroyed) {
+          this.pipelines = built.pipelines;
+          this.instancedPipelines = built.instancedPipelines;
+          for (const filter of good) this.customFilterStatus.set(filter.name, "ok");
+        }
+      }
+      this.customFilterVersion = target;
+    })().catch(() => { this.customFilterVersion = target; }).finally(() => { this.customFilterSync = null; });
+  }
+
+  getCustomFilterStatus() {
+    const result = {};
+    for (const filter of getCustomFilters()) result[filter.name] = { status: this.customFilterStatus.get(filter.name) || "pending", error: this.customFilterErrors.get(filter.name) || null };
+    return result;
   }
 
   getSampler(filter) { return this.samplers?.[filter === "nearest" ? "nearest" : "linear"] || this.sampler; }
@@ -863,6 +930,7 @@ export class WebGPURenderer {
   }
 
   render(time, scene, camera, target = null, processGroups = true, offscreenRoot = false, clear = this.clearBeforeRender, accumulateMetrics = false) {
+    if (this.customFilterVersion !== customFilterVersion()) this.syncCustomFilters();
     if (this.destroyed || this.lost || !this.device || !this.context) return;
     this.assertResourceBudget();
     try {

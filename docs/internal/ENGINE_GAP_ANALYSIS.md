@@ -39,7 +39,7 @@ Legend: ✅ built in · 🔌 official/common plugin or companion package · ➖ 
 | LDtk import | ✅ tiles, IntGrid, entities | 🔌 | 🔌 | 🔌 | — | — | — | — | 🔌 |
 | Bitmap fonts (BMFont) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Filters / post FX (blur, glow, outline…) | ✅ fixed catalogue | ✅ | ✅ (+custom) | ➖ | ➖ (custom shaders) | ➖ | ✅ | ✅ | ✅ |
-| User-written shaders | — (by design so far) | ✅ | ✅ | ✅ | ✅ | ➖ | ➖ | ✅ | ✅ |
+| User-written shaders | ✅ `registerFilter` bodies (local code only) | ✅ | ✅ | ✅ | ✅ | ➖ | ➖ | ✅ | ✅ |
 | 2D lighting / normal maps | ➖ `LightLayer` point lights (no normal maps/shadows) | ✅ | 🔌 | — | — | — | ✅ | ✅ | ✅ |
 | Skeletal animation (Spine/DragonBones) | — | 🔌 | 🔌 | 🔌 | — | 🔌 | ✅ | ✅ | ✅ |
 | Audio sprites / spatial audio | ✅ (2D, deterministic) | ✅ | 🔌 | ✅ | ➖ | ✅ | ✅ | ✅ | ✅ |
@@ -90,9 +90,8 @@ Legend: ✅ built in · 🔌 official/common plugin or companion package · ➖ 
 7. ~~LDtk import~~ ✅ shipped (tiles, IntGrid, entities).
 
 **P2 — strategic**
-8. **Custom shaders.** Deliberately excluded so far (security contract: no remote shaders,
-   both GLSL and WGSL needed). A local, allowlisted, bounded filter registration API is the
-   likely shape; it needs an explicit design decision.
+8. **Custom shaders.** ✅ `registerFilter` shipped as a bounded, local-only API (hidden from
+   agents). Custom vertex shaders and multi-pass materials remain out of scope.
 9. **Netcode.** ✅ `RollbackSession` shipped (rollback over any transport). Still open: a
    reference WebSocket/WebRTC transport, lobby/matchmaking and an example game.
 10. **Real-device evidence.** Mobile/GPU hardware matrix is still mostly empty.
@@ -104,7 +103,7 @@ Legend: ✅ built in · 🔌 official/common plugin or companion package · ➖ 
 3. Editor v3: prefabs, asset browser, simple data-driven behaviours (play/hot reload ✅).
 4. More joint types (prismatic, weld, motors) in `RigidBodyWorld`.
 5. Spine runtime adapter as an optional package (keeps the core dependency-free).
-6. Decide the custom-shader policy; if accepted, ship a bounded `registerFilter` API.
+6. ~~Custom-shader policy~~ ✅ decided: local `registerFilter`, denied to agents.
 7. Normal-mapped sprites and simple shadow casting on top of `LightLayer`.
 8. Netcode example (two browser tabs over a local WebSocket relay) on top of `RollbackSession`.
 

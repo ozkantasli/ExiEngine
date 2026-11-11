@@ -26,3 +26,11 @@ const internalMethods = new Map([
 export function isPublicMethod(ownerName, method) {
   return typeof method === "string" && !method.startsWith("_") && !internalMethods.get(ownerName)?.has(method);
 }
+
+// Exported functions that AI agents (MCP bridge and the browser RuntimeAgent)
+// may not call or see: registerFilter compiles caller-supplied shader code, so
+// it stays a local, reviewed game-code API.
+const agentDeniedExports = new Set(["registerFilter"]);
+export function isAgentCallableExport(name) {
+  return typeof name === "string" && !agentDeniedExports.has(name);
+}

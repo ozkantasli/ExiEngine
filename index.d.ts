@@ -973,3 +973,10 @@ export class TextInput extends Node {
   constructor(options?: NodeOptions & { value?: string; placeholder?: string; width?: number; height?: number; maxLength?: number; onChange?: ((value: string, input: TextInput) => void) | null; onSubmit?: ((value: string, input: TextInput) => void) | null; domProxy?: boolean; theme?: Partial<UITheme> | null });
   setValue(value: string, options?: { silent?: boolean }): this; focusProxy(): void; redraw(): this;
 }
+
+export const MAX_CUSTOM_FILTERS: number;
+/** Local game-code API (not reachable from MCP/RuntimeAgent). Bodies are function bodies:
+ * GLSL `vec4 f(vec4 color, vec2 uv, float amount, vec2 texel)`, WGSL `fn f(color: vec4f, uv: vec2f, amount: f32, texel: vec2f) -> vec4f`;
+ * `exiSample(uv)` samples the current texture in both. */
+export function registerFilter(name: string, source: { glsl: string; wgsl: string }): { name: string; mode: number };
+export function listFilters(): string[];

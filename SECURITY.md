@@ -10,7 +10,7 @@ The engine treats game assets, atlas JSON, save data and pointer/keyboard input 
 2. Asset response byte counts, image sizes and atlas frame counts are limited.
 3. The renderer enforces a total GPU texture byte/count budget; atlas subtextures count as a single `baseTexture` resource.
 4. Redirects, data URLs and unsupported protocols are rejected.
-4. Shader and WGSL text is never built from user/asset data.
+4. Shader and WGSL text is never built from asset, network or AI-agent data. The only extension point is `registerFilter()`, a local game-code API that inserts bounded function bodies (see "Custom filters" below); the MCP bridge and the browser RuntimeAgent cannot see or call it.
 5. Save data is stored only as JSON; the namespace is limited to 64 characters, key names to 128 characters, and values by byte size. `maxBytes` is tied to an absolute 16 MiB ceiling; set/get JSON depth is limited to 64 and a rough node/token budget of 100,000 before `JSON.parse()`, and directly raising the public `maxBytes` is rejected.
 6. Pointer capture/cancel, visibility and `pagehide` transitions clear stuck keyboard/pointer/gamepad state.
 7. Input action names, binding counts, raw keyboard state and keyboard/gamepad indexes are bounded; action bindings remain data and run no callbacks/eval/scripts. Gamepad hot-plug callbacks only receive the engine's snapshot with the 128-character ID, 32-axis and 64-button limits applied. `Input.destroy()` is idempotent, and native callbacks that arrive late after teardown cannot recreate the input state maps.
@@ -46,7 +46,7 @@ The engine treats game assets, atlas JSON, save data and pointer/keyboard input 
 The MCP bridge and the browser `RuntimeAgent` limit the inline byte payload of typed-array/`DataView` outputs with `maxInlineBinaryBytes=32 KiB`; larger values only carry `truncated` metadata. This limit is in addition to the general tool/runtime result limits and does not raise the 512 KiB limit of binary input. BigInt typed-array sample values are converted to strings to prevent JSON serialization errors.
 
 - Script, WASM or executable content inside assets is never run.
-- There is no user shader, HTML template or arbitrary JavaScript engine API.
+- There is no HTML template or arbitrary JavaScript engine API. User shader code is limited to `registerFilter()` function bodies registered by the game's own code (not reachable by agents).
 - The audio and image loaders do not extend remote-origin trust on their own.
 - Production authentication, CDN signature verification and service-worker isolation are not the engine's job; they must be done in the distribution layer.
 - MCP client authentication, user/agent authorization and process isolation are not the engine's job; only connect the bridge to a trusted local agent and constrain it separately with OS/container permissions in production.
@@ -106,7 +106,7 @@ Renderer context/device loss errors are marked with backend and phase/reason inf
 
 Node alpha values are normalized to `[0, 1]`; parent alpha is multiplied into children as `worldAlpha` and included in the regular/static/instanced render cache keys. Zero alpha is filtered from the render queue; user input cannot produce unbounded color or GPU stream values.
 
-Node filters only reach the allowlisted `grayscale`, `invert`, `brightness`, `sepia`, `contrast` and `saturate` shader branches; the filter amount is normalized to `[0, 1]`. The WebGPU filter uniform buffer is reused according to the batch count and limited to 16 MiB; user input cannot create dynamic shaders or unbounded GPU allocations.
+Node filters only reach the built-in shader branches (`FILTER_TYPES`) and filters registered with `registerFilter()`; the filter amount is normalized to `[0, 1]`. The WebGPU filter uniform buffer is reused according to the batch count and limited to 16 MiB; user input cannot create dynamic shaders or unbounded GPU allocations.
 
 `Node.clipRect`, `maskRect`, `cullBounds` and `hitArea` are validated as finite, positive rectangles bounded by `MAX_WORLD_COORDINATE` at the world update boundary as well as in the constructor/setters; direct public field mutation is normalized without allocation or rejected. `maskTexture` is validated as a real `Texture`/`RenderTexture` instance at the constructor/setter and world update boundary; inherited mask texture/rect arguments go through the same check. It is only sampled through the existing bind path, creates no mask buffer or recursive pass allocation, and a source/target feedback loop on the same RenderTexture is rejected in both backends.
 
@@ -231,3 +231,13 @@ For APIs that take callbacks, the only exception is selecting a function the bro
 ### Upload integrity guard
 
 `expectedSha256` is an optional content integrity check; only a 64-hexadecimal SHA-256 digest is accepted. Direct text/asset writes compare the hash before the temporary-file rename, and chunk uploads compare the incremental hash before commit. On a mismatch `EXI_MCP_UPLOAD_INTEGRITY` is returned and the target file is not changed. This check does not turn MCP's trusted-local-process boundary into a sandbox.
+
+## Custom filters (`registerFilter`)
+
+`registerFilter(name, { glsl, wgsl })` is the single place where caller-supplied shader text reaches the GPU. It is designed for code that ships with the game, not for runtime or remote content:
+
+- It is denied to AI agents: `isAgentCallableExport()` in `src/ai/public-methods.js` hides it from the MCP `exi_api` manifest and rejects it in `exi_function`, `exi_export_call` and the browser RuntimeAgent. Do not wire it to network, save-file or user-generated input.
+- Only a function body is accepted, for both backends. Bodies are limited to 4 KiB, at most 16 filters exist, names are `^[a-z][a-z0-9-]{1,31}$` and cannot shadow built-ins.
+- Bodies must keep braces balanced (they cannot close their function and declare top-level code), must `return`, and may not contain `#` directives, backslashes, `uniform`, `layout`, `precision`, WGSL attributes (`@`) or `enable`/`requires`/`diagnostic`.
+- Compilation happens inside the engine's own programs; a body that fails to compile is disabled on that backend (status `error`) while everything else keeps rendering, and the previous working programs/pipelines are kept until a rebuild succeeds.
+- GPU code runs in the browser's GPU sandbox; the remaining risk of a hostile body is performance (an expensive loop). Treat filter bodies like the rest of your shipped code: reviewed and versioned.
