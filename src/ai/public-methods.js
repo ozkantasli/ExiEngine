@@ -4,7 +4,7 @@ const internalMethods = new Map([
   ["AnimatedSprite", new Set(["assertFrameLimit"])],
   ["Animator", new Set(["assertTweenLimit"])],
   ["AssetLoader", new Set(["assertCacheBudget", "assertConfigBudget", "cacheTexture", "createRequestSignal", "decoderKey", "ensureActive", "getCachedTexture", "resolveJSONBytes", "resolveJSONDepth", "resolveJSONNodes", "resolveMaxBytes", "trackPending"])],
-  ["AudioManager", new Set(["assertBudget", "ensureActive", "ensureContextWithoutBuses", "stopVoicesForBuffer"])],
+  ["AudioManager", new Set(["applyVoiceMix", "assertBudget", "ensureActive", "ensureContextWithoutBuses", "stopVoicesForBuffer"])],
   ["ExiEngine", new Set(["detectCanvasSizing", "dispatchKeyEvent", "dispatchPointerEvent", "dispatchPointerInput", "dispatchPointerState", "fallbackToWebGL", "pointerHandlerName", "pointerHoverTargetFor", "pointerTargetFor", "replaceCanvas", "reportRuntimeError", "resolvePointerHit", "resolvePointerHoverHit", "selectBackend"])],
   ["GlyphAtlas", new Set(["assertBudget", "getGlyph", "renderText"])],
   ["Graphics", new Set(["getRenderItems", "getStaticRenderKey"])],

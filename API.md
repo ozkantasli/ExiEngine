@@ -204,13 +204,27 @@ Scales a panel texture with `left/right/top/bottom` borders. Use `setBorders`, `
 ### `Text`, `TextCache`, `GlyphAtlas`
 
 ```js
-const score = new Text({ text: "SCORE 000", fontFamily: "sans-serif", fontSize: 24, fill: "#fff" });
+const score = new Text({ text: "SCORE 000", font: "24px sans-serif", fill: "#fff" });
 score.setStyle({ wordWrap: true, maxWidth: 240 });
 hud.add(score);
 score.setText("SCORE 001");
 ```
 
 `Text.setText`, `setStyle` and `redraw` manage the Canvas 2D raster cache. `TextCache` shares repeated identical style/text pairs with bounded reference counting. `GlyphAtlas` reduces glyph rasterization and provides `getInfo`, `clear` and `destroy`. The Canvas fallback is kept for complex shaping.
+
+### `BitmapFont`, `BitmapText`
+
+```js
+const fontTexture = await loader.loadTexture("/fonts/pixel.png");
+const fontSource = new TextDecoder().decode(await loader.loadBytes("/fonts/pixel.fnt"));
+const font = BitmapFont.fromText(fontTexture, fontSource);          // or BitmapFont.fromJSON(texture, json)
+const score = new BitmapText({ font, text: "SCORE 000", x: 16, y: 16, tint: 0xfacc15 });
+hud.add(score);
+score.setText("SCORE 001");                                         // relayouts only when the text changes
+score.setStyle({ align: "center", maxWidth: 240, anchorX: 0.5 });
+```
+
+Reads AngelCode BMFont data (BMFont, Hiero, msdf-bmfont, Littera ...) in the text `.fnt` form or the common JSON shape, with kerning pairs. `BitmapText` extends `SpriteBatch`, so a label is one batched draw with no Canvas 2D rasterization at runtime, ideal for pixel fonts and frequently changing HUD numbers. Options: `align` (`left`/`center`/`right`), `maxWidth` word wrap (long words are broken), `letterSpacing`, `lineHeight`, `anchorX`/`anchorY`, `tint`; `textWidth`, `textHeight` and `missingGlyphs` describe the last layout, and missing glyphs fall back to `?` when the font has one. `font.layout()`/`measure()` give the same placements without a node. Limits: single-page fonts (pack multi-page fonts into one texture), `MAX_BITMAP_FONT_GLYPHS` glyphs, `MAX_BITMAP_TEXT_LENGTH` characters; glyph rectangles must lie inside the texture. Use `Text` instead when you need system fonts or complex script shaping.
 
 ### `Graphics`
 
@@ -408,7 +422,25 @@ An optional second physics module next to the axis-aligned `PhysicsWorld`: circl
 
 ### `AudioManager`
 
-Provides `ensureContext`, `createBus`, `getBus`, `getBusNames`, `setBusVolume`, `getBusVolume`, `setBusMuted`, `isBusMuted`, `fadeBus`, `stopBus`, `unlock`, `load`, `loadMany`, `play`, `stopVoice`, `stopAll`, `suspend`, `resume`, `setVoiceVolume`, `setVoicePan`, `has`, `unload` and `destroy`.
+Provides `ensureContext`, `createBus`, `getBus`, `getBusNames`, `setBusVolume`, `getBusVolume`, `setBusMuted`, `isBusMuted`, `fadeBus`, `stopBus`, `unlock`, `load`, `loadMany`, `play`, `stopVoice`, `stopAll`, `suspend`, `resume`, `setVoiceVolume`, `setVoicePan`, `has`, `unload` and `destroy`, plus audio sprites, slices and 2D spatial audio:
+
+```js
+await audio.load("sfx", "/audio/sfx.ogg");
+audio.addSprites("sfx", {
+  jump: { start: 0, duration: 0.35 },
+  coin: { start: 0.5, end: 0.8 },
+  engine: { start: 1, duration: 2, loop: true },              // loops inside its own region
+});
+audio.play("jump", { playbackRate: 0.9 + Math.random() * 0.2 }); // pitch variation
+audio.play("music", { offset: 12, loopStart: 4, loopEnd: 68 }); // intro once, then loop a region
+
+audio.configureSpatial({ refDistance: 64, maxDistance: 900, panDistance: 400 });
+audio.setListener(player.position.x, player.position.y);       // call when the camera/player moves
+const hum = audio.play("engine", { position: { x: 800, y: 300 } });
+audio.setVoicePosition(hum, enemy.position.x, enemy.position.y);
+```
+
+`play()` also accepts `offset`, `duration`, `loopStart`/`loopEnd` and `playbackRate` (0.0625-16, changes pitch); invalid ranges throw before any voice is created. Spatial voices pan by their horizontal offset from the listener (`panDistance`) and fade linearly from full volume at `refDistance` to silence at `maxDistance`; `setVoiceVolume` multiplies with that attenuation. The mix is plain arithmetic on a gain and a `StereoPannerNode`, so it is deterministic and works without `PannerNode`.
 
 The AudioContext is subject to the browser's autoplay policy; `unlock()` must be called after a user gesture. Decode byte, decoded byte, voice, bus and lifecycle limits are enforced.
 

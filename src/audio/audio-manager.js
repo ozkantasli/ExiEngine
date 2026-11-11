@@ -7,7 +7,35 @@ const MAX_AUDIO_DECODED_BYTES = 512 * 1024 * 1024;
 const MAX_AUDIO_BATCH_ENTRIES = 4_096;
 const MAX_AUDIO_BATCH_CONCURRENCY = 16;
 const MAX_AUDIO_FADE_DURATION = 60;
+const MAX_AUDIO_SPRITES = 4_096;
+const MIN_PLAYBACK_RATE = 0.0625;
+const MAX_PLAYBACK_RATE = 16;
+const MAX_SPATIAL_DISTANCE = 1e7;
 const safeVolume = (value) => Math.max(0, Math.min(1, Number(value) || 0));
+
+function audioSeconds(value, label, { allowZero = true } = {}) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number < 0 || (!allowZero && number === 0) || number > 86_400) throw new RangeError(`${label} must be a finite number of seconds.`);
+  return number;
+}
+
+function spatialNumber(value, label) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || Math.abs(number) > MAX_SPATIAL_DISTANCE) throw new RangeError(`${label} must be a finite coordinate.`);
+  return number;
+}
+
+// 2D spatial audio: pan follows the horizontal offset from the listener and the
+// volume falls off linearly from refDistance (full) to maxDistance (silent).
+// Plain arithmetic instead of a PannerNode keeps it deterministic and cheap.
+function spatialMix(settings, listener, position) {
+  const dx = position.x - listener.x;
+  const dy = position.y - listener.y;
+  const distance = Math.hypot(dx, dy);
+  const span = Math.max(1e-6, settings.maxDistance - settings.refDistance);
+  const attenuation = distance <= settings.refDistance ? 1 : Math.max(0, 1 - (settings.rolloff * (distance - settings.refDistance)) / span);
+  return { gain: attenuation, pan: Math.max(-1, Math.min(1, dx / settings.panDistance)) };
+}
 const safePan = (value) => Math.max(-1, Math.min(1, Number(value) || 0));
 
 function normalizeAudioKey(value) {
@@ -67,6 +95,9 @@ export class AudioManager {
     // Tek ses kayıt tablosu: source → { buffer, gain, panner, output, cleanup, phase }.
     // Semantics: voices üyeliği "alive" demektir; cleanup() idempotent olup kaydı siler (#40).
     this.voices = new Map();
+    this.sprites = new Map();
+    this.listener = { x: 0, y: 0 };
+    this.spatialSettings = { refDistance: 64, maxDistance: 1024, rolloff: 1, panDistance: 512 };
     this.buses = new Map();
     this.destroyed = false;
     this.generation = 0;
@@ -238,7 +269,8 @@ export class AudioManager {
   setVoiceVolume(source, volume) {
     const record = this.voices.get(source);
     if (!record) return false;
-    record.gain.gain.value = safeVolume(volume);
+    record.volume = safeVolume(volume);
+    this.applyVoiceMix(source, record);
     return true;
   }
 
@@ -387,29 +419,130 @@ export class AudioManager {
     return { results, errors };
   }
 
-  play(nameOrBuffer, { volume = 1, loop = false, bus = "sfx", pan = 0 } = {}) {
+  // Named slices of a loaded buffer ("audio sprites"): one file, many sounds.
+  addSprites(sourceName, definitions) {
     this.ensureActive();
-    const buffer = typeof nameOrBuffer === "string" ? this.buffers.get(normalizeAudioKey(nameOrBuffer)) : nameOrBuffer;
+    const source = normalizeAudioKey(sourceName);
+    if (!definitions || typeof definitions !== "object" || Array.isArray(definitions)) throw new TypeError("Audio sprite definitions must be an object.");
+    const entries = Object.entries(definitions);
+    if (this.sprites.size + entries.length > MAX_AUDIO_SPRITES) throw new RangeError(`Audio sprite limit is ${MAX_AUDIO_SPRITES}.`);
+    const normalized = entries.map(([name, definition]) => {
+      const key = normalizeAudioKey(name);
+      if (!definition || typeof definition !== "object") throw new TypeError(`Audio sprite "${key}" must be an object.`);
+      const start = audioSeconds(definition.start ?? 0, `Audio sprite "${key}" start`);
+      const end = definition.end === undefined ? undefined : audioSeconds(definition.end, `Audio sprite "${key}" end`);
+      const duration = definition.duration === undefined ? (end === undefined ? undefined : end - start) : audioSeconds(definition.duration, `Audio sprite "${key}" duration`, { allowZero: false });
+      if (duration === undefined || !(duration > 0)) throw new RangeError(`Audio sprite "${key}" needs a positive duration or an end after start.`);
+      return [key, Object.freeze({ source, start, duration, loop: Boolean(definition.loop) })];
+    });
+    for (const [key, sprite] of normalized) this.sprites.set(key, sprite);
+    return this;
+  }
+
+  hasSprite(name) { return this.sprites.has(String(name)); }
+  removeSprite(name) { return this.sprites.delete(String(name)); }
+
+  setListener(x, y) {
+    this.listener.x = spatialNumber(x, "Audio listener x");
+    this.listener.y = spatialNumber(y, "Audio listener y");
+    for (const [source, record] of this.voices) if (record.position) this.applyVoiceMix(source, record);
+    return this;
+  }
+
+  configureSpatial({ refDistance = this.spatialSettings.refDistance, maxDistance = this.spatialSettings.maxDistance, rolloff = this.spatialSettings.rolloff, panDistance = this.spatialSettings.panDistance } = {}) {
+    const next = { refDistance: Number(refDistance), maxDistance: Number(maxDistance), rolloff: Number(rolloff), panDistance: Number(panDistance) };
+    if (!(next.refDistance >= 0) || !(next.maxDistance > next.refDistance) || !(next.maxDistance <= MAX_SPATIAL_DISTANCE) || !(next.rolloff >= 0 && next.rolloff <= 1) || !(next.panDistance > 0 && next.panDistance <= MAX_SPATIAL_DISTANCE)) {
+      throw new RangeError("Audio spatial settings need 0 <= refDistance < maxDistance, rolloff 0..1 and a positive panDistance.");
+    }
+    this.spatialSettings = next;
+    for (const [source, record] of this.voices) if (record.position) this.applyVoiceMix(source, record);
+    return this;
+  }
+
+  setVoicePosition(source, x, y) {
+    const record = this.voices.get(source);
+    if (!record) return false;
+    record.position = { x: spatialNumber(x, "Audio voice x"), y: spatialNumber(y, "Audio voice y") };
+    this.applyVoiceMix(source, record);
+    return true;
+  }
+
+  setVoicePlaybackRate(source, rate) {
+    const record = this.voices.get(source);
+    if (!record) return false;
+    if (source.playbackRate) source.playbackRate.value = Math.max(MIN_PLAYBACK_RATE, Math.min(MAX_PLAYBACK_RATE, Number(rate) || 1));
+    return true;
+  }
+
+  applyVoiceMix(source, record) {
+    if (!record.position) { record.gain.gain.value = record.volume; return; }
+    const mix = spatialMix(this.spatialSettings, this.listener, record.position);
+    record.gain.gain.value = record.volume * mix.gain;
+    if (record.panner) record.panner.pan.value = mix.pan;
+    else if (mix.pan !== 0 && typeof this.context?.createStereoPanner === "function") this.setVoicePan(source, mix.pan);
+  }
+
+  play(nameOrBuffer, { volume = 1, loop = false, bus = "sfx", pan = 0, offset = 0, duration, loopStart, loopEnd, playbackRate = 1, position = null } = {}) {
+    this.ensureActive();
+    let buffer = nameOrBuffer;
+    let sliceStart = 0;
+    let sliceDuration;
+    let loopRegion = null;
+    let shouldLoop = Boolean(loop);
+    if (typeof nameOrBuffer === "string") {
+      const sprite = this.sprites.get(nameOrBuffer);
+      if (sprite) {
+        buffer = this.buffers.get(sprite.source);
+        sliceStart = sprite.start;
+        sliceDuration = sprite.duration;
+        if (sprite.loop) { shouldLoop = true; loopRegion = [sprite.start, sprite.start + sprite.duration]; }
+      } else {
+        buffer = this.buffers.get(normalizeAudioKey(nameOrBuffer));
+      }
+    }
     if (!buffer) throw new Error("Audio buffer not found.");
+    const bufferDuration = Number.isFinite(Number(buffer.duration)) ? Number(buffer.duration) : Infinity;
+    const startAt = sliceStart + audioSeconds(offset, "Audio offset");
+    if (startAt >= bufferDuration) throw new RangeError("Audio offset is past the end of the buffer.");
+    let playFor = duration === undefined ? sliceDuration : audioSeconds(duration, "Audio duration", { allowZero: false });
+    if (playFor !== undefined && sliceDuration !== undefined) playFor = Math.min(playFor, sliceStart + sliceDuration - startAt);
+    if (loopStart !== undefined || loopEnd !== undefined) {
+      const regionStart = audioSeconds(loopStart ?? 0, "Audio loopStart");
+      const regionEnd = loopEnd === undefined ? bufferDuration : audioSeconds(loopEnd, "Audio loopEnd");
+      if (!(regionEnd > regionStart) || regionEnd > bufferDuration) throw new RangeError("Audio loopEnd must be after loopStart and inside the buffer.");
+      loopRegion = [regionStart, regionEnd];
+      shouldLoop = true;
+    }
+    const rate = Number(playbackRate);
+    if (!Number.isFinite(rate) || rate < MIN_PLAYBACK_RATE || rate > MAX_PLAYBACK_RATE) throw new RangeError(`Audio playbackRate must be between ${MIN_PLAYBACK_RATE} and ${MAX_PLAYBACK_RATE}.`);
+    let voicePosition = null;
+    if (position !== null && position !== undefined) {
+      if (typeof position !== "object") throw new TypeError("Audio position must be { x, y }.");
+      voicePosition = { x: spatialNumber(position.x, "Audio position x"), y: spatialNumber(position.y, "Audio position y") };
+    }
     if (this.voices.size >= this.maxVoices) throw new RangeError(`Audio voice limit is ${this.maxVoices}.`);
     const context = this.ensureContext();
     const output = this.getBus(bus) || this.getBus("master");
     const source = context.createBufferSource();
     const gain = context.createGain();
-    const requestedPan = safePan(pan);
+    const mix = voicePosition ? spatialMix(this.spatialSettings, this.listener, voicePosition) : null;
+    const requestedPan = mix ? mix.pan : safePan(pan);
     const panner = requestedPan === 0 ? null : context.createStereoPanner?.();
-    if (requestedPan !== 0 && !panner) throw new Error("StereoPannerNode is not available.");
+    if (requestedPan !== 0 && !panner && !mix) throw new Error("StereoPannerNode is not available.");
     source.buffer = buffer;
-    source.loop = loop;
-    gain.gain.value = safeVolume(volume);
+    source.loop = shouldLoop;
+    if (loopRegion) { source.loopStart = loopRegion[0]; source.loopEnd = loopRegion[1]; }
+    if (source.playbackRate) source.playbackRate.value = rate;
+    const baseVolume = safeVolume(volume);
+    gain.gain.value = mix ? baseVolume * mix.gain : baseVolume;
     source.connect(gain);
     if (panner) {
       panner.pan.value = requestedPan;
       gain.connect(panner);
       panner.connect(output.gain);
     } else gain.connect(output.gain);
-    // Ses canlılığı yalnızca voices tablosundaki kayıt üyeliğidir; cleanup idempotenttir (#40).
-    const record = { buffer, gain, panner, output: output.gain, phase: "alive", cleanup: null };
+    // Voice liveness is membership in the voices table; cleanup is idempotent.
+    const record = { buffer, gain, panner, output: output.gain, phase: "alive", cleanup: null, volume: baseVolume, position: voicePosition };
     const cleanup = () => {
       if (!this.voices.has(source)) return;
       record.phase = "cleaned";
@@ -417,14 +550,19 @@ export class AudioManager {
       source.onended = null;
       try { source.disconnect?.(); } catch {}
       try { gain.disconnect?.(); } catch {}
-      try { panner?.disconnect?.(); } catch {}
+      try { record.panner?.disconnect?.(); } catch {}
       this.voices.delete(source);
     };
     record.cleanup = cleanup;
     this.voices.set(source, record);
     source.addEventListener?.("ended", cleanup, { once: true });
     source.onended = cleanup;
-    try { source.start(); } catch (error) { cleanup(); throw error; }
+    try {
+      // A looping voice plays until stopped, so it gets no duration argument.
+      if (startAt === 0 && (playFor === undefined || shouldLoop)) source.start();
+      else if (playFor === undefined || shouldLoop) source.start(0, startAt);
+      else source.start(0, startAt, playFor);
+    } catch (error) { cleanup(); throw error; }
     return source;
   }
 

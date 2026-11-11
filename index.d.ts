@@ -625,6 +625,16 @@ export interface AudioBus { name: string; gain: GainNode; parent: string | null;
 export interface AudioProgress { loaded: number; failed: number; total: number; name: string; percent: number; }
 export interface AudioLoadOptions { signal?: AbortSignal | null; integrity?: string | null; }
 export interface AudioEntry { name: string; url: string; integrity?: string | null; }
+export interface AudioPlayOptions {
+  volume?: number; loop?: boolean; bus?: string; pan?: number;
+  /** Seconds into the buffer (or into the sprite) to start from. */ offset?: number;
+  /** Seconds to play; ignored for looping voices. */ duration?: number;
+  loopStart?: number; loopEnd?: number;
+  /** 0.0625..16; also changes pitch. */ playbackRate?: number;
+  /** World position for 2D spatial audio; pan and distance falloff follow setListener(). */ position?: Point | null;
+}
+export interface AudioSpriteDefinition { start?: number; duration?: number; end?: number; loop?: boolean; }
+export interface AudioSpatialSettings { refDistance: number; maxDistance: number; rolloff: number; panDistance: number; }
 export class AudioManager {
   loader: AssetLoader | null; maxBytes: number; maxDecodedBytes: number; maxVoices: number; decodedBytes: number; readonly voiceCount: number; context: AudioContext | null;
   constructor(options?: { loader?: AssetLoader | null; maxBytes?: number; maxDecodedBytes?: number; maxVoices?: number });
@@ -651,7 +661,17 @@ export class AudioManager {
   unload(name: string): boolean;
   load(name: string, url: string, options?: AudioLoadOptions): Promise<AudioBuffer>;
   loadMany(entries: ReadonlyArray<AudioEntry>, options?: { onProgress?: (event: AudioProgress) => void; signal?: AbortSignal | null; stopOnError?: boolean; maxConcurrent?: number }): Promise<{ results: Map<string, AudioBuffer>; errors: Map<string, Error> }>;
-  play(nameOrBuffer: AudioBuffer | string, options?: { volume?: number; loop?: boolean; bus?: string; pan?: number }): AudioBufferSourceNode;
+  play(nameOrBuffer: AudioBuffer | string, options?: AudioPlayOptions): AudioBufferSourceNode;
+  readonly sprites: ReadonlyMap<string, Readonly<{ source: string; start: number; duration: number; loop: boolean }>>;
+  readonly listener: Point;
+  readonly spatialSettings: Readonly<AudioSpatialSettings>;
+  addSprites(sourceName: string, definitions: Record<string, AudioSpriteDefinition>): this;
+  hasSprite(name: string): boolean;
+  removeSprite(name: string): boolean;
+  setListener(x: number, y: number): this;
+  configureSpatial(settings?: Partial<AudioSpatialSettings>): this;
+  setVoicePosition(source: AudioBufferSourceNode, x: number, y: number): boolean;
+  setVoicePlaybackRate(source: AudioBufferSourceNode, rate: number): boolean;
   destroy(): void;
 }
 
@@ -810,3 +830,39 @@ export class RigidBodyWorld {
   step(delta: number): this;
 }
 export function collideRigidBodies(a: RigidBody, b: RigidBody, manifold?: RigidContactManifold): RigidContactManifold | null;
+
+export const MAX_BITMAP_FONT_GLYPHS: number;
+export const MAX_BITMAP_TEXT_LENGTH: number;
+export interface BitmapFontData {
+  info?: { face?: string; size?: number | string };
+  common?: { lineHeight?: number | string; base?: number | string; pages?: number | string };
+  pages?: string[];
+  chars: Array<{ id: number | string; x?: number | string; y?: number | string; width?: number | string; height?: number | string; xoffset?: number | string; yoffset?: number | string; xadvance?: number | string; page?: number | string }>;
+  kernings?: Array<{ first: number | string; second: number | string; amount: number | string }>;
+}
+export interface BitmapGlyph { id: number; width: number; height: number; xOffset: number; yOffset: number; xAdvance: number; frame: Texture | null; }
+export interface BitmapTextLayoutOptions { maxWidth?: number; letterSpacing?: number; lineHeight?: number; align?: "left" | "center" | "right"; }
+export interface BitmapTextLayout { placements: Array<{ glyph: BitmapGlyph; x: number; y: number; line: number }>; width: number; height: number; lines: number; missing: number; }
+export function parseBitmapFontText(source: string): BitmapFontData;
+export class BitmapFont {
+  texture: Texture; face: string; size: number; lineHeight: number; base: number; destroyed: boolean;
+  readonly glyphs: ReadonlyMap<number, BitmapGlyph>;
+  constructor(texture: Texture, data: string | BitmapFontData);
+  static fromText(texture: Texture, source: string): BitmapFont;
+  static fromJSON(texture: Texture, data: BitmapFontData): BitmapFont;
+  getGlyph(codePoint: number): BitmapGlyph | null;
+  getKerning(first: number, second: number): number;
+  layout(text: string, options?: BitmapTextLayoutOptions): BitmapTextLayout;
+  measure(text: string, options?: BitmapTextLayoutOptions): { width: number; height: number; lines: number; missing: number };
+  destroy(): void;
+}
+export interface BitmapTextOptions extends Omit<SpriteBatchOptions, "texture">, BitmapTextLayoutOptions {
+  font: BitmapFont; text?: string; tint?: number | string; anchorX?: number; anchorY?: number;
+}
+export class BitmapText extends SpriteBatch {
+  font: BitmapFont; text: string; textWidth: number; textHeight: number; missingGlyphs: number;
+  constructor(options: BitmapTextOptions);
+  setText(value: string): this;
+  setStyle(style: Partial<BitmapTextLayoutOptions & { tint: number | string; anchorX: number; anchorY: number }>): this;
+  relayout(): this;
+}

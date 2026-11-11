@@ -124,6 +124,8 @@
 - Engine interpolation roots and WebGL2/WebGPU RenderGroup traversal lists are reused as persistent scratch across frames; the scene reference is cleared on transitions (`npm run bench -- frame-scratch`)
 - JSON scene documents with `serializeScene()`/`deserializeScene()` in the same `{ type, options, children }` shape as MCP `exi_build_scene`; textures are referenced by id, callbacks are never stored, and loading validates types, option keys, numbers and node/depth limits without evaluating code
 - Optional rotating rigid bodies with `RigidBodyWorld`/`RigidBody`: circle, box and convex polygon shapes, SAT manifolds with up to two points, sequential impulses with warm starting and a two-point block solver, friction, restitution, damping, sensors, layer/mask filtering, node sync and deterministic fixed steps; usable as `ExiEngine({ physics })`
+- AngelCode BMFont support with `BitmapFont` (text `.fnt` and JSON, kerning, single page) and `BitmapText`, a `SpriteBatch` subclass that lays out glyph quads with alignment, word wrap, letter spacing, anchors, tint and `?` fallback
+- Audio sprites (`addSprites`/`play(name)`), slices (`offset`/`duration`), loop regions (`loopStart`/`loopEnd`), `playbackRate` pitch control and deterministic 2D spatial audio (`setListener`, `configureSpatial`, `setVoicePosition`) on `AudioManager`
 - A dependency-free TypeScript API contract with the root `index.d.ts`
 - Vertex/instance buffers whose capacity is kept in WebGL2, and narrowed in WebGPU according to a 64 MB global limit and the device limit
 
