@@ -8,10 +8,9 @@ import {
   Camera, ExiEngine, FILTER_TYPES, Graphics, NineSliceSprite, Node, Scene, Sprite, Text, Texture, TileMap,
   SCENE_FORMAT, SCENE_FORMAT_VERSION, deserializeScene, getAABB, serializeScene,
 } from "../src/index.js";
+import { AUTOSAVE_KEY, BUILTIN_TILES_ID, EDITOR_CHANNEL, createBuiltinTiles } from "./shared.js";
 
-const AUTOSAVE_KEY = "exi-editor:autosave";
 const MAX_HISTORY = 100;
-const BUILTIN_TILES_ID = "editor:tiles";
 const $ = (selector) => document.querySelector(selector);
 // ExiEngine replaces its canvas when an automatic WebGPU -> WebGL2 fallback
 // happens, so DOM listeners live on the stable .viewport container and the
@@ -28,21 +27,6 @@ const inspector = $("#inspector");
 const textures = new Map();
 let missingTextures = [];
 
-function createBuiltinTiles() {
-  const tile = 32;
-  const colors = ["#4d7c0f", "#78350f", "#9a3412", "#1e3a8a", "#0e7490", "#6b21a8", "#a16207", "#334155"];
-  const source = document.createElement("canvas");
-  source.width = tile * colors.length;
-  source.height = tile;
-  const context = source.getContext("2d");
-  colors.forEach((color, index) => {
-    context.fillStyle = color; context.fillRect(index * tile, 0, tile, tile);
-    context.fillStyle = "rgba(255,255,255,0.18)"; context.fillRect(index * tile, 0, tile, 4);
-    context.fillStyle = "rgba(0,0,0,0.25)"; context.fillRect(index * tile, tile - 3, tile, 3);
-    context.fillStyle = "rgba(255,255,255,0.85)"; context.font = "bold 12px system-ui, sans-serif"; context.fillText(String(index), index * tile + 4, 18);
-  });
-  return new Texture({ id: BUILTIN_TILES_ID, source, filter: "nearest" });
-}
 textures.set(BUILTIN_TILES_ID, createBuiltinTiles());
 
 async function importTextures(files) {
@@ -57,6 +41,7 @@ async function importTextures(files) {
       setStatus(`Could not import ${file.name}: ${error.message}`, true);
     }
   }
+  broadcastTextures();
   // Rebuild so nodes that referenced a missing id pick up the real texture.
   rebuildFrom(serializeScene(docRoot));
   renderTextures();
@@ -143,8 +128,29 @@ function commit(label) {
   if (history.length > MAX_HISTORY) history.shift();
   future = [];
   try { localStorage.setItem(AUTOSAVE_KEY, json); } catch { /* storage is a convenience only */ }
+  broadcastScene(json);
   refreshUi();
   if (label) setStatus(label);
+}
+
+// Live link to Play windows and games that use watchScene({ channel: EDITOR_CHANNEL }).
+const liveChannel = typeof BroadcastChannel === "function" ? new BroadcastChannel(EDITOR_CHANNEL) : null;
+function broadcastScene(json = JSON.stringify(serializeScene(docRoot))) {
+  liveChannel?.postMessage({ type: "exi-scene", name: docRoot.name, document: JSON.parse(json) });
+}
+function broadcastTextures() {
+  if (!liveChannel) return;
+  const items = [];
+  for (const [id, texture] of textures) if (id !== BUILTIN_TILES_ID && texture.source && typeof ImageBitmap === "function" && texture.source instanceof ImageBitmap) items.push({ id, bitmap: texture.source });
+  if (!items.length) return;
+  try { liveChannel.postMessage({ type: "exi-textures", items }); } catch { /* bitmaps that cannot be cloned stay placeholders */ }
+}
+if (liveChannel) {
+  liveChannel.onmessage = (event) => {
+    if (event.data?.type !== "exi-play-hello") return;
+    broadcastTextures();
+    broadcastScene();
+  };
 }
 
 function applyDocument(mutate, label) {
@@ -405,6 +411,12 @@ function renderInspector() {
   field("Filter", selectInput(node.filter, FILTER_TYPES, (value) => setOption("filter", value)));
   field("Filter amount", numberInput(node.filterAmount, (value) => setOption("filterAmount", Math.max(0, Math.min(1, value))), { step: 0.05, min: 0, max: 1 }));
   field("Blend", selectInput(node.blendMode, ["normal", "additive", "multiply"], (value) => setOption("blendMode", value)));
+  field("Data (JSON)", textInput(node.data ? JSON.stringify(node.data, null, 1) : "", (value) => {
+    if (!value.trim()) { setOption("data", undefined); return; }
+    let parsed;
+    try { parsed = JSON.parse(value); } catch (error) { setStatus(`Data is not valid JSON: ${error.message}`, true); return; }
+    setOption("data", parsed);
+  }, { multiline: true }), { wide: true });
 
   if (node instanceof Text) {
     section("Text");
@@ -670,8 +682,28 @@ window.addEventListener("keydown", (event) => {
 });
 window.addEventListener("keyup", (event) => { if (event.code === "Space") spaceHeld = false; });
 
-function saveDocument() {
+// With the File System Access API (Chromium) the first save asks for a file in
+// the project and later saves overwrite it, so games watching that file with
+// watchScene({ url }) reload. Other browsers download the JSON.
+let fileHandle = null;
+async function saveDocument({ chooseFile = false } = {}) {
   const json = JSON.stringify(serializeScene(docRoot), null, 2);
+  if (typeof window.showSaveFilePicker === "function") {
+    try {
+      if (!fileHandle || chooseFile) {
+        fileHandle = await window.showSaveFilePicker({ suggestedName: `${(docRoot.name || "scene").replace(/[^\w.-]+/g, "-")}.json`, types: [{ description: "ExiEngine scene", accept: { "application/json": [".json"] } }] });
+      }
+      const writable = await fileHandle.createWritable();
+      await writable.write(json);
+      await writable.close();
+      setStatus(`Saved to ${fileHandle.name}`);
+      return;
+    } catch (error) {
+      if (error?.name === "AbortError") { setStatus("Save cancelled"); return; }
+      fileHandle = null;
+      setStatus(`Saving to a file failed (${error.message}); downloading instead`, true);
+    }
+  }
   const link = document.createElement("a");
   link.href = URL.createObjectURL(new Blob([json], { type: "application/json" }));
   link.download = `${(docRoot.name || "scene").replace(/[^\w.-]+/g, "-")}.json`;
@@ -706,7 +738,9 @@ document.querySelectorAll("[data-add]").forEach((button) => button.addEventListe
 const actions = {
   new: () => loadDocument({ format: SCENE_FORMAT, version: SCENE_FORMAT_VERSION, root: { type: "Scene", options: { name: "scene" } } }, "New scene"),
   open: () => $("#open-file").click(),
-  save: saveDocument,
+  save: () => saveDocument(),
+  "save-as": () => saveDocument({ chooseFile: true }),
+  play: () => window.open(`./play.html?name=${encodeURIComponent(docRoot.name || "scene")}`, "exi-play"),
   "import-texture": () => $("#texture-file").click(),
   undo, redo,
   duplicate: duplicateSelected,

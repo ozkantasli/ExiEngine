@@ -45,7 +45,7 @@ Legend: ✅ built in · 🔌 official/common plugin or companion package · ➖ 
 | Audio sprites / spatial audio | ✅ (2D, deterministic) | ✅ | 🔌 | ✅ | ➖ | ✅ | ✅ | ✅ | ✅ |
 | Scene file format | ✅ `serializeScene` JSON | ➖ | — | — | — | — | ✅ | ✅ | ✅ |
 | Visual editor | ➖ first browser editor | — (commercial 3rd party) | — | — | — | — | ✅ | ✅ | ✅ |
-| Hot reload / play-in-editor | — | ➖ (dev servers) | — | — | — | — | ✅ | ✅ | ✅ |
+| Hot reload / play-in-editor | ✅ `watchScene` + live Play window | ➖ (dev servers) | — | — | — | — | ✅ | ✅ | ✅ |
 | Prefabs / asset manager in editor | — | — | — | — | — | — | ✅ | ✅ | ✅ |
 | UI widgets (input, scroll, slider) | ➖ focus/pointer only | ➖ | 🔌 | ➖ | ➖ | ➖ | ✅ | ✅ | ✅ |
 | Netcode helpers | ✅ `RollbackSession` (rollback, transport-agnostic) | — | — | — | — | — | ➖ | ✅ | ✅ |
@@ -74,9 +74,9 @@ Legend: ✅ built in · 🔌 official/common plugin or companion package · ➖ 
 1. **Not on npm yet and little content.** The package is ready (`npm pack` works, dist
    bundles build) but unpublished; four examples versus hundreds for Phaser. Publishing and
    growing examples/tutorials matters more than any single feature.
-2. **Editor is a first version.** Scenes can be edited and saved, but there is no hot reload,
-   play-in-editor, prefabs, asset browser or animation timeline — the things that make
-   GDevelop/Construct/Godot attractive to non-programmers.
+2. **Editor is still light.** Editing, saving, a live Play window and hot reload exist; prefabs,
+   an asset browser, animation timelines and behaviours/events (what makes GDevelop and
+   Construct attractive to non-programmers) do not.
 
 **P1 — common feature requests**
 3. **Skeletal animation (Spine/DragonBones).** Expected by artists; usually solved with a
@@ -100,8 +100,7 @@ Legend: ✅ built in · 🔌 official/common plugin or companion package · ➖ 
 
 1. Publish to npm (owner action) and announce the CDN path.
 2. Grow examples: shooter, puzzle, endless runner, physics puzzle; one tutorial per example.
-3. Editor v2: play-in-editor (run the scene with the engine loop), hot reload of saved
-   scenes in running games, prefab references.
+3. Editor v3: prefabs, asset browser, simple data-driven behaviours (play/hot reload ✅).
 4. Joints + CCD in `RigidBodyWorld`.
 5. Spine runtime adapter as an optional package (keeps the core dependency-free).
 6. Decide the custom-shader policy; if accepted, ship a bounded `registerFilter` API.

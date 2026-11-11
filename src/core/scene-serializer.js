@@ -80,6 +80,7 @@ function nodeOptions(node) {
     interactive: node.interactive, focusable: node.focusable, tabIndex: node.tabIndex,
   };
   for (const key of NODE_RECT_KEYS) if (node[key]) options[key] = rectData(node[key]);
+  if (node.data) options.data = JSON.parse(JSON.stringify(node.data));
   if (node.layout) {
     options.layout = {};
     for (const key of LAYOUT_KEYS) if (node.layout[key] !== null && node.layout[key] !== undefined) options.layout[key] = node.layout[key];
@@ -238,7 +239,7 @@ function missingTilesetTexture(id, source, options, context) {
   return placeholderTexture(id, context, columns * tileWidth, rows * tileHeight);
 }
 
-const COMMON_KEYS = new Set([...NODE_NUMBER_KEYS, ...NODE_BOOLEAN_KEYS, ...NODE_STRING_KEYS, ...NODE_RECT_KEYS, "layout"]);
+const COMMON_KEYS = new Set([...NODE_NUMBER_KEYS, ...NODE_BOOLEAN_KEYS, ...NODE_STRING_KEYS, ...NODE_RECT_KEYS, "layout", "data"]);
 const SPRITE_KEYS = new Set([...COMMON_KEYS, "texture", "tint", ...SPRITE_NUMBER_KEYS, ...SPRITE_BOOLEAN_KEYS]);
 const ALLOWED_KEYS = {
   Node: COMMON_KEYS,
@@ -256,6 +257,10 @@ function readCommonOptions(source, label) {
   for (const key of NODE_BOOLEAN_KEYS) readBoolean(source, key, options, label);
   for (const key of NODE_STRING_KEYS) readString(source, key, options, label, MAX_NAME_LENGTH);
   for (const key of NODE_RECT_KEYS) readRect(source, key, options, label);
+  if (source.data !== undefined && source.data !== null) {
+    if (!isRecord(source.data)) throw new TypeError(`${label}.data must be an object.`);
+    options.data = source.data; // Node validates size and strips prototype keys.
+  }
   if (source.layout !== undefined && source.layout !== null) {
     if (!isRecord(source.layout)) throw new TypeError(`${label}.layout must be an object.`);
     assertKnownKeys(source.layout, new Set(LAYOUT_KEYS), `${label}.layout`);

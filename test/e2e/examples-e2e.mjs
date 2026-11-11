@@ -61,6 +61,7 @@ try {
     await page.close();
   }
   failures += await checkEditor();
+  failures += await checkPlayWindow();
 } finally {
   await browser.close();
   server.kill();
@@ -109,6 +110,41 @@ async function checkEditor() {
   await page.close();
   const ok = errors.length === 0 && Object.values(result).every(Boolean) && Object.keys(result).length === 6;
   console.log(`[examples-e2e] ${ok ? "PASS" : "FAIL"} editor ${JSON.stringify(result)}${errors.length ? ` errors=${JSON.stringify(errors)}` : ""}`);
+  return ok ? 0 : 1;
+}
+
+async function checkPlayWindow() {
+  const context = await browser.newContext({ viewport: { width: 1200, height: 700 } });
+  const errors = [];
+  const result = {};
+  try {
+    const editor = await context.newPage();
+    editor.on("pageerror", (error) => errors.push(`editor: ${error.message}`));
+    await editor.goto(`${base}/editor/`);
+    await editor.waitForFunction(() => window.editor?.engine?.running === true, null, { timeout: 10_000 });
+    await editor.evaluate(() => {
+      localStorage.clear();
+      window.editor.load(window.editor.serialize());
+      window.editor.select([0]); window.editor.setOption("data", { body: "static" });
+      window.editor.select([1]); window.editor.setOption("data", { body: "dynamic" });
+    });
+    const play = await context.newPage();
+    play.on("pageerror", (error) => errors.push(`play: ${error.message}`));
+    play.on("console", (message) => { if (message.type() === "error") errors.push(`play: ${message.text()}`); });
+    await play.goto(`${base}/editor/play.html?name=scene`);
+    await play.waitForFunction(() => window.play?.reloads > 0, null, { timeout: 10_000 });
+    const startY = await play.evaluate(() => window.play.engine.scene.findByName("player").position.y);
+    await play.waitForTimeout(1_200);
+    result.physics = await play.evaluate(([y]) => { const node = window.play.engine.scene.findByName("player"); return node.position.y > y && window.play.world.bodies.length === 2; }, [startY]);
+    await editor.evaluate(() => { window.editor.select([3]); window.editor.setOption("text", "Edited live!"); });
+    await play.waitForFunction(() => window.play.engine.scene.findByName("title")?.text === "Edited live!", null, { timeout: 5_000 });
+    result.live = true;
+  } catch (error) {
+    errors.push(error.message);
+  }
+  await context.close();
+  const ok = errors.length === 0 && result.physics === true && result.live === true;
+  console.log(`[examples-e2e] ${ok ? "PASS" : "FAIL"} editor-play ${JSON.stringify(result)}${errors.length ? ` errors=${JSON.stringify(errors)}` : ""}`);
   return ok ? 0 : 1;
 }
 

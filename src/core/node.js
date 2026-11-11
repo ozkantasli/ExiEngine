@@ -78,6 +78,19 @@ function normalizeLayout(value) {
   };
 }
 
+// Free-form game metadata (like Tiled custom properties): a JSON object that is
+// stored in scene documents and edited in the editor. It is copied on assignment
+// so callers cannot keep a live reference into a node's data.
+export const MAX_NODE_DATA_LENGTH = 16_384;
+export function normalizeNodeData(value) {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== "object" || Array.isArray(value)) throw new TypeError("Node data must be a plain JSON object.");
+  let json;
+  try { json = JSON.stringify(value); } catch { throw new TypeError("Node data must be JSON-serializable."); }
+  if (json.length > MAX_NODE_DATA_LENGTH) throw new RangeError(`Node data JSON is limited to ${MAX_NODE_DATA_LENGTH} characters.`);
+  return JSON.parse(json, (key, item) => (key === "__proto__" || key === "constructor" || key === "prototype" ? undefined : item));
+}
+
 function normalizeTabIndex(value) {
   const number = Number(value);
   return Number.isSafeInteger(number) ? Math.max(-1, Math.min(MAX_TAB_INDEX, number)) : 0;
@@ -165,7 +178,7 @@ function pointInNodeBounds(node, worldX, worldY) {
 }
 
 export class Node {
-  constructor({ name = "node", x = 0, y = 0, scaleX = 1, scaleY = 1, rotation = 0, zIndex = 0, visible = true, alpha = 1, filter = "none", filterAmount = 1, cullable = true, cullBounds = null, clipRect = null, maskRect = null, maskTexture = null, hitArea = null, blendMode = "normal", interactive = false, onPointerDown = null, onPointerUp = null, onPointerCancel = null, onPointerMove = null, onPointerEnter = null, onPointerLeave = null, onWheel = null, onUpdate = null, focusable = false, tabIndex = 0, onFocus = null, onBlur = null, onKeyDown = null, layout = null } = {}) {
+  constructor({ name = "node", x = 0, y = 0, scaleX = 1, scaleY = 1, rotation = 0, zIndex = 0, visible = true, alpha = 1, filter = "none", filterAmount = 1, cullable = true, cullBounds = null, clipRect = null, maskRect = null, maskTexture = null, hitArea = null, blendMode = "normal", interactive = false, onPointerDown = null, onPointerUp = null, onPointerCancel = null, onPointerMove = null, onPointerEnter = null, onPointerLeave = null, onWheel = null, onUpdate = null, focusable = false, tabIndex = 0, onFocus = null, onBlur = null, onKeyDown = null, layout = null, data = null } = {}) {
     this.id = `node-${nextNodeId++}`;
     this.name = name;
     this.position = new Vec2(x, y);
@@ -203,6 +216,7 @@ export class Node {
     this.onKeyDown = normalizeFocusHandler(onKeyDown, "onKeyDown");
     this.focused = false;
     this.layout = normalizeLayout(layout);
+    this.data = normalizeNodeData(data);
     this.interactive = Boolean(interactive) || Boolean(this.onPointerDown || this.onPointerUp || this.onPointerCancel || this.onPointerMove || this.onPointerEnter || this.onPointerLeave || this.onWheel);
     this.renderClip = null;
     this.renderClipCache = null;
@@ -340,6 +354,7 @@ export class Node {
   }
 
   setLayout(layout) { this.layout = normalizeLayout(layout); return this; }
+  setData(data) { this.data = normalizeNodeData(data); return this; }
   clearLayout() { this.layout = null; return this; }
 
   containsPoint(worldX, worldY) {

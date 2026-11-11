@@ -80,6 +80,7 @@ export interface NodeOptions {
   onBlur?: FocusHandler | null;
   onKeyDown?: KeyDownHandler | null;
   layout?: NodeLayout | null;
+  /** Free-form JSON metadata stored in scene documents (max 16 KiB as JSON). */ data?: Record<string, unknown> | null;
 }
 export interface NodeLayout {
   left?: number | null; top?: number | null; right?: number | null; bottom?: number | null;
@@ -148,6 +149,8 @@ export class Node {
   setFocusHandlers(options?: { onFocus?: FocusHandler | null; onBlur?: FocusHandler | null; onKeyDown?: KeyDownHandler | null }): this;
   setFocusable(value: boolean, tabIndex?: number): this;
   setLayout(layout: NodeLayout | null): this;
+  data: Record<string, unknown> | null;
+  setData(data: Record<string, unknown> | null): this;
   clearLayout(): this;
   containsPoint(worldX: number, worldY: number): boolean;
   isAncestorOf(node: Node): boolean;
@@ -908,3 +911,13 @@ export class LightLayer extends RenderGroup {
   clearLights(): this;
   syncLight(light: Light): void;
 }
+
+export const EDITOR_CHANNEL: "exi-editor";
+export interface SceneWatcher { readonly reloads: number; readonly errors: number; readonly stopped: boolean; apply(document: SceneDocument): boolean; poll(): Promise<void>; stop(): void; }
+export interface WatchSceneOptions {
+  url?: string | null; loader?: AssetLoader | null; channel?: string | null; name?: string | null; interval?: number;
+  textures?: ReadonlyMap<string, Texture> | Record<string, Texture> | null; resolveTexture?: ((id: string) => Texture | null | undefined) | null;
+  onChange: (scene: Node, document: SceneDocument, report: DeserializeSceneReport & { source: "url" | "channel" | "manual" }) => void;
+  onError?: ((error: Error, source: "url" | "channel" | "manual") => void) | null;
+}
+export function watchScene(options: WatchSceneOptions): SceneWatcher;

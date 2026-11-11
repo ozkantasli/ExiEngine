@@ -100,7 +100,7 @@ For `Node.traverse`, `Node.find`, `Scene.pick`, input/physics filters and other 
 - `src/render/`: WebGL2/WebGPU backends with a shared batch/clip flow.
 - `src/audio/`: Web Audio buses, bounded decode/voices and lifecycle.
 - `src/core/scene-serializer.js`: `serializeScene`/`deserializeScene` scene documents (same `{ type, options, children }` shape as `exi_build_scene`); data only, never callbacks or code.
-- `editor/`: the dependency-free browser scene editor (`/editor/`); every committed edit is serialize → change → deserialize, so engine validation applies. Attach editor DOM listeners to `.viewport`, not the canvas (the canvas is replaced on WebGPU→WebGL2 fallback).
+- `editor/`: the dependency-free browser scene editor (`/editor/`, live preview at `/editor/play.html`, hot reload through `watchScene` on `EDITOR_CHANNEL`; writing a watched scene JSON with `exi_file_write` reloads a running game); every committed edit is serialize → change → deserialize, so engine validation applies. Attach editor DOM listeners to `.viewport`, not the canvas (the canvas is replaced on WebGPU→WebGL2 fallback).
 - `examples/`: small complete games; keep `test/examples-smoke.mjs` and `test/e2e/examples-e2e.mjs` passing.
 - `test/engine-smoke.mjs`: the main test of the behavior, security and lifecycle contract.
 - `test/*-benchmark.mjs`: allocation/streaming/culling identity gates; not physical FPS claims.

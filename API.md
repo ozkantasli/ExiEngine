@@ -318,6 +318,26 @@ torch.x = player.position.x; torch.y = player.position.y;
 
 A `RenderGroup` covering a world rectangle at reduced resolution: it is filled with the `ambient` color, point lights add soft radial gradients (additive blend, tinted by `color`, scaled by `intensity` 0..1), and the result multiplies the world beneath it, so unlit areas fade to the ambient color and lit areas keep their colors. Lights are plain objects in world coordinates (`x`, `y`, `radius`, `color`, `intensity`, `enabled`); the layer syncs them every update. It costs one extra render pass and one draw for the composite, independent of the screen size. Overlay HUD scenes are not affected. Limits: `MAX_LIGHTS` (256) lights, 4 MPixel light maps; no normal maps or shadow casting yet.
 
+### Node data and scene hot reload
+
+```js
+// Free-form JSON metadata on any node, stored in scene documents and editable in the editor.
+const spawn = new Node({ name: "spawn", x: 64, y: 128, data: { kind: "enemy", hp: 3 } });
+for (const node of scene.children) if (node.data?.kind === "enemy") attachEnemyBehaviour(node);
+
+// Hot reload during development: rebuild the scene whenever the document changes.
+const watcher = watchScene({
+  url: "./levels/level1.json", loader,           // polled through the AssetLoader (same-origin, budgets)
+  channel: EDITOR_CHANNEL, name: "level1",        // and/or live edits from the editor in the same browser
+  textures: { "tiles.png": tiles },
+  onChange: (scene) => { const old = engine.scene; engine.setScene(scene); old.destroy(); attachBehaviours(scene); },
+  onError: (error) => console.warn("scene rejected", error),
+});
+// watcher.stop() when leaving the level; never ship the watcher in production builds.
+```
+
+`node.data` / `setData()` accept a plain JSON object (16 KiB max as JSON); it is copied on assignment and `__proto__`/`constructor`/`prototype` keys are dropped. `watchScene` applies a document only when it differs from the last one, keeps the running scene when a document is rejected (`onError`), and reports where a change came from (`url`, `channel`, `manual`). Polling uses a cache-busting query string and never overlaps; `interval` is 100-60 000 ms. Anything that rewrites the file triggers a reload: the editor's Save (written straight into the project in Chromium), a text editor, or an AI agent using MCP `exi_file_write`.
+
 ## 7. Atlases and asset loading
 
 ### `TextureAtlas`

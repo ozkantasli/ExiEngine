@@ -101,6 +101,11 @@ top of the engine (no dependencies) and edits a live ExiEngine scene:
   right/middle/Space-drag pan, arrow-key nudge, `F` to frame the scene
 - **Tile painting** (`P`): left-drag paints the chosen tile, right/Alt-drag erases
 - **Undo/redo**, duplicate, delete, image import as textures, autosave in the browser
+- **▶ Play** opens a live window that follows every edit; nodes with `data.body` set to
+  `"dynamic"` or `"static"` get rigid-body physics there (`data.shape: "circle"` for circles)
+- **Data (JSON)** per node for game metadata (spawn types, hit points…), saved in the scene
+- **Save** writes straight into a project file in Chromium (File System Access API), so a game
+  running `watchScene({ url })` reloads on every save; other browsers download the JSON
 - **Save/Open** produce and read the same JSON document as `serializeScene()` /
   `deserializeScene()`, so a game loads an edited level with one call:
 
@@ -299,9 +304,9 @@ hidden), but the physical iOS/Android device matrix is not complete yet.
 
 ## Limitations
 
-ExiEngine is a **core** with a lightweight scene editor: it edits and saves scenes, but it
-does not yet have hot reload, animation timelines, prefab/asset management or a play-in-
-editor mode, which full engines provide. Device-loss and fallback flows are verified with simulated smoke
+ExiEngine is a **core** with a lightweight scene editor: it edits, saves, previews (live Play
+window with physics) and hot-reloads scenes, but it does not have animation timelines,
+prefabs, an asset browser or a script editor, which full engines provide. Device-loss and fallback flows are verified with simulated smoke
 tests; real GPU memory soak, driver resets and physical device testing must be done
 separately. Audio is subject to the browser's user-gesture policy. In production,
 HTTPS and server-side security headers still need to be configured.
@@ -317,7 +322,7 @@ drive directly, try ExiEngine.
 | MVP | ✅ | Dependency-free 2D core, scene graph, camera, input, MCP bridge |
 | v0.2 | ✅ | Physics/collision, deterministic fixed step, A*, asset pipeline, safety limits, benchmark gate |
 | v0.3 | ✅ (unreleased) | npm-ready package, Tiled import, examples, scene serialization, browser editor (first version), rigid bodies, post-process filters, BitmapText, audio sprites + spatial audio |
-| v1.0 | 🛠️ | npm publish, editor v2 (play-in-editor, hot reload, prefabs), joints, Spine, lighting, GPU profiling, mobile device matrix |
+| v1.0 | 🛠️ | npm publish, editor v2 (✅ live play + hot reload, prefabs), joints, Spine, lighting, GPU profiling, mobile device matrix |
 
 Details: [ROADMAP.md](ROADMAP.md)
 

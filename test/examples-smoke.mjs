@@ -46,12 +46,19 @@ for (const name of examples) {
 // The browser editor lives in editor/ and follows the same page contract.
 const editorDir = path.join(root, "editor");
 const editorHtml = fs.readFileSync(path.join(editorDir, "index.html"), "utf8");
-const editorMain = fs.readFileSync(path.join(editorDir, "editor.js"), "utf8");
-assert.match(editorHtml, /Content-Security-Policy[^>]*script-src 'self'/, "editor: strict CSP meta");
-assert.doesNotMatch(editorHtml, /frame-ancestors/, "editor: frame-ancestors is ignored in <meta>");
-execFileSync(process.execPath, ["--check", path.join(editorDir, "editor.js")]);
-assert.doesNotMatch(editorMain, /\beval\s*\(|new\s+Function\s*\(|innerHTML\s*=/, "editor: no dynamic code or innerHTML");
-const editorImport = /^import\s*\{([^}]*)\}\s*from\s*"\.\.\/src\/index\.js";/m.exec(editorMain);
-assert.ok(editorImport, "editor: imports the public entry");
-for (const imported of editorImport[1].split(",").map((part) => part.trim()).filter(Boolean)) assert.ok(imported in Exi, `editor: ${imported} is not a public export`);
+for (const page of ["index.html", "play.html"]) {
+  const html = fs.readFileSync(path.join(editorDir, page), "utf8");
+  assert.match(html, /Content-Security-Policy[^>]*script-src 'self'/, `editor/${page}: strict CSP meta`);
+  assert.doesNotMatch(html, /frame-ancestors/, `editor/${page}: frame-ancestors is ignored in <meta>`);
+}
+for (const file of fs.readdirSync(editorDir).filter((entry) => entry.endsWith(".js"))) {
+  const source = fs.readFileSync(path.join(editorDir, file), "utf8");
+  execFileSync(process.execPath, ["--check", path.join(editorDir, file)]);
+  assert.doesNotMatch(source, /\beval\s*\(|new\s+Function\s*\(|innerHTML\s*=/, `editor/${file}: no dynamic code or innerHTML`);
+  for (const [, names, from] of source.matchAll(/^import\s*\{([^}]*)\}\s*from\s*"([^"]+)";/gm)) {
+    assert.ok(from === "../src/index.js" || from === "./shared.js", `editor/${file}: imports only the public entry or shared.js`);
+    if (from !== "../src/index.js") continue;
+    for (const imported of names.split(",").map((part) => part.trim()).filter(Boolean)) assert.ok(imported in Exi, `editor/${file}: ${imported} is not a public export`);
+  }
+}
 console.log(`[examples] OK: ${examples.join(", ")} + editor`);
