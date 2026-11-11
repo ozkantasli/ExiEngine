@@ -35,25 +35,25 @@ out vec4 out_color;
 // Spatial filters (modes 7-10) sample neighbouring texels of the bound texture.
 // They are meant for whole textures such as RenderGroup targets; on atlas
 // frames neighbours can come from adjacent frames.
-vec4 gaussian(vec2 texel, float radius) {
+vec4 gaussian(vec2 uv, vec2 texel, float radius) {
   vec4 sum = vec4(0.0);
   float total = 0.0;
   for (int y = -2; y <= 2; y++) {
     for (int x = -2; x <= 2; x++) {
       float weight = exp(-float(x * x + y * y) / 4.0);
-      sum += texture(u_texture, v_uv + vec2(float(x), float(y)) * texel * radius) * weight;
+      sum += texture(u_texture, uv + vec2(float(x), float(y)) * texel * radius) * weight;
       total += weight;
     }
   }
   return sum / total;
 }
 
-vec4 spatialFilter(float mode, float amount) {
+vec4 spatialFilter(vec2 uv, float mode, float amount) {
   vec2 texel = 1.0 / vec2(textureSize(u_texture, 0));
-  if (mode < 7.5) return gaussian(texel, amount * 4.0);
-  vec4 base = texture(u_texture, v_uv);
+  if (mode < 7.5) return gaussian(uv, texel, amount * 4.0);
+  vec4 base = texture(u_texture, uv);
   if (mode < 8.5) {
-    vec4 glow = gaussian(texel, 2.0 + amount * 6.0);
+    vec4 glow = gaussian(uv, texel, 2.0 + amount * 6.0);
     vec3 premultiplied = base.rgb * base.a + glow.rgb * glow.a * amount * (1.0 - 0.7 * base.a);
     float alpha = min(1.0, base.a + glow.a * amount * 1.5 * (1.0 - base.a));
     return alpha > 0.0 ? vec4(min(premultiplied / alpha, vec3(1.0)), alpha) : vec4(0.0);
@@ -63,7 +63,7 @@ vec4 spatialFilter(float mode, float amount) {
     float edge = 0.0;
     for (int index = 0; index < 8; index++) {
       float angle = float(index) * 0.785398;
-      edge = max(edge, texture(u_texture, v_uv + vec2(cos(angle), sin(angle)) * texel * thickness).a);
+      edge = max(edge, texture(u_texture, uv + vec2(cos(angle), sin(angle)) * texel * thickness).a);
     }
     float outline = edge * (1.0 - base.a);
     float alpha = base.a + outline;
@@ -71,13 +71,17 @@ vec4 spatialFilter(float mode, float amount) {
   }
   float size = 1.0 + floor(amount * 15.0);
   // Snap to one texel near the block center so no transparent texel is blended in.
-  vec2 cell = (floor(v_uv / (texel * size)) * size + floor(size * 0.5) + 0.5) * texel;
+  vec2 cell = (floor(uv / (texel * size)) * size + floor(size * 0.5) + 0.5) * texel;
   return texture(u_texture, cell);
 }
 
 void main() {
   float mode = u_filter.x;
-  vec4 color = (mode > 6.5 && mode < 10.5 ? spatialFilter(mode, u_filter.y) : texture(u_texture, v_uv)) * v_color;
+  // WebGL framebuffers store rows bottom-up, so textures that were rendered to
+  // (u_filter.z) and render-target masks (u_filter.w) are sampled with V flipped
+  // to match WebGPU and ordinary uploaded textures.
+  vec2 uv = u_filter.z > 0.5 ? vec2(v_uv.x, 1.0 - v_uv.y) : v_uv;
+  vec4 color = (mode > 6.5 && mode < 10.5 ? spatialFilter(uv, mode, u_filter.y) : texture(u_texture, uv)) * v_color;
   if (u_filter.x > 0.5 && u_filter.x < 1.5) {
     float luminance = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
     color.rgb = mix(color.rgb, vec3(luminance), u_filter.y);
@@ -102,6 +106,7 @@ void main() {
   if (u_mask_rect.z > 0.0 && u_mask_rect.w > 0.0) {
     vec2 screen = vec2(gl_FragCoord.x, u_resolution.y - gl_FragCoord.y);
     vec2 maskUv = (screen - u_mask_rect.xy) / u_mask_rect.zw;
+    if (u_filter.w > 0.5) maskUv.y = 1.0 - maskUv.y;
     float maskAlpha = maskUv.x >= 0.0 && maskUv.x <= 1.0 && maskUv.y >= 0.0 && maskUv.y <= 1.0 ? texture(u_mask, maskUv).a : 0.0;
     color *= maskAlpha;
   }
@@ -159,6 +164,11 @@ function compileShader(gl, type, source) {
     gl.deleteShader(shader);
     throw error;
   }
+}
+
+// 1 when the texture (or the atlas it belongs to) is a RenderTexture target.
+export function isRenderTargetTexture(texture) {
+  return texture?.renderTarget || texture?.baseTexture?.renderTarget ? 1 : 0;
 }
 
 function createProgram(gl, vertex = vertexSource, fragment = fragmentSource) {
@@ -797,7 +807,7 @@ export class WebGL2Renderer {
           gl.useProgram(this.instancedProgram);
           gl.uniform2f(this.instanceResolutionLocation, renderWidth, renderHeight);
           gl.uniform1i(this.instanceTextureLocation, 0);
-          gl.uniform4f(this.instanceFilterLocation, filterMode(batch.filterType), batch.filterAmount, 0, 0);
+          gl.uniform4f(this.instanceFilterLocation, filterMode(batch.filterType), batch.filterAmount, isRenderTargetTexture(batch.texture), hasMask ? isRenderTargetTexture(batch.maskTexture) : 0);
           gl.uniform1i(this.instanceMaskLocation, hasMask ? 1 : 0);
           gl.uniform4f(this.instanceMaskRectLocation, hasMask ? maskX : 0, hasMask ? maskY : 0, hasMask ? maskWidth : 0, hasMask ? maskHeight : 0);
           gl.bindBuffer(gl.ARRAY_BUFFER, this.instanceBuffer);
@@ -813,7 +823,7 @@ export class WebGL2Renderer {
           gl.useProgram(this.program);
           gl.uniform2f(this.resolutionLocation, renderWidth, renderHeight);
           gl.uniform1i(this.textureLocation, 0);
-          gl.uniform4f(this.filterLocation, filterMode(batch.filterType), batch.filterAmount, 0, 0);
+          gl.uniform4f(this.filterLocation, filterMode(batch.filterType), batch.filterAmount, isRenderTargetTexture(batch.texture), hasMask ? isRenderTargetTexture(batch.maskTexture) : 0);
           gl.uniform1i(this.maskLocation, hasMask ? 1 : 0);
           gl.uniform4f(this.maskRectLocation, hasMask ? maskX : 0, hasMask ? maskY : 0, hasMask ? maskWidth : 0, hasMask ? maskHeight : 0);
           gl.enableVertexAttribArray(this.positionLocation);
