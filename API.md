@@ -226,6 +226,23 @@ score.setStyle({ align: "center", maxWidth: 240, anchorX: 0.5 });
 
 Reads AngelCode BMFont data (BMFont, Hiero, msdf-bmfont, Littera ...) in the text `.fnt` form or the common JSON shape, with kerning pairs. `BitmapText` extends `SpriteBatch`, so a label is one batched draw with no Canvas 2D rasterization at runtime, ideal for pixel fonts and frequently changing HUD numbers. Options: `align` (`left`/`center`/`right`), `maxWidth` word wrap (long words are broken), `letterSpacing`, `lineHeight`, `anchorX`/`anchorY`, `tint`; `textWidth`, `textHeight` and `missingGlyphs` describe the last layout, and missing glyphs fall back to `?` when the font has one. `font.layout()`/`measure()` give the same placements without a node. Limits: single-page fonts (pack multi-page fonts into one texture), `MAX_BITMAP_FONT_GLYPHS` glyphs, `MAX_BITMAP_TEXT_LENGTH` characters; glyph rectangles must lie inside the texture. Use `Text` instead when you need system fonts or complex script shaping.
 
+### UI widgets: `Button`, `Slider`, `TextInput`, `ScrollView`
+
+```js
+const ui = new Scene();                                            // pass as ExiEngine({ overlayScene: ui })
+const name = new TextInput({ x: 40, y: 40, width: 280, placeholder: "Your name", maxLength: 24, onSubmit: (value) => save(value) });
+const volume = new Slider({ x: 40, y: 100, width: 280, min: 0, max: 1, step: 0.05, value: 0.8, onChange: (value) => audio.setBusVolume("master", value) });
+const play = new Button({ label: "Play", x: 40, y: 150, width: 160, onClick: () => startGame() });
+const list = new ScrollView({ x: 360, y: 40, width: 300, height: 200 });
+for (const entry of highScores) list.content.add(new Text({ text: entry, y: list.content.children.length * 24, anchorX: 0, anchorY: 0 }));
+ui.add(name, volume, play, list);
+const engine = await ExiEngine.create({ canvas, overlayScene: ui });
+list.camera = engine.overlayCamera;                                // enables clipping to the viewport
+engine.focus(name);
+```
+
+Canvas-drawn controls built from engine nodes; they use pointer capture, the engine focus order (Tab / Shift+Tab, clicking focuses) and keyboard events, so they work with mouse, touch and keyboard. `Button` fires `onClick` on press+release inside or Enter/Space; `Slider` supports click, drag, arrows, PageUp/PageDown, Home/End, `step` snapping and clamping; `ScrollView` scrolls with the wheel and by dragging, clamps to its content, draws a scrollbar, hides content children that are fully outside the viewport (so they are not drawn or picked) and clips to its rectangle once `camera` is set; `TextInput` edits single-line text with caret, Backspace/Delete/arrows/Home/End, `maxLength` and Enter to submit. When a DOM is available, a focused `TextInput` mirrors its value in a hidden `<input>` so IME composition (Chinese, Japanese, Korean…), paste and mobile virtual keyboards work; pass `domProxy: false` to disable. All widgets take a `theme` (see `UI_THEME`). Limitation: the engine applies pointer input on its fixed step, so mobile Safari may not open the virtual keyboard from a canvas tap; focus the field from a DOM button or accept a hardware keyboard there.
+
 ### `Graphics`
 
 ```js

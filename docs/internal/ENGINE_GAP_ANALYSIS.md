@@ -47,7 +47,7 @@ Legend: ✅ built in · 🔌 official/common plugin or companion package · ➖ 
 | Visual editor | ➖ first browser editor | — (commercial 3rd party) | — | — | — | — | ✅ | ✅ | ✅ |
 | Hot reload / play-in-editor | ✅ `watchScene` + live Play window | ➖ (dev servers) | — | — | — | — | ✅ | ✅ | ✅ |
 | Prefabs / asset manager in editor | — | — | — | — | — | — | ✅ | ✅ | ✅ |
-| UI widgets (input, scroll, slider) | ➖ focus/pointer only | ➖ | 🔌 | ➖ | ➖ | ➖ | ✅ | ✅ | ✅ |
+| UI widgets (input, scroll, slider) | ✅ Button, Slider, TextInput (IME), ScrollView | ➖ | 🔌 | ➖ | ➖ | ➖ | ✅ | ✅ | ✅ |
 | Netcode helpers | ✅ `RollbackSession` (rollback, transport-agnostic) | — | — | — | — | — | ➖ | ✅ | ✅ |
 | npm package + CDN bundle | ✅ ready (not yet published) | ✅ | ✅ | ✅ | ✅ | ✅ | n/a | n/a | n/a |
 | Playable examples | ➖ 4 games + editor | ✅ (hundreds) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
@@ -85,7 +85,8 @@ Legend: ✅ built in · 🔌 official/common plugin or companion package · ➖ 
    CCD for fast thin bodies, prismatic/weld/motor joints still open).
 5. **Normal maps and shadows.** ✅ `LightLayer` point lights shipped; normal-mapped sprites and
    shadow casting are still open.
-6. **UI widgets:** text input (IME), scroll views, sliders, layout containers.
+6. **UI widgets:** ✅ Button, Slider, TextInput (IME via hidden input), ScrollView shipped;
+   layout containers (rows/columns/grids), checkboxes, dropdowns still open.
 7. ~~LDtk import~~ ✅ shipped (tiles, IntGrid, entities).
 
 **P2 — strategic**

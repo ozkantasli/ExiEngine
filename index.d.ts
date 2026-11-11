@@ -943,3 +943,29 @@ export interface LDtkEntity { identifier: string; iid: string | null; layer: str
 export function tileMapFromLDtk(project: Record<string, unknown>, options: LDtkSelection & Omit<TileMapOptions, "texture" | "tileWidth" | "tileHeight" | "columns" | "rows"> & { texture: Texture }): TileMap;
 export function ldtkIntGrid(project: Record<string, unknown>, options?: LDtkSelection): LDtkIntGrid;
 export function ldtkEntities(project: Record<string, unknown>, options?: { level?: number | string | Record<string, unknown>; layer?: string }): LDtkEntity[];
+
+export interface UITheme { background: number; hover: number; active: number; accent: number; track: number; text: string; muted: string; font: string; radius: number; }
+export const UI_THEME: Readonly<UITheme>;
+export class Button extends Node {
+  width: number; height: number; disabled: boolean; hovered: boolean; pressed: boolean; theme: UITheme; label: Text; background: Graphics;
+  onClick: ((button: Button) => void) | null;
+  constructor(options?: NodeOptions & { label?: string; width?: number; height?: number; onClick?: ((button: Button) => void) | null; disabled?: boolean; theme?: Partial<UITheme> | null });
+  click(): boolean; setLabel(value: string): this; setDisabled(value: boolean): this; redraw(): this;
+}
+export class Slider extends Node {
+  min: number; max: number; step: number; width: number; height: number; value: number; dragging: boolean; theme: UITheme;
+  onChange: ((value: number, slider: Slider) => void) | null;
+  constructor(options?: NodeOptions & { width?: number; min?: number; max?: number; step?: number; value?: number; onChange?: ((value: number, slider: Slider) => void) | null; theme?: Partial<UITheme> | null });
+  setValue(value: number): this; setFromWorld(worldX: number, worldY: number): this; redraw(): this;
+}
+export class ScrollView extends Node {
+  width: number; height: number; camera: Camera | null; scrollSpeed: number; scrollY: number; readonly content: Node; readonly contentHeight: number; readonly maxScroll: number;
+  constructor(options?: NodeOptions & { width?: number; height?: number; camera?: Camera | null; scrollSpeed?: number; theme?: Partial<UITheme> | null });
+  scrollTo(y: number): this; scrollBy(delta: number): this;
+}
+export class TextInput extends Node {
+  value: string; placeholder: string; maxLength: number; width: number; height: number; caret: number; domProxy: boolean; proxy: HTMLInputElement | null; theme: UITheme;
+  onChange: ((value: string, input: TextInput) => void) | null; onSubmit: ((value: string, input: TextInput) => void) | null;
+  constructor(options?: NodeOptions & { value?: string; placeholder?: string; width?: number; height?: number; maxLength?: number; onChange?: ((value: string, input: TextInput) => void) | null; onSubmit?: ((value: string, input: TextInput) => void) | null; domProxy?: boolean; theme?: Partial<UITheme> | null });
+  setValue(value: string, options?: { silent?: boolean }): this; focusProxy(): void; redraw(): this;
+}

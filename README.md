@@ -39,6 +39,7 @@ browser.
 🎱 Rigid bodies: rotating circles, boxes and convex polygons with friction, restitution and stable stacking</br>
 🌐 Rollback netcode helper for deterministic multiplayer</br>
 🔤 Bitmap fonts (BMFont .fnt/JSON) and 🔊 audio sprites, pitch and 2D spatial sound</br>
+🎛️ UI widgets: Button, Slider, TextInput (IME), ScrollView</br>
 💡 2D lighting layer with ambient color and point lights</br>
 ✨ Filters and post-processing: grayscale…saturate plus blur, glow, outline, pixelate, vignette on nodes or RenderGroups</br>
 🎮 One action/axis input layer for keyboard, pointer, touch and gamepad</br>
@@ -84,6 +85,7 @@ only and sends CSP/`nosniff` headers.
 | [`examples/platformer`](examples/platformer/main.js) | `TileMap.fromTiled` level, tile-property collision bodies, gravity, coyote time / jump buffering, camera follow + bounds, HUD overlay |
 | [`examples/top-down`](examples/top-down/main.js) | Code-built TileMap walls, zero-gravity physics, trigger pickups, A* (`findGridPath`) chasers, particles, camera shake, `LightLayer` torch lighting |
 | [`examples/physics`](examples/physics/main.js) | `RigidBodyWorld`: boxes, circles, convex polygons, rotation, friction, restitution, a standing pyramid, a plank bridge and a pendulum on joints, click to drop shapes |
+| [`examples/ui-widgets`](examples/ui-widgets/main.js) | `Button`, `Slider`, `TextInput` (IME/mobile) and `ScrollView` with pointer, wheel and keyboard focus |
 | [`examples/ui-menu`](examples/ui-menu/main.js) | Overlay UI, pointer + keyboard focus (Tab/Enter), tweened buttons, `StateMachine` screens |
 
 `npm test` checks the examples statically; `npm run test:e2e:examples` runs them in a real
