@@ -1,8 +1,8 @@
 // ExiEngine example: a top-down arena.
 // Shows a code-built TileMap with merged static wall bodies, zero-gravity physics,
 // trigger pickups via PhysicsWorld.overlaps, A* (findGridPath) chasing enemies,
-// a particle burst, camera shake and a HUD overlay.
-import { Camera, ExiEngine, Graphics, ParticleEmitter, PhysicsBody, PhysicsWorld, Scene, Text, Texture, TileMap, findGridPath } from "../../src/index.js";
+// a particle burst, camera shake, 2D lighting (LightLayer) and a HUD overlay.
+import { Camera, ExiEngine, Graphics, LightLayer, ParticleEmitter, PhysicsBody, PhysicsWorld, Scene, Text, Texture, TileMap, findGridPath } from "../../src/index.js";
 
 const CELL = 32;
 const LAYOUT = [
@@ -75,6 +75,12 @@ const enemies = [cellCenter(18, 1), cellCenter(18, 9), cellCenter(9, 9)].map((st
 const sparks = new ParticleEmitter({ texture: Texture.white, maxParticles: 256, lifetime: 0.45, size: 4, tint: 0xfacc15 });
 scene.add(sparks);
 
+// Lighting: a dark arena, a torch that follows the player and glowing gems.
+const lighting = new LightLayer({ width: COLUMNS * CELL, height: ROWS * CELL, ambient: 0x1e2433 });
+const torch = lighting.addLight({ radius: 150, color: 0xffe2b0 });
+const gemLights = new Map(gems.map((gem) => [gem, lighting.addLight({ x: gem.node.position.x + 7, y: gem.node.position.y + 7, radius: 46, color: 0xfacc15, intensity: 0.8 })]));
+scene.add(lighting);
+
 const camera = new Camera({ roundPixels: true });
 camera.setBounds({ x: 0, y: 0, width: COLUMNS * CELL, height: ROWS * CELL });
 camera.follow(player, { smoothing: 0.12 });
@@ -140,6 +146,7 @@ const engine = await ExiEngine.create({
       sparks.burst(24, { x: hit.node.position.x + 7, y: hit.node.position.y + 7, minSpeed: 40, maxSpeed: 160 });
       hit.node.parent?.remove(hit.node);
       hit.node.destroy();
+      lighting.removeLight(gemLights.get(hit));
       score += 1;
     }
 
@@ -158,10 +165,12 @@ const engine = await ExiEngine.create({
         }
       }
     }
+    torch.x = player.position.x + PLAYER_SIZE / 2;
+    torch.y = player.position.y + PLAYER_SIZE / 2;
     player.alpha = invulnerable > 0 && Math.floor(invulnerable * 10) % 2 ? 0.35 : 1;
     label.setText(lives <= 0 ? `Game over · gems: ${score}` : gems.length === 0 ? `You win! · lives left: ${lives}` : `Gems ${score} · lives ${lives}`);
   },
 });
 engine.start();
 
-window.game = { engine, scene, player, playerBody, physics, enemies };
+window.game = { engine, scene, player, playerBody, physics, enemies, lighting };

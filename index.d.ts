@@ -889,3 +889,22 @@ export class RollbackSession<State = unknown, Input = unknown> {
   advance(): boolean;
   synchronize(): boolean;
 }
+
+export const MAX_LIGHTS: number;
+export interface Light { x: number; y: number; radius: number; color: number | string; intensity: number; enabled: boolean; readonly sprite: Sprite; }
+export interface LightLayerOptions extends Omit<NodeOptions, "x" | "y" | "scaleX" | "scaleY" | "blendMode"> {
+  x?: number; y?: number; width: number; height: number;
+  /** Light map pixels per world unit, (0, 1]. Default 0.25. */ resolution?: number;
+  ambient?: number | string;
+}
+export class LightLayer extends RenderGroup {
+  readonly worldBounds: { x: number; y: number; width: number; height: number };
+  readonly resolution: number; readonly lights: Light[]; readonly ambientSprite: Sprite; readonly lightTexture: Texture;
+  ambient: number | string;
+  constructor(options: LightLayerOptions);
+  setAmbient(color: number | string): this;
+  addLight(light?: Partial<Omit<Light, "sprite">>): Light;
+  removeLight(light: Light): boolean;
+  clearLights(): this;
+  syncLight(light: Light): void;
+}

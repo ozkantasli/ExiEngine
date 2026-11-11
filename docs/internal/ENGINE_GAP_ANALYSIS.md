@@ -40,7 +40,7 @@ Legend: ✅ built in · 🔌 official/common plugin or companion package · ➖ 
 | Bitmap fonts (BMFont) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Filters / post FX (blur, glow, outline…) | ✅ fixed catalogue | ✅ | ✅ (+custom) | ➖ | ➖ (custom shaders) | ➖ | ✅ | ✅ | ✅ |
 | User-written shaders | — (by design so far) | ✅ | ✅ | ✅ | ✅ | ➖ | ➖ | ✅ | ✅ |
-| 2D lighting / normal maps | — | ✅ | 🔌 | — | — | — | ✅ | ✅ | ✅ |
+| 2D lighting / normal maps | ➖ `LightLayer` point lights (no normal maps/shadows) | ✅ | 🔌 | — | — | — | ✅ | ✅ | ✅ |
 | Skeletal animation (Spine/DragonBones) | — | 🔌 | 🔌 | 🔌 | — | 🔌 | ✅ | ✅ | ✅ |
 | Audio sprites / spatial audio | ✅ (2D, deterministic) | ✅ | 🔌 | ✅ | ➖ | ✅ | ✅ | ✅ | ✅ |
 | Scene file format | ✅ `serializeScene` JSON | ➖ | — | — | — | — | ✅ | ✅ | ✅ |
@@ -83,7 +83,8 @@ Legend: ✅ built in · 🔌 official/common plugin or companion package · ➖ 
    runtime adapter.
 4. **Joints and continuous collision** for `RigidBodyWorld` (revolute/distance joints, CCD
    for fast thin bodies).
-5. **2D lighting / normal maps** (Phaser, GDevelop, Construct and Godot have them).
+5. **Normal maps and shadows.** ✅ `LightLayer` point lights shipped; normal-mapped sprites and
+   shadow casting are still open.
 6. **UI widgets:** text input (IME), scroll views, sliders, layout containers.
 7. **LDtk import** next to Tiled.
 
@@ -104,7 +105,7 @@ Legend: ✅ built in · 🔌 official/common plugin or companion package · ➖ 
 4. Joints + CCD in `RigidBodyWorld`.
 5. Spine runtime adapter as an optional package (keeps the core dependency-free).
 6. Decide the custom-shader policy; if accepted, ship a bounded `registerFilter` API.
-7. Lighting (normal-mapped sprites + point lights) as a RenderGroup-based effect.
+7. Normal-mapped sprites and simple shadow casting on top of `LightLayer`.
 8. Netcode example (two browser tabs over a local WebSocket relay) on top of `RollbackSession`.
 
 ## 6. Status of earlier gaps from the previous analysis

@@ -39,6 +39,7 @@ browser.
 🎱 Rigid bodies: rotating circles, boxes and convex polygons with friction, restitution and stable stacking</br>
 🌐 Rollback netcode helper for deterministic multiplayer</br>
 🔤 Bitmap fonts (BMFont .fnt/JSON) and 🔊 audio sprites, pitch and 2D spatial sound</br>
+💡 2D lighting layer with ambient color and point lights</br>
 ✨ Filters and post-processing: grayscale…saturate plus blur, glow, outline, pixelate, vignette on nodes or RenderGroups</br>
 🎮 One action/axis input layer for keyboard, pointer, touch and gamepad</br>
 🔊 Web Audio `AudioManager`: buses, fades, panning, voice budget</br>
@@ -81,7 +82,7 @@ only and sends CSP/`nosniff` headers.
 | Example | Shows |
 |---|---|
 | [`examples/platformer`](examples/platformer/main.js) | `TileMap.fromTiled` level, tile-property collision bodies, gravity, coyote time / jump buffering, camera follow + bounds, HUD overlay |
-| [`examples/top-down`](examples/top-down/main.js) | Code-built TileMap walls, zero-gravity physics, trigger pickups, A* (`findGridPath`) chasers, particles, camera shake |
+| [`examples/top-down`](examples/top-down/main.js) | Code-built TileMap walls, zero-gravity physics, trigger pickups, A* (`findGridPath`) chasers, particles, camera shake, `LightLayer` torch lighting |
 | [`examples/physics`](examples/physics/main.js) | `RigidBodyWorld`: boxes, circles, convex polygons, rotation, friction, restitution, a standing pyramid, click to drop shapes |
 | [`examples/ui-menu`](examples/ui-menu/main.js) | Overlay UI, pointer + keyboard focus (Tab/Enter), tweened buttons, `StateMachine` screens |
 

@@ -127,6 +127,7 @@
 - AngelCode BMFont support with `BitmapFont` (text `.fnt` and JSON, kerning, single page) and `BitmapText`, a `SpriteBatch` subclass that lays out glyph quads with alignment, word wrap, letter spacing, anchors, tint and `?` fallback
 - Audio sprites (`addSprites`/`play(name)`), slices (`offset`/`duration`), loop regions (`loopStart`/`loopEnd`), `playbackRate` pitch control and deterministic 2D spatial audio (`setListener`, `configureSpatial`, `setVoicePosition`) on `AudioManager`
 - Transport-agnostic rollback netcode with `RollbackSession`: input delay, prediction, rollback and re-simulation, unacknowledged-input resend, stall protection and checksum-based desync detection for 1-8 players
+- Cheap 2D lighting with `LightLayer`: a low-resolution light map (ambient fill + additive radial point lights) multiplied over a world rectangle, with world-space light objects synced every update
 - A dependency-free TypeScript API contract with the root `index.d.ts`
 - Vertex/instance buffers whose capacity is kept in WebGL2, and narrowed in WebGPU according to a 64 MB global limit and the device limit
 

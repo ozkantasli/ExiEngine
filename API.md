@@ -306,6 +306,18 @@ engine.setScene(restored);
 
 Documents are `{ format: "exi-scene", version: 1, root }`, where every node is the same `{ type, options, children }` shape that MCP `exi_build_scene` accepts. Supported types are `SERIALIZABLE_NODE_TYPES` (`Scene`, `Node`, `Sprite`, `NineSliceSprite`, `Text`, `Graphics`, `TileMap`); common transform/visual/interaction fields, Sprite/Text style, Graphics commands (polygons keep their source points) and TileMap tiles/flip flags are stored. Callbacks and caches are never stored and loading never evaluates code: unknown types or option keys, non-finite numbers, over-long strings and documents past `MAX_SERIALIZED_NODES` (10 000) nodes or depth 64 are rejected. Textures are stored by id (`"white"` for `Texture.white`); an unresolved id becomes a sourceless placeholder (drawn white) that keeps the original id, so saving again never loses the reference; it is listed in `report.missingTextures`, or loading throws with `strict: true`. Unsupported nodes (particles, batches, render groups) throw on save unless `unsupported: "skip"` is passed, which lists them in `document.skipped`.
 
+### `LightLayer` (2D lighting)
+
+```js
+const lighting = new LightLayer({ x: 0, y: 0, width: levelWidth, height: levelHeight, resolution: 0.25, ambient: 0x1e2433 });
+const torch = lighting.addLight({ x: player.position.x, y: player.position.y, radius: 160, color: 0xffe2b0, intensity: 1 });
+scene.add(lighting);                       // drawn above the world (zIndex 1 000 000) with multiply blending
+// every update: just edit the light object
+torch.x = player.position.x; torch.y = player.position.y;
+```
+
+A `RenderGroup` covering a world rectangle at reduced resolution: it is filled with the `ambient` color, point lights add soft radial gradients (additive blend, tinted by `color`, scaled by `intensity` 0..1), and the result multiplies the world beneath it, so unlit areas fade to the ambient color and lit areas keep their colors. Lights are plain objects in world coordinates (`x`, `y`, `radius`, `color`, `intensity`, `enabled`); the layer syncs them every update. It costs one extra render pass and one draw for the composite, independent of the screen size. Overlay HUD scenes are not affected. Limits: `MAX_LIGHTS` (256) lights, 4 MPixel light maps; no normal maps or shadow casting yet.
+
 ## 7. Atlases and asset loading
 
 ### `TextureAtlas`
