@@ -287,6 +287,19 @@ ground.createStaticBodies(physics, { solidTiles: solid });
 
 `TileMap.fromTiled(map, { texture, layer?, tileset?, ...nodeOptions })` builds one TileMap from one tile layer of a [Tiled](https://www.mapeditor.org) JSON (`.tmj`) map. `layer` and `tileset` select by index or name (defaults: first tile layer, first tileset). Layer `offsetx`/`offsety`, `opacity`, `visible` and `name` are applied on top of the node options, and horizontal/vertical flip bits become `flipX`/`flipY`. Supported: finite orthogonal maps, CSV-array or uncompressed base64 data, embedded or external tilesets (external tilesets are only range-checked against the texture grid). Rejected with an explicit error instead of rendering wrong: infinite/chunked maps, compressed data, non-orthogonal orientation, diagonal-flip (rotated) tiles, tileset margin/spacing, a tile size that differs from the map, and layers that mix tiles from several tilesets (create one TileMap per tileset/layer). `TileMap.tiledTileIdsWithProperty(map, name, { tileset?, value = true })` returns the local tile ids whose custom property equals `value`, ready for `solidTiles`.
 
+#### LDtk import
+
+```js
+const project = await loader.loadJSON("/levels/world.ldtk");
+const tiles = await loader.loadTexture("/levels/tiles.png");
+const ground = tileMapFromLDtk(project, { level: "Level_0", layer: "Ground", texture: tiles });
+const walls = ldtkIntGrid(project, { level: "Level_0", layer: "Collisions" });       // values, get(x, y), toRows()
+const path = findGridPath(walls.toRows(), start, goal, { blockedValues: [1] });
+for (const entity of ldtkEntities(project, { level: "Level_0" })) spawn(entity.identifier, entity.x, entity.y, entity.fields);
+```
+
+Reads [LDtk](https://ldtk.io) project JSON. `tileMapFromLDtk` builds a TileMap from a `Tiles` or `AutoLayer` layer (or the auto-tiles of an `IntGrid` layer): tile ids, X/Y flip bits, layer offsets, opacity and visibility are applied, and when several tiles stack in one cell the top-most one wins. `ldtkIntGrid` returns the integer grid for collision and `findGridPath`; `ldtkEntities` returns entities with pivot position, top-left corner, size, tags and custom fields. Levels and layers are chosen by index, identifier or object; for "separate level files" projects pass the loaded `.ldtkl` object as `level`. Rejected explicitly: tilesets with padding/spacing, tileset grid sizes different from the layer, and layers without tiles.
+
 ### `RenderGroup`
 
 Collects its children in a RenderTexture pass. Provides `resize`, `setEffects`, `clearEffects`, `getEffects` and `getRenderCamera`. The effect list consists of allowlisted filters and uses a bounded ping-pong target.

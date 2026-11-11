@@ -129,6 +129,7 @@
 - Transport-agnostic rollback netcode with `RollbackSession`: input delay, prediction, rollback and re-simulation, unacknowledged-input resend, stall protection and checksum-based desync detection for 1-8 players
 - Cheap 2D lighting with `LightLayer`: a low-resolution light map (ambient fill + additive radial point lights) multiplied over a world rectangle, with world-space light objects synced every update
 - Free-form JSON `node.data` metadata stored in scene documents, and `watchScene()` hot reload from a polled file and/or the editor's BroadcastChannel; the editor gains a live Play window with rigid-body preview from `data.body` and direct-to-file saving
+- LDtk project import: `tileMapFromLDtk` (Tiles/AutoLayer with flips, offsets, opacity), `ldtkIntGrid` (collision/pathfinding grid) and `ldtkEntities` (positions, sizes, tags, custom fields)
 - A dependency-free TypeScript API contract with the root `index.d.ts`
 - Vertex/instance buffers whose capacity is kept in WebGL2, and narrowed in WebGPU according to a 64 MB global limit and the device limit
 

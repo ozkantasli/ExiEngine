@@ -31,3 +31,4 @@ export { BitmapFont, BitmapText, parseBitmapFontText, MAX_BITMAP_FONT_GLYPHS, MA
 export { RollbackSession, MAX_ROLLBACK_PLAYERS, MAX_ROLLBACK_FRAMES } from "./net/rollback.js";
 export { LightLayer, MAX_LIGHTS } from "./core/light-layer.js";
 export { watchScene, EDITOR_CHANNEL } from "./assets/scene-watch.js";
+export { tileMapFromLDtk, ldtkIntGrid, ldtkEntities } from "./core/ldtk.js";

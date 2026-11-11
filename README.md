@@ -34,7 +34,7 @@ browser.
 📦 Zero runtime dependencies, one `import`</br>
 🧩 Scene graph: Sprite, Text, Graphics, TileMap, ParticleEmitter, NineSlice, RenderGroup</br>
 🚀 Instanced `SpriteBatch` with WebGPU compute culling, up to 100,000 sprites per batch</br>
-🗺️ Instanced TileMap, Tiled (.tmj) import, collision-rect generation and A* pathfinding</br>
+🗺️ Instanced TileMap, Tiled (.tmj) and LDtk import, collision-rect generation and A* pathfinding</br>
 🧱 Lightweight physics: gravity, one-way and moving platforms, layers/masks, contact events</br>
 🎱 Rigid bodies: rotating circles, boxes and convex polygons with friction, restitution and stable stacking</br>
 🌐 Rollback netcode helper for deterministic multiplayer</br>

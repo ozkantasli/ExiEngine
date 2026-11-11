@@ -36,7 +36,7 @@ Legend: ✅ built in · 🔌 official/common plugin or companion package · ➖ 
 | Rigid bodies with rotation | ✅ `RigidBodyWorld` (no joints yet) | ✅ (Matter) | — | ✅ | — | ➖ | ✅ | ✅ | ✅ |
 | Joints / constraints | ✅ revolute + distance/rope | ✅ | — | — | — | — | ✅ | ✅ | ✅ |
 | Tiled import | ✅ `TileMap.fromTiled` | ✅ | 🔌 | 🔌 | ➖ | ✅ | ➖ | ➖ | 🔌 |
-| LDtk import | — | 🔌 | 🔌 | 🔌 | — | — | — | — | 🔌 |
+| LDtk import | ✅ tiles, IntGrid, entities | 🔌 | 🔌 | 🔌 | — | — | — | — | 🔌 |
 | Bitmap fonts (BMFont) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Filters / post FX (blur, glow, outline…) | ✅ fixed catalogue | ✅ | ✅ (+custom) | ➖ | ➖ (custom shaders) | ➖ | ✅ | ✅ | ✅ |
 | User-written shaders | — (by design so far) | ✅ | ✅ | ✅ | ✅ | ➖ | ➖ | ✅ | ✅ |
@@ -86,7 +86,7 @@ Legend: ✅ built in · 🔌 official/common plugin or companion package · ➖ 
 5. **Normal maps and shadows.** ✅ `LightLayer` point lights shipped; normal-mapped sprites and
    shadow casting are still open.
 6. **UI widgets:** text input (IME), scroll views, sliders, layout containers.
-7. **LDtk import** next to Tiled.
+7. ~~LDtk import~~ ✅ shipped (tiles, IntGrid, entities).
 
 **P2 — strategic**
 8. **Custom shaders.** Deliberately excluded so far (security contract: no remote shaders,

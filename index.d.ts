@@ -936,3 +936,10 @@ export interface WatchSceneOptions {
   onError?: ((error: Error, source: "url" | "channel" | "manual") => void) | null;
 }
 export function watchScene(options: WatchSceneOptions): SceneWatcher;
+
+export interface LDtkSelection { level?: number | string | Record<string, unknown>; layer?: number | string; }
+export interface LDtkIntGrid { identifier: string; columns: number; rows: number; gridSize: number; values: Int32Array; get(x: number, y: number): number; toRows(): number[][]; }
+export interface LDtkEntity { identifier: string; iid: string | null; layer: string; x: number; y: number; width: number; height: number; left: number; top: number; tags: string[]; fields: Record<string, unknown>; }
+export function tileMapFromLDtk(project: Record<string, unknown>, options: LDtkSelection & Omit<TileMapOptions, "texture" | "tileWidth" | "tileHeight" | "columns" | "rows"> & { texture: Texture }): TileMap;
+export function ldtkIntGrid(project: Record<string, unknown>, options?: LDtkSelection): LDtkIntGrid;
+export function ldtkEntities(project: Record<string, unknown>, options?: { level?: number | string | Record<string, unknown>; layer?: string }): LDtkEntity[];
