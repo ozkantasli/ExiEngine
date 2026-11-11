@@ -117,3 +117,17 @@ test("text: Intl.Segmenter yoksa legacy grapheme", () => {
   label.destroy();
   atlas.destroy();
 });
+
+test("text: accents above capitals get vertical room (top baseline)", () => {
+  const plain = new Text({ text: "Ozkan", font: "20px sans-serif" });
+  const fills = [];
+  const original = plain.context.fillText;
+  plain.context.fillText = (...args) => { fills.push(args); return original?.(...args); };
+  plain.setText("Özkan");
+  assert.equal(fills.at(-1)[2], 5, "drawn 25% of the font size below the top edge");
+  assert.equal(plain.height, Math.ceil(20 * 1.2 + 5 * 2));
+  const huge = new Text({ text: "X", font: "99999px sans-serif" });
+  assert.ok(huge.height <= 4_096, "padding never pushes past the size limit");
+  plain.destroy();
+  huge.destroy();
+});

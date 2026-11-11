@@ -75,3 +75,13 @@ test("graphics: destroy temizliği", () => {
   gfx.destroy();
   assert.equal(gfx.commands.length, 0);
 });
+
+test("graphics: roundedRect with the radius at half a side (pills, round buttons)", async () => {
+  const { Graphics } = await import("../../src/index.js");
+  const shapes = new Graphics().roundedRect(0, 0, 6, 6, 3).roundedRect(0, 0, 100, 6, 3).roundedRect(0, 0, 6, 100, 3).roundedRect(0, 0, 40, 40, 99);
+  assert.equal(shapes.commands.length, 4);
+  for (const command of shapes.commands) {
+    const points = command.points;
+    for (let index = 2; index < points.length; index += 2) assert.ok(points[index] !== points[index - 2] || points[index + 1] !== points[index - 1], "no duplicate consecutive points");
+  }
+});

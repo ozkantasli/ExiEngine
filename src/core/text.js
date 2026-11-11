@@ -72,6 +72,14 @@ function lineHeightFor(font) {
   return Number.isFinite(requested) ? Math.min(MAX_TEXT_DIMENSION, Math.max(1, requested)) : 19.2;
 }
 
+// Accents above capitals (Ö, Ü, Ç, Ş, İ, Â …) and some descenders reach outside
+// the em box that textBaseline "top" aligns to; reserve room so they are not cut.
+function accentPaddingFor(font) {
+  const match = /(?:^|\s)(\d+(?:\.\d+)?)px(?:\s|$)/i.exec(font);
+  const size = match ? Number(match[1]) : 16;
+  return Number.isFinite(size) ? Math.min(256, Math.ceil(size * 0.25)) : 4;
+}
+
 function positive(value, fallback, maximum) {
   const number = Number(value);
   return Number.isFinite(number) && number >= 0 ? Math.min(maximum, number) : fallback;
@@ -131,8 +139,8 @@ function textCacheKey(text, font, fill, stroke, strokeWidth, align, baseline, li
   return JSON.stringify([text, font, String(fill), stroke == null ? "" : String(stroke), strokeWidth, align, baseline, lineHeight, padding, resolution, maxWidth, wordWrap, width, height, sourceWidth, sourceHeight, renderMode]);
 }
 
-function renderText(canvas, context, lines, { font, fill, stroke, strokeWidth, align, baseline, resolution, logicalWidth, logicalHeight, sourceWidth, sourceHeight, outerPadding, lineHeight, measureContext, glyphAtlas = null }) {
-  if (glyphAtlas?.renderText(canvas, context, lines, { font, fill, stroke, strokeWidth, align, baseline, resolution, logicalWidth, logicalHeight, sourceWidth, sourceHeight, outerPadding, lineHeight, measureContext })) return { source: canvas, context, width: logicalWidth, height: logicalHeight, sourceWidth, sourceHeight };
+function renderText(canvas, context, lines, { font, fill, stroke, strokeWidth, align, baseline, resolution, logicalWidth, logicalHeight, sourceWidth, sourceHeight, outerPadding, lineHeight, measureContext, glyphAtlas = null, topPadding = 0 }) {
+  if (glyphAtlas?.renderText(canvas, context, lines, { font, fill, stroke, strokeWidth, align, baseline, resolution, logicalWidth, logicalHeight, sourceWidth, sourceHeight, outerPadding, lineHeight, measureContext, topPadding })) return { source: canvas, context, width: logicalWidth, height: logicalHeight, sourceWidth, sourceHeight };
   canvas.width = sourceWidth;
   canvas.height = sourceHeight;
   if (context.setTransform) context.setTransform(1, 0, 0, 1, 0, 0);
@@ -146,7 +154,7 @@ function renderText(canvas, context, lines, { font, fill, stroke, strokeWidth, a
   if (stroke && strokeWidth > 0) { context.strokeStyle = stroke; context.lineWidth = strokeWidth; }
   const x = align === "left" ? outerPadding : align === "center" ? logicalWidth * 0.5 : logicalWidth - outerPadding;
   for (let index = 0; index < lines.length; index += 1) {
-    const y = outerPadding + index * lineHeight;
+    const y = outerPadding + topPadding + index * lineHeight;
     if (stroke && strokeWidth > 0) context.strokeText(lines[index], x, y);
     context.fillText(lines[index], x, y);
   }
@@ -287,8 +295,9 @@ export class GlyphAtlas {
     const advance = Number(metrics?.width);
     if (!Number.isFinite(advance) || advance < 0) return null;
     const inset = this.padding + style.strokeWidth;
+    const accent = accentPaddingFor(style.font);
     const logicalWidth = Math.max(1, advance + inset * 2);
-    const logicalHeight = Math.max(1, lineHeightFor(style.font) + inset * 2);
+    const logicalHeight = Math.max(1, lineHeightFor(style.font) + inset * 2 + accent * 2);
     const sourceWidth = Math.max(1, Math.ceil(logicalWidth * style.resolution));
     const sourceHeight = Math.max(1, Math.ceil(logicalHeight * style.resolution));
     if (sourceWidth > this.width || sourceHeight > this.height) { this.capacityRejections += 1; return null; }
@@ -311,15 +320,15 @@ export class GlyphAtlas {
     context.textAlign = "left";
     context.textBaseline = "top";
     context.fillStyle = style.fill;
-    if (style.stroke && style.strokeWidth > 0) { context.strokeStyle = style.stroke; context.lineWidth = style.strokeWidth; context.strokeText(cluster, x / style.resolution + inset, y / style.resolution + inset); }
-    context.fillText(cluster, x / style.resolution + inset, y / style.resolution + inset);
+    if (style.stroke && style.strokeWidth > 0) { context.strokeStyle = style.stroke; context.lineWidth = style.strokeWidth; context.strokeText(cluster, x / style.resolution + inset, y / style.resolution + inset + accent); }
+    context.fillText(cluster, x / style.resolution + inset, y / style.resolution + inset + accent);
     context.setTransform?.(1, 0, 0, 1, 0, 0);
-    const entry = { x, y, sourceWidth, sourceHeight, logicalWidth, logicalHeight, inset, advance };
+    const entry = { x, y, sourceWidth, sourceHeight, logicalWidth, logicalHeight, inset, accent, advance };
     this.entries.set(key, entry);
     return entry;
   }
 
-  renderText(canvas, context, lines, { font, fill, stroke, strokeWidth, align, baseline, resolution, logicalWidth, logicalHeight, sourceWidth, sourceHeight, outerPadding, lineHeight, measureContext = context }) {
+  renderText(canvas, context, lines, { font, fill, stroke, strokeWidth, align, baseline, resolution, logicalWidth, logicalHeight, sourceWidth, sourceHeight, outerPadding, lineHeight, measureContext = context, topPadding = 0 }) {
     const complexShaping = requiresComplexShaping(lines.join("\n"));
     if (complexShaping) this.complexScriptFallbacks += 1;
     if (this.destroyed || baseline !== "top" || typeof context.drawImage !== "function" || complexShaping) return false;
@@ -343,9 +352,9 @@ export class GlyphAtlas {
       const line = lines[index];
       const lineWidth = Number(measureContext.measureText(line).width) || 0;
       let x = align === "left" ? outerPadding : align === "center" ? logicalWidth * 0.5 - lineWidth * 0.5 : logicalWidth - outerPadding - lineWidth;
-      const y = outerPadding + index * lineHeight;
+      const y = outerPadding + topPadding + index * lineHeight;
       for (const glyph of lineGlyphs[index]) {
-        context.drawImage(this.canvas, glyph.x, glyph.y, glyph.sourceWidth, glyph.sourceHeight, x - glyph.inset, y - glyph.inset, glyph.logicalWidth, glyph.logicalHeight);
+        context.drawImage(this.canvas, glyph.x, glyph.y, glyph.sourceWidth, glyph.sourceHeight, x - glyph.inset, y - glyph.inset - glyph.accent, glyph.logicalWidth, glyph.logicalHeight);
         x += glyph.advance;
       }
     }
@@ -457,7 +466,9 @@ export class Text extends Sprite {
     let maxLineWidth = 0;
     for (const line of lines) maxLineWidth = Math.max(maxLineWidth, Number(measureContext.measureText(line)?.width) || 0);
     const logicalWidth = Math.max(1, Math.ceil((this.wordWrap && this.maxWidth > 0 ? this.maxWidth : maxLineWidth) + outerPadding * 2));
-    const logicalHeight = Math.max(1, Math.ceil(lines.length * this.lineHeight + outerPadding * 2));
+    const contentHeight = lines.length * this.lineHeight + outerPadding * 2;
+    const topPadding = this.baseline === "top" ? Math.max(0, Math.min(accentPaddingFor(this.font), Math.floor((MAX_TEXT_DIMENSION - contentHeight) / 2))) : 0;
+    const logicalHeight = Math.max(1, Math.ceil(lines.length * this.lineHeight + outerPadding * 2 + topPadding * 2));
     const pixelWidth = Math.max(1, Math.ceil(logicalWidth * this.resolution));
     const pixelHeight = Math.max(1, Math.ceil(logicalHeight * this.resolution));
     if (pixelWidth > MAX_TEXT_DIMENSION || pixelHeight > MAX_TEXT_DIMENSION || pixelWidth * pixelHeight > MAX_TEXT_PIXELS) throw new RangeError("Text canvas limit exceeded.");
@@ -470,7 +481,7 @@ export class Text extends Sprite {
         const canvas = createCanvas();
         const context = canvas.getContext?.("2d");
         if (!context?.measureText) throw new Error("Text requires a Canvas 2D context.");
-        return renderText(canvas, context, lines, { font: this.font, fill: this.fill, stroke: this.stroke, strokeWidth: this.strokeWidth, align: this.align, baseline: this.baseline, resolution: this.resolution, logicalWidth, logicalHeight, sourceWidth: pixelWidth, sourceHeight: pixelHeight, outerPadding, lineHeight: this.lineHeight, measureContext, glyphAtlas: this.glyphAtlas });
+        return renderText(canvas, context, lines, { font: this.font, fill: this.fill, stroke: this.stroke, strokeWidth: this.strokeWidth, align: this.align, baseline: this.baseline, resolution: this.resolution, logicalWidth, logicalHeight, sourceWidth: pixelWidth, sourceHeight: pixelHeight, outerPadding, lineHeight: this.lineHeight, measureContext, glyphAtlas: this.glyphAtlas, topPadding });
       });
       if (entry) {
         this.releaseTexture();
@@ -493,7 +504,7 @@ export class Text extends Sprite {
     }
 
     const sameSize = this.canvas.width === pixelWidth && this.canvas.height === pixelHeight;
-    const rendered = renderText(this.canvas, this.context, lines, { font: this.font, fill: this.fill, stroke: this.stroke, strokeWidth: this.strokeWidth, align: this.align, baseline: this.baseline, resolution: this.resolution, logicalWidth, logicalHeight, sourceWidth: pixelWidth, sourceHeight: pixelHeight, outerPadding, lineHeight: this.lineHeight, measureContext, glyphAtlas: this.glyphAtlas });
+    const rendered = renderText(this.canvas, this.context, lines, { font: this.font, fill: this.fill, stroke: this.stroke, strokeWidth: this.strokeWidth, align: this.align, baseline: this.baseline, resolution: this.resolution, logicalWidth, logicalHeight, sourceWidth: pixelWidth, sourceHeight: pixelHeight, outerPadding, lineHeight: this.lineHeight, measureContext, glyphAtlas: this.glyphAtlas, topPadding });
     if (sameSize && !this.cacheEntry && !ownsNewCanvas) this.texture.updateSource(this.canvas);
     else {
       const previous = this.texture;

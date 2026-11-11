@@ -163,12 +163,19 @@ export class Graphics extends Node {
       { cx: left + r, cy: top + rectHeight - r, startAngle: Math.PI * 0.5, endAngle: Math.PI },
       { cx: left + r, cy: top + r, startAngle: Math.PI, endAngle: Math.PI * 1.5 },
     ];
+    // When r reaches half a side (pills, round buttons) neighbouring arcs meet
+    // in the same point; duplicate consecutive points would break triangulation.
+    const epsilon = 1e-6;
     for (const corner of corners) {
       for (let i = 0; i <= segs; i += 1) {
         const angle = corner.startAngle + (corner.endAngle - corner.startAngle) * (i / segs);
-        points.push(worldValue(corner.cx + Math.cos(angle) * r), worldValue(corner.cy + Math.sin(angle) * r));
+        const px = worldValue(corner.cx + Math.cos(angle) * r); const py = worldValue(corner.cy + Math.sin(angle) * r);
+        const count = points.length;
+        if (count >= 2 && Math.abs(points[count - 2] - px) < epsilon && Math.abs(points[count - 1] - py) < epsilon) continue;
+        points.push(px, py);
       }
     }
+    if (points.length >= 4 && Math.abs(points[0] - points[points.length - 2]) < epsilon && Math.abs(points[1] - points[points.length - 1]) < epsilon) points.length -= 2;
     return this.polygon(points, { fill, alpha });
   }
 
