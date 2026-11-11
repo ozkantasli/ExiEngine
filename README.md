@@ -258,7 +258,7 @@ Physical device results are collected in [test/HARDWARE_MATRIX.md](test/HARDWARE
 | Threat model and security contract | [SECURITY.md](SECURITY.md) |
 | Product requirements | [PRD.md](docs/internal/PRD.md) |
 | Roadmap | [ROADMAP.md](ROADMAP.md) |
-| Comparison with other engines | [ENGINE_FEATURE_MATRIX.md](docs/internal/ENGINE_FEATURE_MATRIX.md), [ENGINE_GAP_ANALYSIS.md](docs/internal/ENGINE_GAP_ANALYSIS.md) |
+| Comparison with other engines | [ENGINE_GAP_ANALYSIS.md](docs/internal/ENGINE_GAP_ANALYSIS.md) (web 2D: Phaser, PixiJS, Excalibur, KAPLAY, melonJS, GDevelop, Construct, Godot web), [ENGINE_FEATURE_MATRIX.md](docs/internal/ENGINE_FEATURE_MATRIX.md) (broad survey) |
 | Research gaps | [RESEARCH_GAPS.md](docs/internal/RESEARCH_GAPS.md) |
 | Implicit state machine audit | [IMPLICIT_STATE_MACHINES.md](docs/internal/IMPLICIT_STATE_MACHINES.md) |
 
@@ -314,7 +314,8 @@ drive directly, try ExiEngine.
 |---|---|---|
 | MVP | ✅ | Dependency-free 2D core, scene graph, camera, input, MCP bridge |
 | v0.2 | ✅ | Physics/collision, deterministic fixed step, A*, asset pipeline, safety limits, benchmark gate |
-| v1.0 | 🛠️ | Scene serialization ✅, browser editor ✅ (first version), hot reload, GPU profiling, mobile device matrix |
+| v0.3 | ✅ (unreleased) | npm-ready package, Tiled import, examples, scene serialization, browser editor (first version), rigid bodies, post-process filters, BitmapText, audio sprites + spatial audio |
+| v1.0 | 🛠️ | npm publish, editor v2 (play-in-editor, hot reload, prefabs), joints, Spine, lighting, GPU profiling, mobile device matrix |
 
 Details: [ROADMAP.md](ROADMAP.md)
 
