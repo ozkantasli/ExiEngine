@@ -111,3 +111,119 @@ test("light layer: normal buffer mirrors sprites and lights use the normal-light
   assert.equal(layer.removeNormalMap(other), false);
   layer.destroy();
 });
+
+function insideConvex(points, x, y) {
+  let sign = 0;
+  for (let index = 0; index < points.length; index += 2) {
+    const x1 = points[index]; const y1 = points[index + 1];
+    const x2 = points[(index + 2) % points.length]; const y2 = points[(index + 3) % points.length];
+    const cross = (x2 - x1) * (y - y1) - (y2 - y1) * (x - x1);
+    if (Math.abs(cross) < 1e-9) continue;
+    if (sign === 0) sign = Math.sign(cross);
+    else if (Math.sign(cross) !== sign) return false;
+  }
+  return true;
+}
+
+// Is a world point dark in this light's shadow pass?
+function shadowed(layer, light, worldX, worldY) {
+  const { shadow } = light;
+  const scaleX = layer.width / layer.worldBounds.width; const scaleY = layer.height / layer.worldBounds.height;
+  const half = shadow.size / 2;
+  const lightX = (light.x - layer.worldBounds.x) * scaleX; const lightY = (light.y - layer.worldBounds.y) * scaleY;
+  const x = ((worldX - layer.worldBounds.x) * scaleX - lightX) / shadow.scale + half;
+  const y = ((worldY - layer.worldBounds.y) * scaleY - lightY) / shadow.scale + half;
+  return shadow.shapes.commands.some((command) => insideConvex(command.points, x, y));
+}
+
+test("light layer: shadow-casting lights darken only the area behind occluders", async () => {
+  const { MAX_SHADOW_LIGHTS, Graphics, Sprite } = await import("../../src/index.js");
+  const scene = new Scene();
+  const layer = new LightLayer({ width: 400, height: 200, resolution: 0.5 });
+  scene.add(layer);
+  const wall = layer.addOccluder({ x: 140, y: 80, width: 20, height: 40 });
+  layer.addOccluder({ points: [300, 20, 330, 20, 315, 50] });
+  const lamp = layer.addLight({ x: 100, y: 100, radius: 120, shadows: true });
+  scene.update(1 / 60);
+  assert.ok(lamp.shadow, "a shadow pass exists");
+  assert.equal(lamp.sprite.parent, lamp.shadow.group, "the light draws inside its shadow pass");
+  assert.equal(lamp.shadow.group.blendMode, "additive");
+  assert.ok(lamp.shadow.size >= 120 && lamp.shadow.size <= 1024);
+  assert.equal(shadowed(layer, lamp, 200, 100), true, "behind the wall is dark");
+  assert.equal(shadowed(layer, lamp, 210, 85), true, "the shadow widens with distance");
+  assert.equal(shadowed(layer, lamp, 120, 100), false, "in front of the wall is lit");
+  assert.equal(shadowed(layer, lamp, 150, 100), false, "the wall itself stays lit");
+  assert.equal(shadowed(layer, lamp, 100, 160), false, "beside the light is lit");
+  assert.equal(shadowed(layer, lamp, 200, 30), false, "outside the wall's shadow cone is lit");
+  const commandsWithFarTriangle = lamp.shadow.shapes.commands.length;
+  assert.ok(commandsWithFarTriangle >= 1 && commandsWithFarTriangle <= 3, `only back-facing edges inside the light cast (${commandsWithFarTriangle})`);
+
+  // Occluders follow edits; moving the light moves the shadow.
+  lamp.x = 250; scene.update(1 / 60);
+  assert.equal(shadowed(layer, lamp, 200, 100), false);
+  assert.equal(shadowed(layer, lamp, 100, 100), true, "the shadow now falls to the left");
+  wall.enabled = false; scene.update(1 / 60);
+  assert.equal(shadowed(layer, lamp, 100, 100), false, "a disabled occluder casts nothing");
+  wall.enabled = true;
+
+  // Node occluders follow position and rotation.
+  const crate = new Graphics({ x: 180, y: 100 }).rect(-10, -10, 20, 20, { fill: 0xffffff });
+  scene.add(crate);
+  const following = layer.addOccluder({ node: crate });
+  lamp.x = 100; layer.removeOccluder(wall); scene.update(1 / 60);
+  assert.equal(shadowed(layer, lamp, 240, 100), true, "a node occluder casts a shadow");
+  crate.position.y = 40; scene.update(1 / 60);
+  assert.ok(following.points[1] < 40, "node occluder points follow the node");
+  assert.equal(shadowed(layer, lamp, 240, 100), false);
+  crate.visible = false; scene.update(1 / 60);
+  assert.equal(lamp.shadow.shapes.commands.length, 0, "hidden nodes cast nothing");
+
+  // Turning shadows off moves the light back into the light map and frees the pass.
+  const group = lamp.shadow.group;
+  lamp.shadows = false; scene.update(1 / 60);
+  assert.equal(lamp.shadow, null);
+  assert.equal(group.destroyed, true);
+  assert.equal(lamp.sprite.parent, layer);
+  assert.deepEqual([lamp.sprite.position.x, lamp.sprite.width], [50, 120]);
+  lamp.shadows = true; scene.update(1 / 60);
+  assert.ok(lamp.shadow);
+  layer.removeLight(lamp);
+  assert.equal(layer.shadowLightCount, 0);
+
+  // Limits and validation.
+  for (let index = 0; index < MAX_SHADOW_LIGHTS; index += 1) layer.addLight({ x: index, y: 10, radius: 4, shadows: true });
+  assert.throws(() => layer.addLight({ shadows: true }), /shadow-casting/);
+  const extra = layer.addLight({ x: 10, y: 10, radius: 4 });
+  extra.shadows = true; scene.update(1 / 60);
+  assert.equal(extra.shadow, null, "over the cap a light stays unshadowed instead of failing");
+  assert.throws(() => layer.addOccluder({ points: [0, 0, 1, 1] }), /three/);
+  assert.throws(() => layer.addOccluder({ points: new Array(200).fill(1) }), /at most/);
+  assert.throws(() => layer.addOccluder({ x: 0, y: 0, width: 0, height: 5 }), /positive/);
+  assert.throws(() => layer.addOccluder({ node: {} }), /Node/);
+  assert.throws(() => layer.addOccluder({ points: [0, 0, NaN, 1, 2, 2] }), /finite/);
+  layer.clearOccluders();
+  assert.equal(layer.occluders.length, 0);
+  layer.destroy();
+  void Sprite;
+});
+
+test("light layer: shadow passes keep normal mapping by remapping the normal buffer", async () => {
+  const { Sprite } = await import("../../src/index.js");
+  const scene = new Scene();
+  const layer = new LightLayer({ width: 400, height: 200, resolution: 0.5, normals: true });
+  scene.add(layer);
+  const wall = new Sprite({ texture: Texture.white, x: 150, y: 100, width: 20, height: 40 });
+  scene.add(wall);
+  layer.addNormalMap(wall, Texture.white);
+  layer.addOccluder({ node: wall });
+  const lamp = layer.addLight({ x: 100, y: 100, radius: 80, shadows: true });
+  scene.update(1 / 60);
+  assert.equal(lamp.sprite.filter, "normal-light");
+  assert.equal(lamp.sprite.maskTexture, layer.normalBuffer.target);
+  const half = lamp.shadow.size / 2;
+  // The light map origin sits at half - lightX in the pass, at the light map's size.
+  assert.deepEqual([lamp.sprite.maskRect.x, lamp.sprite.maskRect.y, lamp.sprite.maskRect.width, lamp.sprite.maskRect.height], [half - 50, half - 50, 200, 100]);
+  lamp.shadows = false; scene.update(1 / 60);
+  assert.deepEqual([lamp.sprite.maskRect.x, lamp.sprite.maskRect.width], [0, 200], "back in the light map the mask covers it again");
+  layer.destroy();
+});

@@ -1,7 +1,8 @@
 // ExiEngine example: a top-down arena.
 // Shows a code-built TileMap with merged static wall bodies, zero-gravity physics,
 // trigger pickups via PhysicsWorld.overlaps, A* (findGridPath) chasing enemies,
-// a particle burst, camera shake, 2D lighting (LightLayer) and a HUD overlay.
+// a particle burst, camera shake, 2D lighting (LightLayer) with walls casting
+// shadows from the player's torch, and a HUD overlay.
 import { Camera, ExiEngine, Graphics, LightLayer, ParticleEmitter, PhysicsBody, PhysicsWorld, Scene, Text, Texture, TileMap, findGridPath } from "../../src/index.js";
 
 const CELL = 32;
@@ -77,7 +78,9 @@ scene.add(sparks);
 
 // Lighting: a dark arena, a torch that follows the player and glowing gems.
 const lighting = new LightLayer({ width: COLUMNS * CELL, height: ROWS * CELL, ambient: 0x1e2433 });
-const torch = lighting.addLight({ radius: 150, color: 0xffe2b0 });
+// The merged wall rectangles double as shadow occluders for the torch.
+for (const rect of walls.getCollisionRects(null, [])) lighting.addOccluder(rect);
+const torch = lighting.addLight({ radius: 170, color: 0xffe2b0, shadows: true });
 const gemLights = new Map(gems.map((gem) => [gem, lighting.addLight({ x: gem.node.position.x + 7, y: gem.node.position.y + 7, radius: 46, color: 0xfacc15, intensity: 0.8 })]));
 scene.add(lighting);
 

@@ -102,8 +102,22 @@ const orbs = [[240, 300, 0x60a5fa], [480, 200, 0xf472b6], [720, 330, 0x4ade80]].
 let normalsOn = true;
 for (const [sprite, normals] of surfaces) lighting.addNormalMap(sprite, normals);
 
-const torch = lighting.addLight({ x: WIDTH / 2, y: HEIGHT / 2, radius: 320, color: 0xffd9a0, intensity: 1, height: 0.25 });
-const blue = lighting.addLight({ x: 120, y: 80, radius: 260, color: 0x7dd3fc, intensity: 0.7, height: 0.3 });
+// Round occluders that follow the orbs: both lights cast shadows from them (S toggles).
+const ORB_SIDES = 16;
+const orbOccluders = orbs.map(() => lighting.addOccluder({ points: new Array(ORB_SIDES * 2).fill(0).map((_, index) => index) }));
+function syncOrbOccluders() {
+  for (const [index, orb] of orbs.entries()) {
+    const points = orbOccluders[index].points;
+    for (let side = 0; side < ORB_SIDES; side += 1) {
+      const angle = (side / ORB_SIDES) * Math.PI * 2;
+      points[side * 2] = orb.position.x + Math.cos(angle) * 46;
+      points[side * 2 + 1] = orb.position.y + Math.sin(angle) * 46;
+    }
+  }
+}
+syncOrbOccluders();
+const torch = lighting.addLight({ x: WIDTH / 2, y: HEIGHT / 2, radius: 320, color: 0xffd9a0, intensity: 1, height: 0.25, shadows: true });
+const blue = lighting.addLight({ x: 120, y: 80, radius: 260, color: 0x7dd3fc, intensity: 0.7, height: 0.3, shadows: true });
 scene.add(lighting);
 
 const hud = new Scene();
@@ -121,7 +135,7 @@ const engine = await ExiEngine.create({
   scene,
   camera,
   overlayScene: hud,
-  inputActions: { normals: ["KeyN"], height: ["KeyH"] },
+  inputActions: { normals: ["KeyN"], height: ["KeyH"], shadows: ["KeyS"] },
   inputAxes: {
     moveX: [{ type: "key-axis", positive: "ArrowRight", negative: "ArrowLeft" }],
     moveY: [{ type: "key-axis", positive: "ArrowDown", negative: "ArrowUp" }],
@@ -143,6 +157,8 @@ const engine = await ExiEngine.create({
     blue.x = WIDTH / 2 + Math.cos(time * 0.6) * 380;
     blue.y = HEIGHT / 2 + Math.sin(time * 0.9) * 200;
     for (const [index, orb] of orbs.entries()) orb.position.y += Math.sin(time * 1.5 + index) * 0.3;
+    syncOrbOccluders();
+    if (input.wasActionPressed("shadows")) torch.shadows = blue.shadows = !torch.shadows;
     if (input.wasActionPressed("normals")) {
       normalsOn = !normalsOn;
       for (const [sprite, normals] of surfaces) {
@@ -151,7 +167,7 @@ const engine = await ExiEngine.create({
       }
     }
     if (input.wasActionPressed("height")) torch.height = torch.height > 0.5 ? 0.1 : torch.height + 0.2;
-    label.setText(`normal maps ${normalsOn ? "on" : "off"} (N) · torch height ${torch.height.toFixed(2)} (H) · arrows or pointer move the torch`);
+    label.setText(`normal maps ${normalsOn ? "on" : "off"} (N) · shadows ${torch.shadows ? "on" : "off"} (S) · torch height ${torch.height.toFixed(2)} (H) · arrows or pointer move the torch`);
   },
 });
 engine.start();

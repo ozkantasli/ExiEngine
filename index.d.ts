@@ -957,11 +957,22 @@ export class RollbackSession<State = unknown, Input = unknown> {
 
 export const MAX_LIGHTS: number;
 export const MAX_NORMAL_SPRITES: number;
+export const MAX_SHADOW_LIGHTS: number;
+export const MAX_OCCLUDERS: number;
+export const MAX_OCCLUDER_POINTS: number;
 export interface Light {
   x: number; y: number; radius: number; color: number | string; intensity: number; enabled: boolean;
   /** 0..1, only used with normal maps: low lights graze surfaces. Default 0.35. */ height: number;
+  /** Cast shadows from the layer's occluders (one extra render pass per light; at most MAX_SHADOW_LIGHTS, extra ones render unshadowed). Default false. */ shadows: boolean;
   readonly sprite: Sprite;
+  /** The light's shadow pass while it casts shadows, otherwise null. */ readonly shadow: { readonly group: RenderGroup; readonly size: number; readonly scale: number } | null;
 }
+/** Blocks shadow-casting lights. points are world-space x/y pairs (kept in sync for node occluders). */
+export interface Occluder { readonly node: Node | null; points: number[]; enabled: boolean; }
+export type OccluderOptions =
+  | { points: ArrayLike<number>; enabled?: boolean }
+  | { x: number; y: number; width: number; height: number; enabled?: boolean }
+  | { node: Node; enabled?: boolean };
 export interface LightLayerOptions extends Omit<NodeOptions, "x" | "y" | "scaleX" | "scaleY" | "blendMode"> {
   x?: number; y?: number; width: number; height: number;
   /** Light map pixels per world unit, (0, 1]. Default 0.25. */ resolution?: number;
@@ -974,9 +985,14 @@ export class LightLayer extends RenderGroup {
   ambient: number | string;
   constructor(options: LightLayerOptions);
   setAmbient(color: number | string): this;
-  addLight(light?: Partial<Omit<Light, "sprite">>): Light;
+  addLight(light?: Partial<Omit<Light, "sprite" | "shadow">>): Light;
   removeLight(light: Light): boolean;
   clearLights(): this;
+  readonly occluders: Occluder[];
+  /** Adds a polygon, a rectangle or a node-following occluder (world coordinates). The occluder itself stays lit; the area behind it is dark. */
+  addOccluder(options: OccluderOptions): Occluder;
+  removeOccluder(occluder: Occluder): boolean;
+  clearOccluders(): this;
   syncLight(light: Light): void;
   readonly normals: boolean; readonly normalBuffer: RenderGroup | null; readonly normalSprites: ReadonlyMap<Sprite, Sprite>;
   /** Mirrors `sprite` into the normal buffer with a tangent-space normal map (rgb = n * 0.5 + 0.5, green up). Returns the mirror sprite. */

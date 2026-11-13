@@ -40,7 +40,7 @@ Legend: ✅ built in · 🔌 official/common plugin or companion package · ➖ 
 | Bitmap fonts (BMFont) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Filters / post FX (blur, glow, outline…) | ✅ fixed catalogue | ✅ | ✅ (+custom) | ➖ | ➖ (custom shaders) | ➖ | ✅ | ✅ | ✅ |
 | User-written shaders | ✅ `registerFilter` bodies (local code only) | ✅ | ✅ | ✅ | ✅ | ➖ | ➖ | ✅ | ✅ |
-| 2D lighting / normal maps | ✅ `LightLayer` point lights + normal maps (no shadows yet) | ✅ | 🔌 | — | — | — | ✅ | ✅ | ✅ |
+| 2D lighting / normal maps | ✅ `LightLayer` point lights, normal maps and shadow casting | ✅ | 🔌 | — | — | — | ✅ | ✅ | ✅ |
 | Skeletal animation (Spine/DragonBones) | — | 🔌 | 🔌 | 🔌 | — | 🔌 | ✅ | ✅ | ✅ |
 | Audio sprites / spatial audio | ✅ (2D, deterministic) | ✅ | 🔌 | ✅ | ➖ | ✅ | ✅ | ✅ | ✅ |
 | Scene file format | ✅ `serializeScene` JSON | ➖ | — | — | — | — | ✅ | ✅ | ✅ |
@@ -84,8 +84,8 @@ Legend: ✅ built in · 🔌 official/common plugin or companion package · ➖ 
 4. ~~More joint types~~ ✅ revolute (with motor), weld, prismatic (limits + motor) and distance/rope
    joints plus anti-tunneling shipped, then revolute angle limits and damped springs
    (`DistanceJoint` `frequency`) and a `WheelJoint` for vehicles. Gear and pulley joints remain open.
-5. **Shadows.** ✅ `LightLayer` point lights and normal-mapped sprites shipped; shadow casting is
-   still open.
+5. ~~Shadows~~ ✅ `LightLayer` point lights, normal-mapped sprites and shadow casting from
+   polygon, rectangle and node occluders shipped. Soft penumbras remain open.
 6. ~~UI widgets~~ ✅ Button, Slider, TextInput (IME via hidden input), ScrollView, Checkbox,
    Dropdown and Stack/Grid layout containers shipped. Rich text and tooltips remain open.
 7. ~~LDtk import~~ ✅ shipped (tiles, IntGrid, entities).
@@ -105,7 +105,7 @@ Legend: ✅ built in · 🔌 official/common plugin or companion package · ➖ 
 4. ~~More joint types~~ ✅ (weld, prismatic, motors, revolute angle limits, springs, wheel); next: gear/pulley joints if games ask for them.
 5. Spine runtime adapter as an optional package (keeps the core dependency-free).
 6. ~~Custom-shader policy~~ ✅ decided: local `registerFilter`, denied to agents.
-7. ~~Normal-mapped sprites~~ ✅; simple shadow casting on top of `LightLayer` is next.
+7. ~~Normal-mapped sprites~~ ✅ and ~~shadow casting~~ ✅ on top of `LightLayer`.
 8. Netcode example (two browser tabs over a local WebSocket relay) on top of `RollbackSession`.
 
 ## 6. Status of earlier gaps from the previous analysis

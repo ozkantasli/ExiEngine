@@ -26,7 +26,8 @@ Content, authoring and game-feature release. Everything stays dependency-free.
   damped springs and bungees through `DistanceJoint` `frequency`/`dampingRatio` (`setSpring`, `currentLength`),
   anti-tunneling (speculative contacts + substeps).
 - **Rendering:** `blur`, `glow`, `outline`, `pixelate`, `vignette` filters (`FILTER_TYPES`),
-  `LightLayer` 2D lighting with optional normal maps (`normals: true`, `addNormalMap`), `BitmapFont` / `BitmapText` (AngelCode BMFont), `registerFilter` custom
+  `LightLayer` 2D lighting with optional normal maps (`normals: true`, `addNormalMap`) and shadow casting
+  (`addOccluder`, `shadows: true`), `BitmapFont` / `BitmapText` (AngelCode BMFont), `registerFilter` custom
   filter bodies (GLSL + WGSL, bounded, not reachable by AI agents).
 - **Audio:** audio sprites (`addSprites`), slices and loop regions, `playbackRate`, deterministic 2D
   spatial audio (`setListener`, `configureSpatial`, `setVoicePosition`).
