@@ -21,6 +21,8 @@ Content, authoring and game-feature release. Everything stays dependency-free.
 - **Physics:** `RigidBodyWorld` / `RigidBody` (circles, boxes, convex polygons, rotation, friction,
   restitution, stable stacking, sensors, layers), `RevoluteJoint` (with motor), `WeldJoint`,
   `PrismaticJoint` (limits, motor), `DistanceJoint` (rod/rope),
+  `RevoluteJoint` angle limits (`lowerAngle`/`upperAngle`, `setLimits`, `jointAngle`),
+  damped springs and bungees through `DistanceJoint` `frequency`/`dampingRatio` (`setSpring`, `currentLength`),
   anti-tunneling (speculative contacts + substeps).
 - **Rendering:** `blur`, `glow`, `outline`, `pixelate`, `vignette` filters (`FILTER_TYPES`),
   `LightLayer` 2D lighting with optional normal maps (`normals: true`, `addNormalMap`), `BitmapFont` / `BitmapText` (AngelCode BMFont), `registerFilter` custom

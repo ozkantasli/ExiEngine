@@ -303,3 +303,99 @@ test("rigid joints: a prismatic slider stays on its axis, honours limits and its
   assert.ok(Math.abs(cabin.position.x) < 0.01 && Math.abs(cabin.angle) < 0.001);
   void lift;
 });
+
+test("rigid joints: revolute angle limits stop a swinging arm and a motor", async () => {
+  const { RevoluteJoint, WeldJoint } = await import("../../src/index.js");
+  const world = new RigidBodyWorld({ gravityY: 980 });
+  const pivot = world.add(new RigidBody({ shape: { type: "circle", radius: 2 }, x: 0, y: 0, static: true }));
+  // A horizontal arm hinged at its left end: gravity swings it down (positive angle).
+  const arm = world.add(new RigidBody({ shape: { type: "box", width: 100, height: 10 }, x: 50, y: 0 }));
+  const hinge = world.addJoint(new RevoluteJoint({ a: pivot, b: arm, x: 0, y: 0, lowerAngle: -0.25, upperAngle: 0.5 }));
+  assert.equal(hinge.jointAngle, 0);
+  let peak = 0;
+  for (let index = 0; index < 240; index += 1) { world.step(1 / 60); peak = Math.max(peak, hinge.jointAngle); }
+  assert.ok(peak < 0.5 + 0.03, `never swings far past the upper limit (${peak})`);
+  assert.ok(Math.abs(hinge.jointAngle - 0.5) < 0.03, `rests on the upper limit (${hinge.jointAngle})`);
+  const anchors = hinge.worldAnchors();
+  assert.ok(Math.hypot(anchors.bx - anchors.ax, anchors.by - anchors.ay) < 0.5, "the pin still holds");
+
+  hinge.setMotor(-4, 1e9);
+  for (let index = 0; index < 120; index += 1) world.step(1 / 60);
+  assert.ok(Math.abs(hinge.jointAngle + 0.25) < 0.03, `the motor drives it to the lower limit (${hinge.jointAngle})`);
+
+  hinge.setLimits(null, null).setMotor(0, 0);
+  peak = -Infinity;
+  for (let index = 0; index < 120; index += 1) { world.step(1 / 60); peak = Math.max(peak, hinge.jointAngle); }
+  assert.ok(peak > 2, `swings freely once the limits are cleared (${peak})`);
+
+  // Limits are relative to the angle at creation, not to world angle 0.
+  const tilted = new RigidBodyWorld({ gravityY: 0 });
+  const base = tilted.add(new RigidBody({ shape: { type: "box", width: 10, height: 10 }, x: 0, y: 0, angle: 1, static: true }));
+  const door = tilted.add(new RigidBody({ shape: { type: "box", width: 60, height: 6 }, x: 30, y: 0, angularVelocity: 6 }));
+  const doorHinge = tilted.addJoint(new RevoluteJoint({ a: base, b: door, x: 0, y: 0, lowerAngle: 0, upperAngle: 0.8 }));
+  assert.ok(Math.abs(doorHinge.referenceAngle + 1) < 1e-12);
+  for (let index = 0; index < 60; index += 1) tilted.step(1 / 60);
+  assert.ok(doorHinge.jointAngle <= 0.8 + 0.03, `a door stops at its open limit (${doorHinge.jointAngle})`);
+
+  assert.throws(() => hinge.setLimits(1, -1), /lowerAngle/);
+  assert.throws(() => new RevoluteJoint({ a: pivot, b: arm, x: 0, y: 0, lowerAngle: NaN }), /finite/);
+  assert.throws(() => new WeldJoint({ a: pivot, b: arm }).setLimits(0, 1), /no angle limits/);
+});
+
+test("rigid joints: a spring distance joint oscillates, settles and can be a bungee", async () => {
+  const { DistanceJoint } = await import("../../src/index.js");
+  const make = (frequency, dampingRatio) => {
+    const world = new RigidBodyWorld({ gravityY: 0 });
+    const anchor = world.add(new RigidBody({ shape: { type: "circle", radius: 2 }, x: 0, y: 0, static: true }));
+    const mass = world.add(new RigidBody({ shape: { type: "circle", radius: 5 }, x: 0, y: 150 }));
+    const spring = world.addJoint(new DistanceJoint({ a: anchor, b: mass, length: 100, frequency, dampingRatio }));
+    return { world, mass, spring };
+  };
+
+  // Undamped: overshoots past the rest length and keeps moving.
+  const free = make(2, 0);
+  let shortest = Infinity;
+  for (let index = 0; index < 60; index += 1) { free.world.step(1 / 60); shortest = Math.min(shortest, free.spring.currentLength); }
+  assert.ok(shortest < 70, `an undamped spring overshoots (${shortest})`);
+
+  // Critically damped: settles at the rest length without a large overshoot.
+  const damped = make(2, 1);
+  shortest = Infinity;
+  for (let index = 0; index < 180; index += 1) { damped.world.step(1 / 60); shortest = Math.min(shortest, damped.spring.currentLength); }
+  assert.ok(shortest > 95, `critical damping barely overshoots (${shortest})`);
+  assert.ok(Math.abs(damped.spring.currentLength - 100) < 1, `settles at the rest length (${damped.spring.currentLength})`);
+  assert.ok(Math.hypot(damped.mass.velocity.x, damped.mass.velocity.y) < 1, "comes to rest");
+
+  // Under gravity a spring stretches beyond its rest length, a rigid rod does not.
+  const hanging = (frequency) => {
+    const world = new RigidBodyWorld({ gravityY: 980 });
+    const hook = world.add(new RigidBody({ shape: { type: "circle", radius: 2 }, x: 0, y: 0, static: true }));
+    const load = world.add(new RigidBody({ shape: { type: "circle", radius: 5 }, x: 0, y: 100 }));
+    const joint = world.addJoint(new DistanceJoint({ a: hook, b: load, frequency, dampingRatio: 1 }));
+    for (let index = 0; index < 240; index += 1) world.step(1 / 60);
+    return joint.currentLength;
+  };
+  const stretched = hanging(2);
+  // Static deflection g / omega^2 = 980 / (4 pi)^2 ~ 6.2.
+  assert.ok(Math.abs(stretched - 100 - 980 / (4 * Math.PI) ** 2) < 1.5, `stretches by about g/omega^2 (${stretched})`);
+  assert.ok(Math.abs(hanging(0) - 100) < 0.5, "frequency 0 stays a rigid rod");
+
+  // Bungee: slack while shorter than the rest length, springy once stretched.
+  const bungeeWorld = new RigidBodyWorld({ gravityY: 980 });
+  const top = bungeeWorld.add(new RigidBody({ shape: { type: "circle", radius: 2 }, x: 0, y: 0, static: true }));
+  const jumper = bungeeWorld.add(new RigidBody({ shape: { type: "circle", radius: 5 }, x: 0, y: 10 }));
+  const cord = bungeeWorld.addJoint(new DistanceJoint({ a: top, b: jumper, length: 100, rope: true, frequency: 1.5, dampingRatio: 0.3 }));
+  for (let index = 0; index < 20; index += 1) bungeeWorld.step(1 / 60);
+  assert.ok(Math.abs(jumper.velocity.y - 980 * 20 / 60) < 15, `free falls while the cord is slack (${jumper.velocity.y})`);
+  let longest = 0;
+  for (let index = 0; index < 120; index += 1) { bungeeWorld.step(1 / 60); longest = Math.max(longest, cord.currentLength); }
+  assert.ok(longest > 110, `the cord stretches past its length (${longest})`);
+  assert.ok(Number.isFinite(jumper.position.y) && jumper.velocity.y < 2000, "stays bounded");
+
+  const { spring } = make(2, 0.5);
+  assert.equal(spring.setSpring(0).frequency, 0);
+  assert.throws(() => spring.setSpring(-1), /negative/);
+  assert.throws(() => spring.setSpring(5000), /1000 Hz/);
+  assert.throws(() => spring.setSpring(1, 1000), /dampingRatio/);
+  assert.throws(() => new DistanceJoint({ a: spring.a, b: spring.b, frequency: NaN }), /finite/);
+});

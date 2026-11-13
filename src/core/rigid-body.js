@@ -417,9 +417,10 @@ class RigidJoint {
   }
 }
 
-// Pins two bodies together at one world point; they may rotate freely around it.
+// Pins two bodies together at one world point; they may rotate freely around it,
+// optionally inside an angle range (elbows, doors, flippers).
 export class RevoluteJoint extends RigidJoint {
-  constructor({ a, b, x, y, collideConnected = false, motorSpeed = 0, maxMotorTorque = 0 } = {}) {
+  constructor({ a, b, x, y, collideConnected = false, motorSpeed = 0, maxMotorTorque = 0, lowerAngle = null, upperAngle = null } = {}) {
     super(a, b, collideConnected);
     const px = Number(x); const py = Number(y);
     if (!Number.isFinite(px) || !Number.isFinite(py)) throw new RangeError("RevoluteJoint x/y must be finite.");
@@ -434,6 +435,17 @@ export class RevoluteJoint extends RigidJoint {
     this.motorImpulse = 0;
     this.angularMass = 0;
     this.step = 0;
+    // Angle limits are measured relative to the angle at creation (jointAngle).
+    this.referenceAngle = b.angle - a.angle;
+    [this.lowerAngle, this.upperAngle] = angleLimits(lowerAngle, upperAngle, "RevoluteJoint");
+    this.lowerImpulse = 0; this.upperImpulse = 0;
+    this.angleAtPrepare = 0;
+  }
+
+  // Sets or clears (null) the allowed jointAngle range in radians.
+  setLimits(lower = null, upper = null) {
+    [this.lowerAngle, this.upperAngle] = angleLimits(lower, upper, "RevoluteJoint");
+    return this;
   }
 
   setMotor(speed, maxTorque = this.maxMotorTorque) {
@@ -444,12 +456,51 @@ export class RevoluteJoint extends RigidJoint {
 
   get angle() { return this.b.angle - this.a.angle; }
 
+  // Rotation of b relative to a since the joint was created (radians, unwrapped).
+  get jointAngle() { return this.b.angle - this.a.angle - this.referenceAngle; }
+
   prepareMotor(delta) {
     const k = this.a.invInertia + this.b.invInertia;
     this.angularMass = k > 0 ? 1 / k : 0;
     this.step = delta;
+    this.angleAtPrepare = this.jointAngle;
+    if (this.lowerAngle === null || this.angularMass === 0) this.lowerImpulse = 0;
+    if (this.upperAngle === null || this.angularMass === 0) this.upperImpulse = 0;
+    applyAngularImpulse(this.a, this.b, this.lowerImpulse - this.upperImpulse);
     if (!(this.maxMotorTorque > 0) || this.angularMass === 0) { this.motorImpulse = 0; return; }
     applyAngularImpulse(this.a, this.b, this.motorImpulse);
+  }
+
+  // Limits are speculative like PrismaticJoint's: they only push back once the
+  // joint would cross them within this step.
+  solveLimits() {
+    if (this.angularMass === 0) return;
+    const inverseStep = this.step > 0 ? 1 / this.step : 0;
+    if (this.lowerAngle !== null) {
+      const gap = this.angleAtPrepare - this.lowerAngle;
+      const bias = gap > 0 ? gap * inverseStep : 0;
+      const previous = this.lowerImpulse;
+      this.lowerImpulse = Math.max(0, previous - this.angularMass * (this.b.angularVelocity - this.a.angularVelocity + bias));
+      applyAngularImpulse(this.a, this.b, this.lowerImpulse - previous);
+    }
+    if (this.upperAngle !== null) {
+      const gap = this.upperAngle - this.angleAtPrepare;
+      const bias = gap > 0 ? gap * inverseStep : 0;
+      const previous = this.upperImpulse;
+      this.upperImpulse = Math.max(0, previous - this.angularMass * (this.a.angularVelocity - this.b.angularVelocity + bias));
+      applyAngularImpulse(this.a, this.b, -(this.upperImpulse - previous));
+    }
+  }
+
+  correctLimits() {
+    if (this.angularMass === 0 || (this.lowerAngle === null && this.upperAngle === null)) return 0;
+    const angle = this.jointAngle;
+    let error = 0;
+    if (this.lowerAngle !== null && angle < this.lowerAngle) error = angle - this.lowerAngle;
+    else if (this.upperAngle !== null && angle > this.upperAngle) error = angle - this.upperAngle;
+    if (Math.abs(error) <= JOINT_ANGULAR_SLOP) return 0;
+    rotateBodies(this.a, this.b, -error * this.angularMass * JOINT_POSITION_FACTOR);
+    return Math.abs(error);
   }
 
   solveMotor() {
@@ -476,6 +527,11 @@ export class RevoluteJoint extends RigidJoint {
 
   // Removes drift by moving positions/angles directly (no velocity energy).
   correctPosition() {
+    const limitError = this.correctLimits();
+    return Math.max(limitError, this.correctPoint());
+  }
+
+  correctPoint() {
     const { a, b, ra, rb } = this;
     const anchors = this.worldAnchors();
     const cx = anchors.bx - anchors.ax; const cy = anchors.by - anchors.ay;
@@ -493,6 +549,7 @@ export class RevoluteJoint extends RigidJoint {
 
   solve() {
     this.solveMotor();
+    this.solveLimits();
     const velocity = this.relativeVelocity();
     const rx = -velocity.x; const ry = -velocity.y;
     const ix = this.mass.a * rx + this.mass.b * ry;
@@ -503,9 +560,10 @@ export class RevoluteJoint extends RigidJoint {
 }
 
 // Keeps two anchor points at a fixed distance (a rigid rod), or with rope: true
-// at most that distance (slack allowed).
+// at most that distance (slack allowed). A positive frequency (Hz) turns it into
+// a damped spring with that rest length (suspensions, bungees with rope: true).
 export class DistanceJoint extends RigidJoint {
-  constructor({ a, b, anchorA = null, anchorB = null, length, rope = false, collideConnected = false } = {}) {
+  constructor({ a, b, anchorA = null, anchorB = null, length, rope = false, frequency = 0, dampingRatio = 0.7, collideConnected = false } = {}) {
     super(a, b, collideConnected);
     const worldA = anchorA ?? a.position; const worldB = anchorB ?? b.position;
     for (const value of [worldA.x, worldA.y, worldB.x, worldB.y]) if (!Number.isFinite(Number(value))) throw new RangeError("DistanceJoint anchors must be finite.");
@@ -519,6 +577,23 @@ export class DistanceJoint extends RigidJoint {
     this.normal = { x: 0, y: 0 };
     this.mass = 0;
     this.active = true;
+    this.setSpring(frequency, dampingRatio);
+    this.gamma = 0; this.bias = 0;
+  }
+
+  // frequency 0 makes the joint rigid again; dampingRatio 1 is critical damping.
+  setSpring(frequency, dampingRatio = this.dampingRatio) {
+    const hz = nonNegative(frequency, "DistanceJoint frequency");
+    if (hz > MAX_SPRING_FREQUENCY) throw new RangeError(`DistanceJoint frequency must not exceed ${MAX_SPRING_FREQUENCY} Hz.`);
+    const ratio = nonNegative(dampingRatio, "DistanceJoint dampingRatio");
+    if (ratio > MAX_SPRING_DAMPING) throw new RangeError(`DistanceJoint dampingRatio must not exceed ${MAX_SPRING_DAMPING}.`);
+    this.frequency = hz; this.dampingRatio = ratio;
+    return this;
+  }
+
+  get currentLength() {
+    const anchors = this.worldAnchors();
+    return Math.hypot(anchors.bx - anchors.ax, anchors.by - anchors.ay);
   }
 
   prepare(delta) {
@@ -533,11 +608,21 @@ export class DistanceJoint extends RigidJoint {
     const rnA = cross(ra.x, ra.y, this.normal.x, this.normal.y); const rnB = cross(rb.x, rb.y, this.normal.x, this.normal.y);
     const k = a.invMass + b.invMass + a.invInertia * rnA * rnA + b.invInertia * rnB * rnB;
     this.mass = k > 0 ? 1 / k : 0;
-    void delta;
+    this.gamma = 0; this.bias = 0;
+    if (this.frequency > 0 && k > 0 && delta > 0) {
+      // Soft constraint (Box2D): spring stiffness and damping from the effective mass.
+      const omega = 2 * Math.PI * this.frequency;
+      const effective = 1 / k;
+      const gamma = delta * (2 * effective * this.dampingRatio * omega + delta * effective * omega * omega);
+      this.gamma = gamma > 0 ? 1 / gamma : 0;
+      this.bias = error * delta * effective * omega * omega * this.gamma;
+      this.mass = 1 / (k + this.gamma);
+    }
     applyPairImpulse(a, b, ra, rb, this.normal.x * this.impulse, this.normal.y * this.impulse);
   }
 
   correctPosition() {
+    if (this.frequency > 0) return 0; // a spring is meant to stretch
     const { a, b, ra, rb } = this;
     const anchors = this.worldAnchors();
     const dx = anchors.bx - anchors.ax; const dy = anchors.by - anchors.ay;
@@ -558,7 +643,7 @@ export class DistanceJoint extends RigidJoint {
     if (!this.active) return;
     const velocity = this.relativeVelocity();
     const normalVelocity = velocity.x * this.normal.x + velocity.y * this.normal.y;
-    let impulse = this.mass * -normalVelocity;
+    let impulse = -this.mass * (normalVelocity + this.bias + this.gamma * this.impulse);
     if (this.rope) {
       // A rope can only pull: the accumulated impulse stays <= 0 (towards each other).
       const previous = this.impulse;
@@ -584,6 +669,8 @@ export class WeldJoint extends RevoluteJoint {
 
   setMotor() { throw new TypeError("WeldJoint has no motor."); }
 
+  setLimits() { throw new TypeError("WeldJoint has no angle limits."); }
+
   prepare(delta) {
     super.prepare(delta);
     if (this.angularMass > 0) applyAngularImpulse(this.a, this.b, this.angularImpulse);
@@ -605,7 +692,7 @@ export class WeldJoint extends RevoluteJoint {
       angleError = wrapAngle(this.b.angle - this.a.angle - this.referenceAngle);
       if (Math.abs(angleError) > JOINT_ANGULAR_SLOP) rotateBodies(this.a, this.b, -angleError * this.angularMass * JOINT_POSITION_FACTOR);
     }
-    return Math.max(super.correctPosition(), Math.abs(angleError) > JOINT_ANGULAR_SLOP ? Math.abs(angleError) : 0);
+    return Math.max(this.correctPoint(), Math.abs(angleError) > JOINT_ANGULAR_SLOP ? Math.abs(angleError) : 0);
   }
 }
 
@@ -762,6 +849,16 @@ export class PrismaticJoint extends RigidJoint {
     }
     return worst;
   }
+}
+
+const MAX_SPRING_FREQUENCY = 1_000;
+const MAX_SPRING_DAMPING = 100;
+
+function angleLimits(lower, upper, label) {
+  const low = lower === null || lower === undefined ? null : finiteNumber(lower, `${label} lowerAngle`);
+  const high = upper === null || upper === undefined ? null : finiteNumber(upper, `${label} upperAngle`);
+  if (low !== null && high !== null && low > high) throw new RangeError(`${label} lowerAngle must not exceed upperAngle.`);
+  return [low, high];
 }
 
 function finiteNumber(value, label) {

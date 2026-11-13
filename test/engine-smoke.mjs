@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { serializeScene, deserializeScene, RigidBody, RigidBodyWorld, AnimatedSprite, Animator, AudioManager, Camera, Collider, CollisionWorld, ExiEngine, findGridPath, GlyphAtlas, Graphics, Input, inspectKTX2, MAX_GRID_PATH_CELLS, MAX_WORLD_COORDINATE, Mat3, NineSliceSprite, Node, ParticleEmitter, PhysicsBody, PhysicsWorld, Profiler, RenderGroup, RenderTexture, Scene, Sprite, SpriteBatch, Text, TextCache, Texture, TextureAtlas, TileMap, Tween, Vec2, clamp, containsAABB, degToRad, easing, getAABB, intersectsAABB, lerp, pointInAABB, radToDeg } from "../src/index.js";
+import { serializeScene, deserializeScene, RigidBody, RigidBodyWorld, RevoluteJoint, DistanceJoint, AnimatedSprite, Animator, AudioManager, Camera, Collider, CollisionWorld, ExiEngine, findGridPath, GlyphAtlas, Graphics, Input, inspectKTX2, MAX_GRID_PATH_CELLS, MAX_WORLD_COORDINATE, Mat3, NineSliceSprite, Node, ParticleEmitter, PhysicsBody, PhysicsWorld, Profiler, RenderGroup, RenderTexture, Scene, Sprite, SpriteBatch, Text, TextCache, Texture, TextureAtlas, TileMap, Tween, Vec2, clamp, containsAABB, degToRad, easing, getAABB, intersectsAABB, lerp, pointInAABB, radToDeg } from "../src/index.js";
 import { buildRenderBatches, collectRenderGroups, createRenderBatchState } from "../src/render/batch.js";
 import { AssetLoader } from "../src/assets/asset-loader.js";
 import { SaveStore } from "../src/assets/save-store.js";
@@ -665,6 +665,11 @@ const rigidCrate = rigidWorld.add(new RigidBody({ shape: { type: "polygon", poin
 for (let index = 0; index < 240; index += 1) rigidWorld.step(1 / 60);
 assert.ok(Math.abs(rigidCrate.position.y - 180) < 1 && rigidNode.position.y === rigidCrate.position.y);
 assert.throws(() => new RigidBody({ shape: { type: "polygon", points: [0, 0, 10, 0, 5, 2, 10, 10, 0, 10] } }), /convex/);
+const limitedHinge = rigidWorld.addJoint(new RevoluteJoint({ a: rigidWorld.bodies[0], b: rigidWorld.add(new RigidBody({ shape: { type: "box", width: 40, height: 4 }, x: 220, y: 40 })), x: 200, y: 40, lowerAngle: -0.2, upperAngle: 0.2 }));
+const rigidSpring = rigidWorld.addJoint(new DistanceJoint({ a: rigidWorld.bodies[0], b: rigidWorld.add(new RigidBody({ shape: { type: "circle", radius: 4 }, x: 300, y: 100 })), length: 80, frequency: 3, dampingRatio: 1 }));
+for (let index = 0; index < 240; index += 1) rigidWorld.step(1 / 60);
+assert.ok(Math.abs(limitedHinge.jointAngle) <= 0.23 && rigidSpring.frequency === 3 && Number.isFinite(rigidSpring.currentLength));
+assert.throws(() => limitedHinge.setLimits(0.3, 0.1), /lowerAngle/);
 const unevenTileMap = new TileMap({ texture: new Texture({ sourceWidth: 10, sourceHeight: 8 }), tileWidth: 4, tileHeight: 4, columns: 2, rows: 1 });
 unevenTileMap.setTile(0, 0, 0).setTile(1, 0, 1);
 assert.equal(unevenTileMap.getFrame(1).u0, 0.4);
