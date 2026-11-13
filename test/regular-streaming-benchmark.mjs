@@ -37,7 +37,7 @@ const result = {
   bufferReallocations: frameCount - sameBufferFrames,
   elapsedMs: Number(elapsedMs.toFixed(2)),
   simulatedFramesPerSecond: Number((frameCount / Math.max(elapsedMs / 1000, Number.EPSILON)).toFixed(2)),
-  note: "Node ölçümü; gerçek WebGL2 driver ve fiziksel cihaz FPS ölçümü değildir.",
+  note: "Node measurement; not a real WebGL2 driver or physical-device FPS measurement.",
 };
 console.log(JSON.stringify(result, null, 2));
 if (sameBufferFrames !== frameCount) process.exitCode = 1;

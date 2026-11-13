@@ -1,4 +1,4 @@
-// StateMachine / Sentinel — explicit state-machine altyapısı testleri
+// StateMachine / Sentinel — explicit state-machine infrastructure tests
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
@@ -24,7 +24,7 @@ function makeMachine() {
   });
 }
 
-test("stateMachine: initial/state/can/events sözleşmesi", () => {
+test("stateMachine: initial/state/can/events contract", () => {
   const machine = makeMachine();
   assert.equal(machine.state, "idle");
   assert.ok(machine.is("idle"));
@@ -34,7 +34,7 @@ test("stateMachine: initial/state/can/events sözleşmesi", () => {
   assert.equal(machine.transitions.length, 3);
 });
 
-test("stateMachine: send hedef durumu döndürür ve geçişi uygular", () => {
+test("stateMachine: send returns the target state and applies the transition", () => {
   const machine = makeMachine();
   assert.equal(machine.send("arm"), "armed");
   assert.equal(machine.state, "armed");
@@ -42,12 +42,12 @@ test("stateMachine: send hedef durumu döndürür ve geçişi uygular", () => {
   assert.equal(machine.send("fire"), "idle");
 });
 
-test("stateMachine: aynı-durum yeniden silahlanma (re-arm) legal", () => {
+test("stateMachine: same-state re-arm is legal", () => {
   const machine = makeMachine();
   assert.equal(machine.send("reset"), "idle");
 });
 
-test("stateMachine: geçersiz geçiş InvalidStateTransitionError fırlatır", () => {
+test("stateMachine: an invalid transition throws InvalidStateTransitionError", () => {
   const machine = makeMachine();
   assert.throws(() => machine.send("fire"), (error) => {
     assert.ok(error instanceof InvalidStateTransitionError);
@@ -60,7 +60,7 @@ test("stateMachine: geçersiz geçiş InvalidStateTransitionError fırlatır", (
   assert.equal(machine.state, "idle");
 });
 
-test("stateMachine: geçiş tablosu doğrulaması ve dinleyiciler", () => {
+test("stateMachine: transition table validation and listeners", () => {
   assert.throws(() => new StateMachine({ name: "bad", initial: "a", states: { a: { on: { go: "missing" } } } }), RangeError);
   assert.throws(() => new StateMachine({ name: "bad", initial: "missing", states: { a: { on: {} } } }), RangeError);
   const machine = makeMachine();
@@ -71,12 +71,12 @@ test("stateMachine: geçiş tablosu doğrulaması ve dinleyiciler", () => {
   machine.send("fire");
   assert.deepEqual(seen, [["test", "idle", "arm", "armed"]]);
   const failing = makeMachine();
-  failing.onTransition(() => { throw new Error("listener patladı"); });
+  failing.onTransition(() => { throw new Error("listener exploded"); });
   assert.equal(failing.send("arm"), "armed");
   assert.equal(typeof machine.clone().state, "string");
 });
 
-test("sentinel: UNINITIALIZED/NONE/CONSUMED eşsiz ve isSentinel tutarlı", () => {
+test("sentinel: UNINITIALIZED/NONE/CONSUMED are unique and isSentinel is consistent", () => {
   assert.notEqual(UNINITIALIZED, NONE);
   assert.notEqual(UNINITIALIZED, CONSUMED);
   assert.notEqual(NONE, CONSUMED);
@@ -89,7 +89,7 @@ test("sentinel: UNINITIALIZED/NONE/CONSUMED eşsiz ve isSentinel tutarlı", () =
   }
 });
 
-test("tween: finished açık oynatıcı durum makinesi üzerinden türetilir", () => {
+test("tween: finished is derived from the explicit player state machine", () => {
   const target = { value: 0 };
   const tween = new Tween(target, "value", 10, 1, { loop: 0, ease: (value) => value });
   assert.equal(tween.finished, false);
@@ -98,7 +98,7 @@ test("tween: finished açık oynatıcı durum makinesi üzerinden türetilir", (
   assert.equal(tween.update(1), false);
 });
 
-test("animatedSprite: phase makinesi play/stop/complete/reopen akışını korur", () => {
+test("animatedSprite: the phase machine keeps the play/stop/complete/reopen flow", () => {
   const texture = new Texture({ width: 1, height: 1 });
   const sprite = new AnimatedSprite({ frames: [texture, texture], frameRate: 4, loop: false, onComplete: () => { sprite.completedHits = (sprite.completedHits || 0) + 1; } });
   assert.equal(sprite.phase, "playing");
@@ -113,7 +113,7 @@ test("animatedSprite: phase makinesi play/stop/complete/reopen akışını korur
   assert.equal(sprite.completed, true);
   assert.equal(sprite.playing, false);
   sprite.stop();
-  assert.equal(sprite.completed, true, "stop() completed işaretini kaybetmemeli");
+  assert.equal(sprite.completed, true, "stop() must not lose the completed flag");
   sprite.gotoFrame(0);
   assert.equal(sprite.phase, "stopped", "gotoFrame completed → stopped");
   sprite.play();

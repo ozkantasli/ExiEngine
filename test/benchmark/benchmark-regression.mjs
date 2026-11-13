@@ -1,9 +1,9 @@
-// ExiEngine benchmark regresyon eşiği
-// 25 benchmark'ı sırayla çalıştırır, JSON çıktılarını yakalar, baseline ile karşılaştırır.
-// - İlk koşu: test/benchmark/benchmark-baseline.json oluşturur (baseline modu).
-// - Sonraki koşular: elapsedMs drift'ini (+%50 tolerans) ve simulatedFramesPerSecond
-//   düşüşünü (-%40) kontrol eder. Bu bir FPS iddiası değil, belirgin regresyon kapısıdır.
-// Mevcut 25 benchmark dosyası DEĞİŞMEZ (kontrat: benchmark silme/yumuşatma yok).
+// ExiEngine benchmark regression gate
+// Runs the 25 benchmarks in order, captures their JSON output and compares it with the baseline.
+// - First run: creates test/benchmark/benchmark-baseline.json (baseline mode).
+// - Later runs: check elapsedMs drift (+50% tolerance) and the simulatedFramesPerSecond
+//   drop (-40%). This is not an FPS claim, it is a gate for obvious regressions.
+// The 25 existing benchmark files do NOT change (contract: no deleting or softening benchmarks).
 import { spawn } from "node:child_process";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import path from "node:path";
@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const baselinePath = path.join(root, "test", "benchmark", "benchmark-baseline.json");
-const allowedElapsedDrift = 0.5; // +%50 elapsed süresi
+const allowedElapsedDrift = 0.5; // +50% elapsed time
 const allowedFpsDrop = 0.4; // -%40 simulated FPS
 
 const benchmarks = [
@@ -37,8 +37,8 @@ function runBenchmark(name) {
 
 function parseResult(name, stdout) {
   try {
-    // Benchmark çıktısı tek JSON nesnesidir; sondaki boşlukları temizleyip tümünü dener,
-    // başarısızsa son satırı dener (bazı benchmark'lar log satırı ekleyebilir).
+    // Benchmark output is a single JSON object; try all of it after trimming trailing whitespace,
+    // and fall back to the last line (some benchmarks may add log lines).
     const trimmed = stdout.trim();
     const candidates = [trimmed, trimmed.split("\n").filter(Boolean).pop()];
     for (const candidate of candidates) {
@@ -88,10 +88,10 @@ for (const name of benchmarks) {
 if (!baseline) {
   await mkdir(path.dirname(baselinePath), { recursive: true });
   await writeFile(baselinePath, JSON.stringify(results, null, 2) + "\n", "utf8");
-  console.log(`\n[benchmark] Baseline oluşturuldu: ${path.relative(root, baselinePath)}`);
+  console.log(`\n[benchmark] Baseline created: ${path.relative(root, baselinePath)}`);
 } else if (failures > 0) {
-  console.error(`\n[benchmark] ${failures} benchmark regresyon eşiğini aştı.`);
+  console.error(`\n[benchmark] ${failures} benchmark(s) exceeded the regression threshold.`);
   process.exitCode = 1;
 } else {
-  console.log("\n[benchmark] Tüm benchmark'lar baseline içinde.");
+  console.log("\n[benchmark] All benchmarks are within the baseline.");
 }

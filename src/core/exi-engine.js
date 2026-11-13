@@ -10,8 +10,8 @@ import { RenderTexture } from "../assets/render-texture.js";
 import { DEFAULT_CLEAR_COLOR, normalizeClearAlpha, normalizeClearColor } from "../render/clear.js";
 import { StateMachine } from "./state-machine.js";
 
-// Yaşam döngüsü: tüm legal arc'lar açık tanım (created/ready/running/paused/visibility-paused/stopped);
-// "destroyed" alanı terminal (bu alan üzerinden gösterilir). Boole'lar makineden türetilir (#1/#12).
+// Lifecycle: every legal arc is declared explicitly (created/ready/running/paused/visibility-paused/stopped);
+// "destroyed" is terminal (exposed through that field). The booleans are derived from the machine (#1/#12).
 const LIFECYCLE_STATE_NAMES = ["created", "ready", "running", "paused", "visibility-paused", "stopped"];
 const LIFECYCLE_STATES = Object.fromEntries(
   LIFECYCLE_STATE_NAMES.map((name) => [name, { on: Object.fromEntries(LIFECYCLE_STATE_NAMES.map((target) => [target, target])) }]),
@@ -126,7 +126,7 @@ export class ExiEngine {
     this.assets = new AssetLoader();
     this.audio = new AudioManager({ loader: this.assets });
     this.profiler = new Profiler();
-    // Explicit lifecycle machine: boole'lar (running/paused/visibilityPaused) makineden türetilir.
+    // Explicit lifecycle machine: the booleans (running/paused/visibilityPaused) are derived from it.
     this._lifecycleMachine = new StateMachine({ name: "engineLifecycle", initial: "created", states: LIFECYCLE_STATES });
     this.raf = 0;
     this.lastTime = 0;
@@ -306,7 +306,7 @@ export class ExiEngine {
         globalThis.document?.addEventListener?.("keydown", this.handleAudioUnlockGesture);
       }
       this.initialized = true;
-      // Yaşam döngüsü durumunu gerçekte yansıt ("created" → "ready"); makine tek doğruluk kaynağıdır.
+      // Reflect the real lifecycle state ("created" → "ready"); the machine is the single source of truth.
       if (this._lifecycleMachine.state === "created") this._setLifecycle("ready");
       this.emitStatus({ type: "engine-ready", info: this.getInfo() });
       return this;
@@ -584,7 +584,7 @@ export class ExiEngine {
 
   _advance(delta, time) {
     this._assertConfiguration();
-    // Odağı yok edilmiş Node'da bırakma: bir sonraki key event'ini beklemeden blur() uygula (#10 denetimi).
+    // Do not leave focus on a destroyed Node: blur() without waiting for the next key event (#10 audit).
     if (this.focusedNode && this.focusedNode.destroyed) this.blur();
     const requestedDelta = Number(delta);
     const frameDelta = Number.isFinite(requestedDelta) ? Math.min(this.maxFrameDelta, Math.max(0, requestedDelta)) : 0;
@@ -653,12 +653,12 @@ export class ExiEngine {
     return this;
   }
 
-  // running/paused/visibilityPaused artık makineden türetilen erişimlerdir; doğrudan yazım makinaya senkronlanır (#12).
+  // running/paused/visibilityPaused are accessors derived from the machine; direct writes are synced into it (#12).
   get running() { return this._lifecycleMachine.state === "running"; }
   set running(value) {
     if (value === true) { this._setLifecycle("running"); return; }
     const state = this._lifecycleMachine.state;
-    if (state === "paused" || state === "visibility-paused") return; // pause baskın
+    if (state === "paused" || state === "visibility-paused") return; // pause wins
     this._setLifecycle(this.initialized ? "ready" : "created");
   }
   get paused() { const state = this._lifecycleMachine.state; return state === "paused" || state === "visibility-paused"; }
@@ -747,7 +747,7 @@ export class ExiEngine {
   }
 
   stop() {
-    // destroy() sonrası stop()'un audio suspend / lifecycle yazmasını engelle (start/resume ile simetrik guard).
+    // After destroy(), stop() must not suspend audio or write the lifecycle (guard symmetric with start/resume).
     if (this.destroyed) return this;
     this._setLifecycle("stopped");
     this._stopLoop();

@@ -58,7 +58,7 @@ try {
     resizeReallocations: resizedTexture === dynamicInitialTexture ? 0 : 1,
     cacheHits,
     clearedEntries,
-    note: "Node Canvas 2D sözleşme ölçümü; gerçek GPU upload/FPS ölçümü değildir.",
+    note: "Node Canvas 2D contract measurement; not a real GPU upload/FPS measurement.",
   };
   console.log(JSON.stringify(result, null, 2));
   label.destroy();

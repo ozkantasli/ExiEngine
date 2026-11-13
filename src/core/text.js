@@ -171,7 +171,7 @@ export class TextCache {
     this.entries = new Map();
     this.totalPixels = 0;
     this.clock = 0;
-    // Kurban-bulunamayan tahliye redleri gözlemlenebilir — #49 ("no victim" durumu gizli kalmaz).
+    // Eviction refusals with no victim are observable — #49 (the "no victim" case does not stay hidden).
     this.evictionFailures = 0;
   }
 
@@ -263,7 +263,7 @@ export class GlyphAtlas {
     this.rowHeight = 0;
     this.usedPixels = 0;
     this.complexScriptFallbacks = 0;
-    // Kapasite/boyut redleri artık gözlemlenebilir ("full-but-alive" sınıfı sessizce kaybolmaz) — #50.
+    // Capacity/size refusals are observable (the "full-but-alive" class is not silently lost) — #50.
     this.capacityRejections = 0;
     this.destroyed = false;
   }

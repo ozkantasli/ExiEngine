@@ -41,7 +41,7 @@ const result = {
   spatialVisibilityChecks,
   elapsedMs: Number(elapsedMs.toFixed(2)),
   simulatedFramesPerSecond: Number((frameCount / Math.max(elapsedMs / 1000, Number.EPSILON)).toFixed(2)),
-  note: "Node ölçümü; gerçek WebGL2/WebGPU driver/GPU FPS ölçümü değildir.",
+  note: "Node measurement; not a real WebGL2/WebGPU driver/GPU FPS measurement.",
 };
 console.log(JSON.stringify(result, null, 2));
 if (sameScratchFrames !== frameCount || sameBoundsFrames !== frameCount || spatialVisibilityChecks >= frameCount * 256) process.exitCode = 1;

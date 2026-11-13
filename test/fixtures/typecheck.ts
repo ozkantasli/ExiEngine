@@ -1,6 +1,6 @@
 // ExiEngine TypeScript consumer fixture — index.d.ts'deki public API'nin
-// TS tarafından kullanılabilirliğini sözdizimi + çalıştırma düzeyinde doğrular.
-// --experimental-strip-types ile çalıştırılır: tip importları kaldırılır, JS çalışır.
+// usability from TypeScript at the syntax + execution level.
+// Run with --experimental-strip-types: type imports are stripped and the JS runs.
 import type {
   ExiEngine,
   Scene,
@@ -45,7 +45,7 @@ import type {
 
 import { Scene, Sprite, Camera, clamp, Vec2, Texture, TileMap, serializeScene, deserializeScene } from "../../src/index.js";
 
-// Tip düzeyinde sözleşme: bu sembollerin TS'te mevcut olduğunu kanıtlar.
+// Type-level contract: proves these symbols exist for TS.
 export type {
   ExiEngine,
   Scene,
@@ -87,7 +87,7 @@ export type {
   CaptureFrameResult,
 };
 
-// Çalıştırılabilir tip kullanımı (runtime'da gerçekten koşar)
+// Executable type usage (actually runs at runtime)
 export function makeScene(): Scene {
   const scene = new Scene();
   const sprite = new Sprite({ width: 16, height: 16 });
@@ -115,7 +115,7 @@ export function useTiled(texture: Texture): TileMap {
   return tileMap;
 }
 
-// Modül yüklendiğinde çalıştır: doğrulama
+// Run on module load: verification
 if (import.meta.url) {
   const scene = makeScene();
   if (scene.children.length !== 1) throw new Error("typecheck fixture: scene build failed");

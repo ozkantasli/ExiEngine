@@ -45,7 +45,7 @@ const sourceFiles = [
 for (const relativePath of sourceFiles) {
   const source = await readFile(path.join(root, relativePath), "utf8");
   assert.doesNotMatch(source, /from\s+["'](?:pixi|phaser|three|babylon|godot|bevy)/i, `${relativePath} harici motor import ediyor`);
-  assert.doesNotMatch(source, /\beval\s*\(|\bnew\s+Function\s*\(/, `${relativePath} dinamik kod çalıştırıyor`);
+  assert.doesNotMatch(source, /\beval\s*\(|\bnew\s+Function\s*\(/, `${relativePath} runs dynamic code`);
 }
 
 const engine = await readFile(path.join(root, "src/core/exi-engine.js"), "utf8");
@@ -96,7 +96,7 @@ assert.equal(typeof packageJson.scripts?.["bench:regression"], "string");
 assert.match(packageJson.scripts.test, /run-all\.mjs/);
 for (const agentFile of ["AI_ENGINE_GUIDE.md", "AGENTS.md", "CLAUDE.md", "GEMINI.md", "CONTRIBUTING.md", "API.md", "MCP.md"]) {
   const agentGuide = await readFile(path.join(root, agentFile), "utf8");
-  assert.ok(agentGuide.length > 0, `${agentFile} boş olmamalı`);
+  assert.ok(agentGuide.length > 0, `${agentFile} must not be empty`);
 }
 assert.match(await readFile(path.join(root, "AI_ENGINE_GUIDE.md"), "utf8"), /npm run doctor/);
 assert.match(await readFile(path.join(root, "AI_ENGINE_GUIDE.md"), "utf8"), /exi_api/);
@@ -497,10 +497,10 @@ assert.match(types, /findByName\(name: string\): Node \| null/);
 assert.match(types, /roundedRect\(x: number, y: number, width: number, height: number/);
 assert.doesNotMatch(types, /\n  sub\(value: Vec2\)/);
 assert.doesNotMatch(types, /\n  scale\(value: number\)/);
-// Test altyapısı varlık kontrolleri (AAA kalite araç zinciri)
+// Test infrastructure presence checks (quality toolchain)
 for (const requiredFile of ["test/run-all.mjs", "tools/lint.mjs", "test/typecheck-syntax.mjs", "test/fixtures/typecheck.ts", "test/coverage/coverage.mjs", "test/coverage/thresholds.mjs", "test/benchmark/benchmark-regression.mjs", "test/e2e/preview-e2e.mjs", ".github/workflows/ci.yml"]) {
   const info = await stat(path.join(root, requiredFile));
-  assert.ok(info.size > 0, `${requiredFile} boş olmamalı`);
+  assert.ok(info.size > 0, `${requiredFile} must not be empty`);
 }
 const guide = await readFile(path.join(root, "AI_ENGINE_GUIDE.md"), "utf8");
 assert.match(guide, /npm run lint/);

@@ -29,7 +29,7 @@ const result = {
   samePositionsFrames,
   sameBoundsFrames,
   elapsedMs: Number(elapsedMs.toFixed(2)),
-  note: "Node Graphics dirty-rebuild identity sözleşme ölçümü; gerçek GPU/FPS ölçümü değildir.",
+  note: "Node Graphics dirty-rebuild identity contract measurement; not a real GPU/FPS measurement.",
 };
 console.log(JSON.stringify(result, null, 2));
 if ([sameItemListFrames, sameItemFrames, samePositionsFrames, sameBoundsFrames].some((value) => value !== frameCount)) process.exitCode = 1;

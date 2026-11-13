@@ -64,7 +64,7 @@ const result = {
     elapsedMs: Number(spatialElapsedMs.toFixed(2)),
     simulatedFramesPerSecond: Number((frameCount / Math.max(spatialElapsedMs / 1000, Number.EPSILON)).toFixed(2)),
   },
-  note: "Node collision sözleşme ölçümü; gerçek fiziksel cihaz FPS ölçümü değildir.",
+  note: "Node collision contract measurement; not a real physical-device FPS measurement.",
 };
 console.log(JSON.stringify(result, null, 2));
 if (sameResultListFrames !== frameCount || firstHitFrames !== frameCount || sameColliderBoundsFrames !== frameCount || spatialSameResultListFrames !== frameCount || spatialFirstHitFrames !== frameCount) process.exitCode = 1;

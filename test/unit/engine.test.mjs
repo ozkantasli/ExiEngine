@@ -12,7 +12,7 @@ function stubEngine(options = {}) {
   return engine;
 }
 
-test("engine: fixed-step sıralama scene→animator→physics→onUpdate", () => {
+test("engine: fixed-step order scene→animator→physics→onUpdate", () => {
   const scene = new Scene();
   const order = [];
   scene.update = () => order.push("scene");
@@ -34,7 +34,7 @@ test("engine: fixed-step sıralama scene→animator→physics→onUpdate", () =>
   engine.destroy();
 });
 
-test("engine: timeScale ve setTimeScale sınırları", () => {
+test("engine: timeScale and setTimeScale bounds", () => {
   let updates = 0;
   const scene = new Scene();
   scene.update = () => { updates += 1; };
@@ -54,7 +54,7 @@ test("engine: timeScale ve setTimeScale sınırları", () => {
   engine.destroy();
 });
 
-test("engine: maxPixelRatio ve boyut sınırları", () => {
+test("engine: maxPixelRatio and size bounds", () => {
   assert.equal(new ExiEngine({ canvas: { getContext() {} }, maxPixelRatio: 1 }).maxPixelRatio, 1);
   assert.equal(new ExiEngine({ canvas: { getContext() {} }, maxPixelRatio: 9 }).maxPixelRatio, 4);
   assert.equal(new ExiEngine({ canvas: { getContext() {} }, maxPixelRatio: 0 }).maxPixelRatio, 2);
@@ -72,7 +72,7 @@ test("engine: maxPixelRatio ve boyut sınırları", () => {
   bounded.destroy();
 });
 
-test("engine: interpolate akışı", () => {
+test("engine: interpolate flow", () => {
   const scene = new Scene();
   const node = new Node({ x: 0, y: 0 });
   node.update = function updateNode() { this.position.x += 10; };
@@ -92,7 +92,7 @@ test("engine: interpolate akışı", () => {
   engine.destroy();
 });
 
-test("engine: resize contain/cover ve logical size", () => {
+test("engine: resize contain/cover and logical size", () => {
   const previousDPR = Object.getOwnPropertyDescriptor(globalThis, "devicePixelRatio");
   Object.defineProperty(globalThis, "devicePixelRatio", { configurable: true, value: 1 });
   const camera = new Camera();
@@ -121,7 +121,7 @@ test("engine: oversized canvas clamp", () => {
   engine.destroy();
 });
 
-test("engine: manual step ve running kısıtı", () => {
+test("engine: manual step and running constraint", () => {
   let updates = 0;
   let renders = 0;
   const scene = new Scene();
@@ -137,7 +137,7 @@ test("engine: manual step ve running kısıtı", () => {
   engine.destroy();
 });
 
-test("engine: setScene pointer state temizliği", () => {
+test("engine: setScene clears pointer state", () => {
   const sceneA = new Scene();
   const sceneB = new Scene();
   const camera = new Camera({ width: 320, height: 180 });
@@ -160,7 +160,7 @@ test("engine: setScene pointer state temizliği", () => {
   engine.destroy();
 });
 
-test("engine: renderer-error guard durdurur", () => {
+test("engine: renderer-error guard stops the engine", () => {
   const statuses = [];
   const engine = new ExiEngine({ canvas: { getContext() {} }, renderer: "webgl2", onStatus: (status) => statuses.push(status.type) });
   const renderer = new WebGL2Renderer({ canvas: null });
@@ -178,7 +178,7 @@ test("engine: renderer-error guard durdurur", () => {
   renderer.destroy();
 });
 
-test("engine: callback hatası runtime-error + input endFrame", () => {
+test("engine: callback error runtime-error + input endFrame", () => {
   const statuses = [];
   let inputEnds = 0;
   const engine = new ExiEngine({ canvas: { getContext() {} }, onStatus: (status) => statuses.push(status.type), onUpdate: () => { throw new Error("update callback failure"); } });
@@ -255,7 +255,7 @@ test("engine: create cleans renderer when input configuration is invalid", async
   assert.equal(getEventListeners(canvas, "pointerdown").length, 0);
 });
 
-test("engine: late-init destroy yarışı", async () => {
+test("engine: late-init destroy race", async () => {
   const previousInit = WebGL2Renderer.prototype.init;
   WebGL2Renderer.prototype.init = () => new Promise((resolve) => { setTimeout(resolve, 10); });
   const engine = new ExiEngine({ canvas: { getContext() {} }, renderer: "webgl2" });
@@ -266,7 +266,7 @@ test("engine: late-init destroy yarışı", async () => {
   WebGL2Renderer.prototype.init = previousInit;
 });
 
-test("engine: handleRendererLost fallback davranışı", async () => {
+test("engine: handleRendererLost fallback behavior", async () => {
   const engine = stubEngine({ renderer: "auto" });
   let fallbackCalls = 0;
   engine.fallbackToWebGL = async () => { fallbackCalls += 1; };
@@ -292,7 +292,7 @@ test("engine: handleRendererLost fallback davranışı", async () => {
   assert.equal(destroyedCalls, 0);
 });
 
-test("engine: lifecycleState geçişleri ve stop audio suspend", () => {
+test("engine: lifecycleState transitions and stop audio suspend", () => {
   const engine = stubEngine({ renderer: "auto" });
   assert.equal(engine.lifecycleState, "created");
   engine.initialized = true;
@@ -317,7 +317,7 @@ test("engine: lifecycleState geçişleri ve stop audio suspend", () => {
   assert.equal(engine.lifecycleState, "destroyed");
 });
 
-test("engine: recoverable renderer kaybı pause ve context-restored resume", () => {
+test("engine: recoverable renderer loss pause and context-restored resume", () => {
   const previousRaf = globalThis.requestAnimationFrame;
   const previousCancel = globalThis.cancelAnimationFrame;
   globalThis.requestAnimationFrame = () => 1;
@@ -352,7 +352,7 @@ test("engine: recoverable renderer kaybı pause ve context-restored resume", () 
   }
 });
 
-test("engine: destroy assets temizliği ve pauseAudio opt-out", () => {
+test("engine: destroy asset cleanup and pauseAudio opt-out", () => {
   const engine = new ExiEngine({ canvas: { getContext() {} } });
   engine.destroy();
   assert.equal(engine.assets.destroyed, true);
@@ -365,7 +365,7 @@ test("engine: destroy assets temizliği ve pauseAudio opt-out", () => {
   optOut.destroy();
 });
 
-test("engine: renderToTexture eşleşme", () => {
+test("engine: renderToTexture matching", () => {
   const calls = [];
   const camera = new Camera({ width: 32, height: 16 });
   const engine = stubEngine({ camera });

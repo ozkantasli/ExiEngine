@@ -220,7 +220,7 @@ async function startSoak() {
     }
   };
 
-  print(`Başlatılıyor: ${spriteCount} sprite / ${durationMs / 1000} sn`);
+  print(`Starting: ${spriteCount} sprites / ${durationMs / 1000} s`);
   try {
     try { await audio.unlock(); } catch (error) { audioVoiceError = error?.message || String(error); }
     try {

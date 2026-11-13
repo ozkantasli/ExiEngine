@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Node, Scene, Sprite } from "../../src/index.js";
 
-test("node: traversal ve arama", () => {
+test("node: traversal and search", () => {
   const scene = new Scene();
   const parent = new Node({ name: "parent" });
   const childA = new Node({ name: "childA" });
@@ -19,7 +19,7 @@ test("node: traversal ve arama", () => {
   assert.equal(scene.find((n) => n.name === "parent"), parent);
 });
 
-test("node: update sırası ve callback doğrulaması", () => {
+test("node: update order and callback validation", () => {
   const order = [];
   const deltas = [];
   const parent = new Node({ onUpdate: (delta, node) => { order.push(node); deltas.push(delta); } });
@@ -33,7 +33,7 @@ test("node: update sırası ve callback doğrulaması", () => {
   assert.throws(() => new Node({ onUpdate: "invalid" }), /callback/);
 });
 
-test("node: pointer handler yönetimi", () => {
+test("node: pointer handler management", () => {
   const node = new Node();
   const handler = () => {};
   node.setPointerHandlers({ onPointerDown: handler });
@@ -44,14 +44,14 @@ test("node: pointer handler yönetimi", () => {
   assert.throws(() => new Node({ onPointerDown: "not-a-function" }), /callback/);
 });
 
-test("node: hitArea ve containsPoint", () => {
+test("node: hitArea and containsPoint", () => {
   const node = new Node({ interactive: true, hitArea: { x: -10, y: -5, width: 20, height: 10 } });
   assert.equal(node.containsPoint(9, 4), true);
   assert.equal(node.containsPoint(11, 0), false);
   assert.throws(() => node.setHitArea({ x: 0, y: 0, width: Infinity, height: 1 }), /Clip rect/);
 });
 
-test("node: dünya matrisi ve lazy güncelleme", () => {
+test("node: world matrix and lazy update", () => {
   const scene = new Scene();
   const parent = new Node({ x: 10 });
   const child = new Sprite({ width: 4, height: 4, x: 2 });
@@ -70,7 +70,7 @@ test("node: dünya matrisi ve lazy güncelleme", () => {
   assert.equal(child.worldMatrix.tx, 22);
 });
 
-test("node: yeniden ebeveynleme (reparenting)", () => {
+test("node: reparenting", () => {
   const scene = new Scene();
   const a = new Node({ x: 10 });
   const b = new Node({ x: 100 });
@@ -84,7 +84,7 @@ test("node: yeniden ebeveynleme (reparenting)", () => {
   assert.equal(child.worldMatrix.tx, 102);
 });
 
-test("node: cycle koruması", () => {
+test("node: cycle guard", () => {
   const parent = new Node();
   const child = new Node();
   parent.children.push(child);
@@ -99,7 +99,7 @@ test("node: cycle koruması", () => {
   child.destroy();
 });
 
-test("node: derinlik ve child limitleri", () => {
+test("node: depth and child limits", () => {
   const root = new Node();
   let cursor = root;
   for (let depth = 0; depth <= 1_024; depth += 1) {
@@ -115,7 +115,7 @@ test("node: derinlik ve child limitleri", () => {
   oversized.destroy();
 });
 
-test("node: destroy zinciri ve atomic add", () => {
+test("node: destroy chain and atomic add", () => {
   const parent = new Node();
   const child = new Node();
   parent.add(child);
@@ -131,7 +131,7 @@ test("node: destroy zinciri ve atomic add", () => {
   assert.deepEqual(scene.children, [before]);
 });
 
-test("scene: pick ve zIndex sıralaması", () => {
+test("scene: pick and zIndex ordering", () => {
   const scene = new Scene();
   const back = new Sprite({ width: 100, height: 100, zIndex: 0 });
   const front = new Sprite({ width: 50, height: 50, zIndex: 1 });
@@ -143,7 +143,7 @@ test("scene: pick ve zIndex sıralaması", () => {
   assert.throws(() => scene.pick(0, 0, "not-a-function"), /predicate/);
 });
 
-test("node: yok edilmiş düğüm update tetiklemez", () => {
+test("node: a destroyed node does not trigger update", () => {
   let calls = 0;
   const node = new Node({ onUpdate: () => { calls += 1; } });
   node.destroy();

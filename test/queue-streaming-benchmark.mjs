@@ -12,7 +12,7 @@ const state = createRenderBatchState();
 const warmQueue = buildRenderBatches(scene, camera, width, height, { state });
 const sourceBatch = warmQueue.batches[0];
 const sourceData = sourceBatch?.data;
-if (!(sourceData instanceof Float32Array)) throw new Error("Queue benchmark kaynak buffer üretmedi.");
+if (!(sourceData instanceof Float32Array)) throw new Error("Queue benchmark produced no source buffer.");
 
 let sameBatchFrames = 0;
 let sameDataFrames = 0;
@@ -38,7 +38,7 @@ const result = {
   renderOrderRebuilds: state.renderOrderRebuilds,
   elapsedMs: Number(elapsedMs.toFixed(2)),
   simulatedFramesPerSecond: Number((frameCount / Math.max(elapsedMs / 1000, Number.EPSILON)).toFixed(2)),
-  note: "Node queue sözleşme ölçümü; gerçek WebGL2/WebGPU sürücü ve fiziksel cihaz FPS ölçümü değildir.",
+  note: "Node queue contract measurement; not a real WebGL2/WebGPU driver or physical-device FPS measurement.",
 };
 console.log(JSON.stringify(result, null, 2));
 if (sameQueueFrames !== frameCount || sameBatchFrames !== frameCount || sameDataFrames !== frameCount) process.exitCode = 1;

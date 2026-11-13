@@ -7,7 +7,7 @@ const flush = () => new Promise((resolve) => setImmediate(resolve));
 
 class TestProbe { destroy() { this.destroyCalls = (this.destroyCalls || 0) + 1; } }
 
-test("runtime-agent: stop in-flight poll isteğini abort eder", async () => {
+test("runtime-agent: stop aborts the in-flight poll request", async () => {
   let commandSignal = null;
   let resultSignal = null;
   let pollRequests = 0;
@@ -38,7 +38,7 @@ test("runtime-agent: stop in-flight poll isteğini abort eder", async () => {
   assert.equal(agent.controller, null);
 });
 
-test("runtime-agent: eşzamanlı poll çağrıları tekilleşir", async () => {
+test("runtime-agent: concurrent poll calls are deduplicated", async () => {
   let requests = 0;
   const agent = new RuntimeAgent({
     api: {},
@@ -55,7 +55,7 @@ test("runtime-agent: eşzamanlı poll çağrıları tekilleşir", async () => {
   agent.stop();
 });
 
-test("runtime-agent: askıdaki execute komutu EXI_RUNTIME_COMMAND_TIMEOUT'a düşer", async () => {
+test("runtime-agent: a hanging execute command falls to EXI_RUNTIME_COMMAND_TIMEOUT", async () => {
   const posted = [];
   const agent = new RuntimeAgent({
     api: { hang: () => new Promise(() => {}) },
@@ -83,7 +83,7 @@ test("runtime-agent: askıdaki execute komutu EXI_RUNTIME_COMMAND_TIMEOUT'a dü�
   assert.equal(agent.controller, null);
 });
 
-test("runtime-agent: stop+start aynı anda birden fazla aktif poll üretmez", async () => {
+test("runtime-agent: stop+start never yields more than one active poll", async () => {
   const gotPromises = [];
   const agent = new RuntimeAgent({
     api: {},
@@ -120,7 +120,7 @@ test("runtime-agent: stop+start aynı anda birden fazla aktif poll üretmez", as
   assert.equal(gotPromises[0].settled, false);
 });
 
-test("runtime-agent: release snapshot hash evict eder; stop tümünü temizler", async () => {
+test("runtime-agent: release evicts the snapshot hash; stop clears everything", async () => {
   const agent = new RuntimeAgent({
     api: {},
     token: "",

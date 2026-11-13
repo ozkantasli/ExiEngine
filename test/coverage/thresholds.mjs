@@ -1,10 +1,10 @@
-// ExiEngine coverage eşikleri — modül bazlı minimum line coverage.
-// Faz 2 sonrası: unit suite 14 dosya / ~145 test; birim modüllerin neredeyse tamamı %85+.
-// Renderer'lar (webgl2/webgpu) GPU bağımlıdır; hardware-soak ile tamamlanır.
-// NOT: Bu eşikler tooling eşiğidir, test yumuşatma DEĞİLDİR; unit suite büyüdükçe yükseltilir.
+// ExiEngine coverage thresholds — minimum line coverage per module.
+// Since phase 2: the unit suite has grown (14 files / ~145 tests then); nearly all unit modules are 85%+.
+// The renderers (webgl2/webgpu) depend on a GPU; hardware-soak completes them.
+// NOTE: these are tooling thresholds, NOT a softening of tests; they are raised as the unit suite grows.
 
 export const thresholds = {
-  // Birim modüller — yüksek eşik (unit testlerde doğrudan hedeflenir)
+  // Unit modules — high threshold (targeted directly by unit tests)
   "src/core/math.js": 90,
   "src/core/pathfinding.js": 90,
   "src/core/profiler.js": 90,

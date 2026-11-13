@@ -1,4 +1,4 @@
-// ExiEngine unit test — Text / TextCache / GlyphAtlas (Canvas 2D stub ile)
+// ExiEngine unit test — Text / TextCache / GlyphAtlas (with a Canvas 2D stub)
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Text, TextCache, GlyphAtlas } from "../../src/index.js";
@@ -30,7 +30,7 @@ test.after(() => {
   else delete globalThis.Intl;
 });
 
-test("text: temel render ve cache", () => {
+test("text: basic render and cache", () => {
   const label = new Text({ text: "GPU", font: "16px sans-serif", padding: 2 });
   const texture = label.texture;
   assert.equal(label.width, 28);
@@ -49,7 +49,7 @@ test("text: temel render ve cache", () => {
   label.destroy();
 });
 
-test("text: wordWrap ve style", () => {
+test("text: wordWrap and style", () => {
   const label = new Text({ text: "AAAA BBBB", font: "16px sans-serif", maxWidth: 32, wordWrap: true });
   assert.equal(label.maxWidth, 32);
   assert.equal(label.wordWrap, true);
@@ -64,7 +64,7 @@ test("text: wordWrap ve style", () => {
   bounded.destroy();
 });
 
-test("text: TextCache paylaşım ve refcount", () => {
+test("text: TextCache sharing and refcount", () => {
   const cache = new TextCache({ maxEntries: 4, maxPixels: 4096 });
   const a = new Text({ text: "SAME", font: "16px sans-serif", cache });
   const b = new Text({ text: "SAME", font: "16px sans-serif", cache });
@@ -87,7 +87,7 @@ test("text: TextCache paylaşım ve refcount", () => {
   assert.throws(() => direct.acquire("guard", () => null), (error) => error?.code === "EXI_TEXT_CONFIG");
 });
 
-test("text: GlyphAtlas grapheme ve kompleks script fallback", () => {
+test("text: GlyphAtlas grapheme and complex script fallback", () => {
   const atlas = new GlyphAtlas({ width: 64, height: 64, maxEntries: 32, maxPixels: 4096 });
   assert.throws(() => new GlyphAtlas({ width: 4097 }), /limit/);
   assert.throws(() => new GlyphAtlas({ width: 64, height: 64, maxPixels: 1024 }), /pixel/);
@@ -109,7 +109,7 @@ test("text: GlyphAtlas grapheme ve kompleks script fallback", () => {
   destroyed.destroy();
 });
 
-test("text: Intl.Segmenter yoksa legacy grapheme", () => {
+test("text: legacy graphemes without Intl.Segmenter", () => {
   globalThis.Intl = { Segmenter: undefined };
   const atlas = new GlyphAtlas({ width: 128, height: 128, maxEntries: 32, maxPixels: 16_384 });
   const label = new Text({ text: "A\u0301👩‍💻🇹🇷", font: "16px sans-serif", glyphAtlas: atlas });

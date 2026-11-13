@@ -42,7 +42,7 @@ const result = {
   offscreenRenderItemCalls,
   visibleRenderItemCalls,
   visibleNodeCount: visibleQueue.nodeCount,
-  note: "Node subtree cullBounds sözleşme ölçümü; gerçek GPU/FPS ölçümü değildir.",
+  note: "Node subtree cullBounds contract measurement; not a real GPU/FPS measurement.",
 };
 console.log(JSON.stringify(result, null, 2));
 if (offscreenCulled !== frameCount || offscreenRenderItemCalls !== 0 || visibleRenderItemCalls !== childCount || visibleQueue.nodeCount !== childCount) process.exitCode = 1;

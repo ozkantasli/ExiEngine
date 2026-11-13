@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { Scene, SpriteBatch, Texture, TextureAtlas, Camera } from "../../src/index.js";
 import { buildRenderBatches } from "../../src/render/batch.js";
 
-test("spriteBatch: compact batch ve cache", () => {
+test("spriteBatch: compact batch and cache", () => {
   const batch = new SpriteBatch({ texture: Texture.white });
   batch.addSprite({ x: -20, y: 0, width: 12, height: 12, tint: 0xff0000 });
   batch.addSprite({ x: 20, y: 0, width: 12, height: 12, tint: 0x00ff00, rotation: Math.PI / 4 });
@@ -48,7 +48,7 @@ test("spriteBatch: markDirty, addSprites, removeSprite, setFrame", () => {
   assert.equal(batch.removeSprite(0), true);
 });
 
-test("spriteBatch: kapasite limitleri", () => {
+test("spriteBatch: capacity limits", () => {
   const capped = new SpriteBatch({ texture: Texture.white });
   capped.sprites.length = 100_000;
   assert.throws(() => capped.addSprite(), /limit/);
@@ -59,7 +59,7 @@ test("spriteBatch: kapasite limitleri", () => {
   assert.throws(() => direct.getLocalBounds(), /limit/);
 });
 
-test("spriteBatch: spatial culling ve chunk", () => {
+test("spriteBatch: spatial culling and chunk", () => {
   const camera = new Camera({ width: 320, height: 180 });
   const batch = new SpriteBatch({ texture: Texture.white, chunkSize: 2, spatialCulling: true, cellSize: 32 });
   batch.addSprite({ x: 1000, width: 12, height: 12 });
@@ -118,7 +118,7 @@ test("spriteBatch: instanced + gpuCulling stream", () => {
   camera.position.x = 0;
 });
 
-test("spriteBatch: atlas frame ve setFrame animasyon", () => {
+test("spriteBatch: atlas frame and setFrame animation", () => {
   const camera = new Camera({ width: 320, height: 180 });
   const base = new Texture({ id: "batch-atlas", sourceWidth: 64, sourceHeight: 32 });
   const atlas = TextureAtlas.fromJSON(base, { frames: { left: { frame: { x: 0, y: 0, w: 32, h: 32 } }, right: { frame: { x: 32, y: 0, w: 32, h: 32 } } } });
@@ -135,7 +135,7 @@ test("spriteBatch: atlas frame ve setFrame animasyon", () => {
   assert.equal(frameQueue.batches[0].instanceData[8], 0.5);
 });
 
-test("spriteBatch: addAnimatedSprite ve animation lifecycle", () => {
+test("spriteBatch: addAnimatedSprite and animation lifecycle", () => {
   const base = new Texture({ id: "batch-anim-atlas", sourceWidth: 64, sourceHeight: 32 });
   const atlas = TextureAtlas.fromJSON(base, { frames: { left: { frame: { x: 0, y: 0, w: 32, h: 32 } }, right: { frame: { x: 32, y: 0, w: 32, h: 32 } } } });
   const batch = new SpriteBatch({ texture: base, instanced: true, gpuCulling: true });
@@ -163,7 +163,7 @@ test("spriteBatch: addAnimatedSprite ve animation lifecycle", () => {
   assert.throws(() => batch.addAnimatedSprite({ frames: [atlas.get("left")], onComplete: "invalid" }), /onComplete/);
 });
 
-test("spriteBatch: pingPong ve frame change callbacks", () => {
+test("spriteBatch: pingPong and frame change callbacks", () => {
   const base = new Texture({ id: "batch-pingpong", sourceWidth: 64, sourceHeight: 32 });
   const atlas = TextureAtlas.fromJSON(base, { frames: { left: { frame: { x: 0, y: 0, w: 32, h: 32 } }, right: { frame: { x: 32, y: 0, w: 32, h: 32 } } } });
   const batch = new SpriteBatch({ texture: base });

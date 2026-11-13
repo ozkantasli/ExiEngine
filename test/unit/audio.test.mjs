@@ -1,4 +1,4 @@
-// ExiEngine unit test — AudioManager (Fake AudioContext ile)
+// ExiEngine unit test — AudioManager (with a fake AudioContext)
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { AudioManager } from "../../src/index.js";
@@ -53,7 +53,7 @@ const audioLoader = {
   calls: [],
 };
 
-test("audio: limitler constructor doğrulaması", () => {
+test("audio: limits constructor validation", () => {
   assert.throws(() => new AudioManager({ maxBytes: 0 }), /limit/);
   assert.throws(() => new AudioManager({ maxBytes: 64 * 1024 * 1024 + 1 }), /limit/);
   assert.throws(() => new AudioManager({ maxDecodedBytes: 0 }), /limit/);
@@ -103,7 +103,7 @@ test("audio: load / unload / voice lifecycle", async () => {
   audio.destroy();
 });
 
-test("audio: loadMany batch ve progress", async () => {
+test("audio: loadMany batch and progress", async () => {
   audioLoader.calls = [];
   const audio = new AudioManager({ loader: audioLoader, maxDecodedBytes: 128 });
   const progress = [];
@@ -124,7 +124,7 @@ test("audio: loadMany batch ve progress", async () => {
   audio.destroy();
 });
 
-test("audio: voice limiti", () => {
+test("audio: voice limit", () => {
   const audio = new AudioManager({ maxVoices: 1 });
   const buffer = { length: 1, numberOfChannels: 1 };
   const voice = audio.play(buffer);
@@ -134,7 +134,7 @@ test("audio: voice limiti", () => {
   audio.destroy();
 });
 
-test("audio: StereoPanner yoksa pan hatası", () => {
+test("audio: pan error without StereoPanner", () => {
   class NoPannerContext extends FakeAudioContext {
     createStereoPanner() { return null; }
   }
@@ -145,7 +145,7 @@ test("audio: StereoPanner yoksa pan hatası", () => {
   globalThis.AudioContext = FakeAudioContext;
 });
 
-test("audio: destroy sırasında pending decode reddedilir", async () => {
+test("audio: a pending decode is rejected during destroy", async () => {
   let resolveDecode;
   class DeferredContext extends FakeAudioContext {
     decodeAudioData() { return new Promise((resolve) => { resolveDecode = () => resolve({ length: 4, numberOfChannels: 2 }); }); }
@@ -163,7 +163,7 @@ test("audio: destroy sırasında pending decode reddedilir", async () => {
   globalThis.AudioContext = FakeAudioContext;
 });
 
-test("audio: unload pending load request'ini abort eder", async () => {
+test("audio: unload aborts the pending load request", async () => {
   let requestSignal = null;
   const blockingLoader = {
     loadBytes: (_url, options = {}) => new Promise((_resolve, reject) => {
@@ -187,7 +187,7 @@ test("audio: unload pending load request'ini abort eder", async () => {
   audio.destroy();
 });
 
-test("audio: shared load dedupe ve abort", async () => {
+test("audio: shared load dedupe and abort", async () => {
   let resolveBytes;
   let loadCalls = 0;
   const sharedLoader = {
@@ -204,7 +204,7 @@ test("audio: shared load dedupe ve abort", async () => {
   const surviving = audio.load("shared", "/shared.ogg");
   abort.abort();
   await assert.rejects(aborted, /AbortError/);
-  // Pending load varken farklı URL ile aynı isim → "zaten yükleniyor" (rejected promise)
+  // Same name with a different URL while a load is pending → "already loading" (rejected promise)
   await assert.rejects(audio.load("shared", "/other.ogg"), /already loading/);
   resolveBytes();
   await surviving;
@@ -238,7 +238,7 @@ test("audio: bus volume / mute / fade", async () => {
   audio.destroy();
 });
 
-test("audio: custom bus ve limitler", () => {
+test("audio: custom bus and limits", () => {
   const audio = new AudioManager();
   audio.createBus("voice", { volume: 0.5, parent: null });
   audio.ensureContext();

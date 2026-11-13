@@ -3,17 +3,17 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Tween, Animator, easing } from "../../src/index.js";
 
-test("animation: easing fonksiyonları sözleşmesi", () => {
+test("animation: easing function contract", () => {
   for (const name of Object.keys(easing)) {
     const fn = easing[name];
-    assert.equal(typeof fn, "function", `easing.${name} fonksiyon olmalı`);
+    assert.equal(typeof fn, "function", `easing.${name} must be a function`);
     assert.equal(fn(0), 0, `easing.${name}(0) = 0`);
     assert.ok(Math.abs(fn(1) - 1) < 1e-7, `easing.${name}(1) = 1`);
     assert.ok(Number.isFinite(fn(0.5)), `easing.${name}(0.5) finite`);
   }
 });
 
-test("animation: Tween ilerleme ve yoyo/loop", () => {
+test("animation: Tween progress and yoyo/loop", () => {
   const target = { value: 0 };
   const tween = new Tween(target, "value", 10, 1, { loop: 2, yoyo: true, ease: (value) => value });
   tween.update(1);
@@ -26,7 +26,7 @@ test("animation: Tween ilerleme ve yoyo/loop", () => {
   assert.equal(target.value, 10);
 });
 
-test("animation: güvenli easing ve bounded değerler", () => {
+test("animation: safe easing and bounded values", () => {
   const target = { value: 0 };
   const unsafe = new Tween(target, "value", 10, 1, { ease: () => Infinity });
   unsafe.update(0.5);
@@ -37,7 +37,7 @@ test("animation: güvenli easing ve bounded değerler", () => {
   assert.throws(() => new Tween({}, "value", 1, 1, { ease: "invalid" }), /easing/);
 });
 
-test("animation: Animator ekle/çıkar ve limitler", () => {
+test("animation: Animator add/remove and limits", () => {
   const animator = new Animator();
   const target = { value: 0 };
   animator.add(new Tween(target, "value", 10, 1, { ease: (value) => value }));
@@ -58,7 +58,7 @@ test("animation: Animator ekle/çıkar ve limitler", () => {
   assert.throws(() => new Animator({ maxTweens: 65_537 }), /tween limit/);
 });
 
-test("animation: Animator doğrudan mutasyon koruması", () => {
+test("animation: Animator direct mutation guard", () => {
   const limited = new Animator({ maxTweens: 1 });
   limited.tweens.add(new Tween({ value: 0 }, "value", 1, 1));
   assert.throws(() => limited.add(new Tween({ value: 0 }, "value", 1, 1)), /at most 1 tween/);
@@ -69,7 +69,7 @@ test("animation: Animator doğrudan mutasyon koruması", () => {
   assert.throws(() => capacity.add(new Tween({ value: 0 }, "value", 1, 1)), /tween limit/);
 });
 
-test("animation: onComplete ve otomatik kaldırma", () => {
+test("animation: onComplete and automatic removal", () => {
   let completions = 0;
   const animator = new Animator({ maxTweens: 1 });
   animator.add(new Tween({ value: 0 }, "value", 1, 1, { onComplete: () => { completions += 1; } }));

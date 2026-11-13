@@ -29,7 +29,7 @@ const result = {
   culledCommands,
   transformPointCalls,
   expectedTransformPointCalls,
-  note: "Node Graphics item-bounds culling sözleşme ölçümü; gerçek GPU/FPS ölçümü değildir.",
+  note: "Node Graphics item-bounds culling contract measurement; not a real GPU/FPS measurement.",
 };
 console.log(JSON.stringify(result, null, 2));
 if (culledCommands !== commandCount * frameCount || transformPointCalls !== expectedTransformPointCalls) process.exitCode = 1;

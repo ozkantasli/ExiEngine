@@ -7,9 +7,9 @@ import { NONE } from "./sentinel.js";
 
 const MAX_TILE_COUNT = 500_000;
 
-// TileMap frameCache, subTexture'ları tileIndex başına saklar; ancak texture
-// yeniden atanırsa veya atlas UV leri değişirse eski kareleri sunardı. Texture
-// kimliğini WeakMap ile ve baseTexture sürümünü anahtara katarak ayıklar.
+// TileMap frameCache stores subTextures per tileIndex; but if the texture
+// was reassigned or the atlas UVs changed it would serve stale frames. It keys
+// on texture identity through a WeakMap and on the baseTexture version.
 const textureUidRegistry = new WeakMap();
 let nextTextureUid = 1;
 function textureUid(texture) {

@@ -20,10 +20,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
-      # Bağımlılık yok (runtime dependency-free); npm ci gerekmez.
+      # No dependencies (runtime dependency-free); npm ci is not needed.
       - run: npm test
       - run: npm run lint
-      # Node 22'de --experimental-strip-types SKIP raporlar (script içi tespit); 24'te tam çalışır.
+      # On Node 22 --experimental-strip-types reports SKIP (detected in the script); it fully runs on 24.
       - run: npm run test:typecheck
 
   verify:
@@ -35,9 +35,9 @@ jobs:
         with:
           node-version: 24
       - run: npm run verify
-      # Not: bench:regression (baseline drift) CI'da ÇALIŞTIRILMAZ — baseline yerel
-      # donanımda üretildiği için GitHub runner'ında farklı CPU/timing flaky sonuç verir.
-      # Drift kapısı yerel geliştirmede anlamlıdır; CI kapısı verify (25 benchmark)'dır.
+      # Note: bench:regression (baseline drift) does NOT run in CI — the baseline is produced on local
+      # hardware, so a GitHub runner's different CPU/timing gives flaky results.
+      # The drift gate is meaningful in local development; the CI gate is verify (25 benchmarks).
 
   coverage:
     name: Coverage
@@ -46,7 +46,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          # Node 24: --experimental-test-coverage Node 22.13+ patch bağımlıdır; 24'te sabittir.
+          # Node 24: --experimental-test-coverage depends on Node 22.13+ patches; it is stable on 24.
           node-version: 24
       - run: npm run test:coverage
         continue-on-error: false

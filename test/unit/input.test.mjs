@@ -49,7 +49,7 @@ test("input: invalid constructor bindings leave existing listeners untouched", (
   }
 });
 
-test("input: temel binding ve axis davranışı", () => {
+test("input: basic binding and axis behavior", () => {
   const input = new Input(makeCanvas(), { axes: { keyboardAxis: { type: "key-axis", positive: "ArrowRight", negative: "ArrowLeft" } } });
   input.bindAction("keyboardAction", "KeyB");
   input.bindAction("pointerAction", { type: "pointer", button: 0 });
@@ -71,7 +71,7 @@ test("input: temel binding ve axis davranışı", () => {
   input.destroy();
 });
 
-test("input: getPointerWorld ve camera doğrulaması", () => {
+test("input: getPointerWorld and camera validation", () => {
   const input = new Input(makeCanvas());
   const camera = new Camera({ width: 100, height: 50, x: 10, y: 20 });
   const world = input.getPointerWorld(camera);
@@ -83,7 +83,7 @@ test("input: getPointerWorld ve camera doğrulaması", () => {
   input.destroy();
 });
 
-test("input: aksiyon basma/bırakma ve frame semantiği", () => {
+test("input: action press/release and frame semantics", () => {
   const input = new Input(makeCanvas());
   input.bindAction("keyboardAction", "KeyB");
   windowListeners.get("keydown")({ code: "KeyB" });
@@ -97,7 +97,7 @@ test("input: aksiyon basma/bırakma ve frame semantiği", () => {
   input.destroy();
 });
 
-test("input: pointer state ve multi-pointer", () => {
+test("input: pointer state and multi-pointer", () => {
   const input = new Input(makeCanvas());
   canvasListeners.get("pointerdown")({ clientX: 10, clientY: 10, button: 0, pointerId: 6 });
   assert.equal(input.isPointerDown(0), true);
@@ -112,7 +112,7 @@ test("input: pointer state ve multi-pointer", () => {
   assert.equal(input.pointer.pointerId, 7);
   assert.equal(input.getPointers().size, 2);
   assert.equal(input.getPointer(8)?.type, "touch");
-  // endFrame was* bayraklarını temizler; pointer state'i endFrame'de korunur (frame semantiği)
+  // endFrame clears the was* flags; pointer state is kept across endFrame (frame semantics)
   input.endFrame();
   assert.equal(input.wasPointerReleased(0), false);
   windowListeners.get("pointerup")({ clientX: 20, clientY: 20, button: 0, pointerId: 8 });
@@ -120,7 +120,7 @@ test("input: pointer state ve multi-pointer", () => {
   input.destroy();
 });
 
-test("input: wheel ve pointercancel", () => {
+test("input: wheel and pointercancel", () => {
   const input = new Input(makeCanvas());
   canvasListeners.get("pointerdown")({ clientX: 10, clientY: 10, button: 0, pointerId: 7 });
   canvasListeners.get("wheel")({ clientX: 20, clientY: 20, deltaX: 0, deltaY: 12 });
@@ -132,7 +132,7 @@ test("input: wheel ve pointercancel", () => {
   input.destroy();
 });
 
-test("input: blur ve pagehide sıfırlama", () => {
+test("input: blur and pagehide reset", () => {
   const input = new Input(makeCanvas());
   input.bindAction("keyboardAction", "KeyB");
   windowListeners.get("keydown")({ code: "KeyA" });
@@ -153,7 +153,7 @@ test("input: blur ve pagehide sıfırlama", () => {
   input.destroy();
 });
 
-test("input: binding snapshot izolasyonu ve setBindings", () => {
+test("input: binding snapshot isolation and setBindings", () => {
   const input = new Input(makeCanvas());
   input.bindAction("keyboardAction", "KeyB");
   const snapshot = input.getBindings();
@@ -167,7 +167,7 @@ test("input: binding snapshot izolasyonu ve setBindings", () => {
   input.destroy();
 });
 
-test("input: unbind ve inject", () => {
+test("input: unbind and inject", () => {
   const input = new Input(makeCanvas());
   input.bindAction("keyboardAction", "KeyB");
   assert.equal(input.unbindAction("keyboardAction"), true);
@@ -184,7 +184,7 @@ test("input: unbind ve inject", () => {
   input.destroy();
 });
 
-test("input: limitler ve doğrudan mutasyon koruması", () => {
+test("input: limits and direct mutation guard", () => {
   const input = new Input(makeCanvas());
   for (let index = 0; index < 32; index += 1) input.handlePointerMove({ clientX: 10, clientY: 10, pointerId: 100 + index, pointerType: "touch" });
   assert.equal(input.getPointers().size, 32);
@@ -200,7 +200,7 @@ test("input: limitler ve doğrudan mutasyon koruması", () => {
   input.destroy();
 });
 
-test("input: gamepad bağlantı ve snapshot", () => {
+test("input: gamepad connection and snapshot", () => {
   const events = [];
   const pad = { index: 0, id: "smoke-pad", axes: [0, 0], buttons: [{ pressed: false }] };
   let activePads = [pad];
@@ -232,7 +232,7 @@ test("input: gamepad bağlantı ve snapshot", () => {
   input.destroy();
 });
 
-test("input: destroy sonrası stale handler güvenli", () => {
+test("input: stale handler is safe after destroy", () => {
   const input = new Input(makeCanvas());
   const keyDown = input.handleKeyDown;
   const pointerDown = input.handlePointerDown;
@@ -245,7 +245,7 @@ test("input: destroy sonrası stale handler güvenli", () => {
   input.destroy();
 });
 
-test("input: getVector ve injectKeyUp", () => {
+test("input: getVector and injectKeyUp", () => {
   const canvas = makeCanvas();
   const input = new Input(canvas, {
     axes: {

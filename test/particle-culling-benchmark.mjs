@@ -43,7 +43,7 @@ const result = {
   visibleInstanceCount,
   sameViewFrames,
   viewReallocations: frameCount - sameViewFrames,
-  note: "Node particle packed-culling sözleşme ölçümü; gerçek GPU/FPS ölçümü değildir.",
+  note: "Node particle packed-culling contract measurement; not a real GPU/FPS measurement.",
 };
 console.log(JSON.stringify(result, null, 2));
 if (offscreenInstanceCount !== 0 || offscreenCulledCount !== particleCount || visibleInstanceCount !== particleCount || sameViewFrames !== frameCount) process.exitCode = 1;

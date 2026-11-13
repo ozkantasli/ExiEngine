@@ -11,8 +11,8 @@ const MAX_ANIMATION_RATE = 240;
 const MAX_ANIMATION_DELTA = 5;
 const MAX_ANIMATION_STEPS = 4_096;
 
-// AnimatedSprite ile aynı "oynatıcı" sözlüğü: phase ∈ { playing, stopped, completed }.
-// playing alanı phase'den türeyen erişimdir (eski tüketiciler için); tek doğruluk kaynağı phase'dir.
+// The same "player" vocabulary as AnimatedSprite: phase ∈ { playing, stopped, completed }.
+// playing is an accessor derived from phase (for older consumers); phase is the single source of truth.
 function transitionAnimation(animation, event) {
   if (event === "play") {
     const replay = animation.phase === "completed";
@@ -286,7 +286,7 @@ export class SpriteBatch extends Node {
     const animation = sprite?.animation;
     if (!animation) return false;
     if (animation.phase === "completed") {
-      // AnimatedSprite.play() ile aynı replay semantiği: başa sar, texture'ı senkronla, onFrameChange yayınla.
+      // Same replay semantics as AnimatedSprite.play(): rewind, sync the texture, emit onFrameChange.
       animation.currentFrame = 0;
       animation.direction = 1;
       animation.elapsed = 0;
@@ -296,7 +296,7 @@ export class SpriteBatch extends Node {
       this.markDirty();
       return true;
     }
-    // stopped → playing görsel değişiklik değildir; dirty işaretleme gerekmez.
+    // stopped → playing is not a visual change; no dirty marking needed.
     transitionAnimation(animation, "play");
     return true;
   }
@@ -318,7 +318,7 @@ export class SpriteBatch extends Node {
     animation.currentFrame = nextFrame;
     animation.direction = 1;
     animation.elapsed = 0;
-    // AnimatedSprite.gotoFrame ile aynı: completed'ten stopped'a dön; playing'e dokunma.
+    // Same as AnimatedSprite.gotoFrame: go from completed back to stopped; leave playing alone.
     transitionAnimation(animation, "reopen");
     syncSpriteAnimationTexture(sprite);
     if (changed) animation.onFrameChange?.(this, index, animation.currentFrame);
@@ -517,8 +517,8 @@ export class SpriteBatch extends Node {
     const useGpuCulling = this.gpuCulling && gpuCulling;
     const canCull = Boolean(camera && this.cullable !== false);
     const needsCamera = Boolean(camera && !useGpuCulling);
-    // İnstance yolu contentVersion'ı tek doğruluk kaynağı olarak kullanır; itemsDirty'yi tüketmez.
-    // itemsDirty yalnızca renderItems tüketicisinin bayrağı olarak kalır (instance rebuild onu temizlemez).
+    // The instance path uses contentVersion as the single source of truth; it does not consume itemsDirty.
+    // itemsDirty stays the flag of the renderItems consumer only (an instance rebuild does not clear it).
     if (this.hasInstanceCache(camera, width, height, useGpuCulling, needsCamera)) { this.lastCulledCount = 0; return this.instanceItems; }
     this.lastCulledCount = 0;
     const previousInstanceItem = this.instanceItems[0] || this.instanceChunkItems[0] || null;
@@ -748,7 +748,7 @@ export class SpriteBatch extends Node {
     const canCull = camera && this.cullable !== false;
     const renderItemsKey = canCull ? this.getStaticRenderKey(camera, width, height) : "all";
     if (!this.itemsDirty && this.renderItemsKey === renderItemsKey) { this.lastCulledCount = 0; return this.renderItems; }
-    // chunkBounds her invalidate()'te boşaltılır; bayrak okumaya gerek yok.
+    // chunkBounds is emptied on every invalidate(); no flag needs to be read.
     this.itemsDirty = false;
     this.lastCulledCount = 0;
     this.renderItems.length = 0;

@@ -1,7 +1,7 @@
-// ExiEngine test orchestration — her test dosyasını sıralı ama bağımsız çalıştırır.
-// Bir test başarısız olursa sonrakiler yine de koşar; tümü bitince özet raporlanır.
-// Henüz var olmayan aşamalar (unit, typecheck) SKIP olarak raporlanır; dosya oluşturulunca otomatik aktifleşir.
-// Bağımlılık yoktur: yalnızca Node built-in'leri.
+// ExiEngine test orchestration — runs every test file in order but independently.
+// If a test fails the following ones still run; a summary is reported at the end.
+// Stages that do not exist yet are reported as SKIP; they activate once their file exists.
+// No dependencies: Node built-ins only.
 import { spawn } from "node:child_process";
 import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
@@ -9,8 +9,8 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-// Sıra önemli (engine-smoke en son; mcp-smoke child process bırakabilir).
-// Her dosya kendi içinde tamamlanır; birinin başarısızlığı diğerlerini durdurmaz.
+// Order matters (mcp-smoke may leave a child process behind).
+// Each file completes on its own; one failing does not stop the others.
 const stages = [
   { name: "static", file: "test/static-smoke.mjs", command: ["node", "test/static-smoke.mjs"] },
   { name: "server", file: "test/server-smoke.mjs", command: ["node", "test/server-smoke.mjs"] },
@@ -72,28 +72,28 @@ for (const stage of stages) {
   results.push(await runStage(stage, command));
 }
 
-console.log("\n[run-all] Özet:");
+console.log("\n[run-all] Summary:");
 let failed = 0;
 for (const result of results) {
   const { stage, code, signal, error, skipped, stderr } = result;
   if (skipped) {
-    console.log(`  ${stage.name.padEnd(10)} SKIP (dosya yok: ${stage.file})`);
+    console.log(`  ${stage.name.padEnd(10)} SKIP (missing file: ${stage.file})`);
     continue;
   }
   const ok = code === 0;
   if (!ok) failed += 1;
-  const status = ok ? "GEÇTİ" : `BAŞARISIZ (${signal || `exit ${code}`}${error ? `: ${error.message}` : ""})`;
+  const status = ok ? "PASSED" : `FAILED (${signal || `exit ${code}`}${error ? `: ${error.message}` : ""})`;
   console.log(`  ${stage.name.padEnd(10)} ${status}`);
   if (!ok) {
-    // GitHub Actions annotation'larına düşer (oturumsuz API'den okunabilir)
+    // Ends up in GitHub Actions annotations (readable through the unauthenticated API)
     const detail = (stderr || "").trim().split("\n").slice(-6).join(" | ");
-    console.error(`##[error][run-all] ${stage.name} başarısız: exit ${code}${signal ? ` (${signal})` : ""}${error ? ` — ${error.message}` : ""}${detail ? ` — stderr: ${detail.slice(0, 600)}` : ""}`);
+    console.error(`##[error][run-all] ${stage.name} failed: exit ${code}${signal ? ` (${signal})` : ""}${error ? ` — ${error.message}` : ""}${detail ? ` — stderr: ${detail.slice(0, 600)}` : ""}`);
   }
 }
 
 if (failed > 0) {
-  console.error(`\n[run-all] ${failed} aşama başarısız.`);
+  console.error(`\n[run-all] ${failed} stage(s) failed.`);
   process.exitCode = 1;
 } else {
-  console.log("\n[run-all] Tüm aşamalar geçti.");
+  console.log("\n[run-all] All stages passed.");
 }

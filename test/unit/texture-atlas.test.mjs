@@ -10,7 +10,7 @@ test.after(() => {
   else delete globalThis.OffscreenCanvas;
 });
 
-test("atlas: pack drawImage sırası ve boyut", () => {
+test("atlas: pack drawImage order and size", () => {
   const packedDraws = [];
   globalThis.OffscreenCanvas = class {
     constructor(width, height) { this.width = width; this.height = height; }
@@ -27,7 +27,7 @@ test("atlas: pack drawImage sırası ve boyut", () => {
   assert.equal(atlas.get("red"), atlas.get("red"));
 });
 
-test("atlas: pack texture frame kaynağı", () => {
+test("atlas: pack texture frame source", () => {
   const packedDraws = [];
   globalThis.OffscreenCanvas = class {
     constructor(width, height) { this.width = width; this.height = height; }
@@ -40,7 +40,7 @@ test("atlas: pack texture frame kaynağı", () => {
   assert.deepEqual(packedDraws.at(-1).slice(1, 5), [4, 2, 6, 3]);
 });
 
-test("atlas: pack limitler ve red'ler", () => {
+test("atlas: pack limits and refusals", () => {
   const packedDraws = [];
   globalThis.OffscreenCanvas = class {
     constructor(width, height) { this.width = width; this.height = height; }
@@ -52,7 +52,7 @@ test("atlas: pack limitler ve red'ler", () => {
   assert.throws(() => TextureAtlas.pack([{ name: "one", source: { width: 1, height: 1 } }], { maxWidth: Infinity }), /limits/);
 });
 
-test("atlas: fromJSON array ve name limitleri", () => {
+test("atlas: fromJSON array and name limits", () => {
   const arr = TextureAtlas.fromJSON(new Texture({ sourceWidth: 32, sourceHeight: 16 }), { frames: [
     { filename: "hero/run-0.png", frame: { x: 0, y: 0, w: 16, h: 16 }, rotated: false, trimmed: false },
     { name: "hero/run-1.png", frame: { x: 16, y: 0, w: 16, h: 16 } },
@@ -65,7 +65,7 @@ test("atlas: fromJSON array ve name limitleri", () => {
   assert.throws(() => TextureAtlas.fromJSON(new Texture({ sourceWidth: 16, sourceHeight: 16 }), { frames: { ["x".repeat(257)]: { frame: { x: 0, y: 0, w: 1, h: 1 } } } }), /name/);
 });
 
-test("atlas: kapasite ve lifecycle edge'leri", () => {
+test("atlas: capacity and lifecycle edges", () => {
   const base = new Texture({ id: "atlas-base", sourceWidth: 8, sourceHeight: 8 });
   const lifecycle = new TextureAtlas(base, { hero: { x: 0, y: 0, width: 4, height: 4 } });
   const frame = lifecycle.get("hero");

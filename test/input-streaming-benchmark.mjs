@@ -22,7 +22,7 @@ input.bindAxis("moveX", { type: "gamepad-axis", axis: 0, deadzone: 0.15 });
 
 input.beginFrame();
 const first = input.getGamepad(0);
-if (!first) throw new Error("Input benchmark gamepad snapshot üretmedi.");
+if (!first) throw new Error("Input benchmark produced no gamepad snapshot.");
 const axes = first.axes;
 const buttons = first.buttons;
 const pressed = first.pressed;
@@ -64,7 +64,7 @@ const result = {
   arrayReallocations: (frameCount - sameAxesFrames) + (frameCount - sameButtonFrames) + (frameCount - samePressedFrames) + (frameCount - sameReleasedFrames),
   elapsedMs: Number(elapsedMs.toFixed(2)),
   simulatedFramesPerSecond: Number((frameCount / Math.max(elapsedMs / 1000, Number.EPSILON)).toFixed(2)),
-  note: "Node input sözleşme ölçümü; gerçek cihaz gamepad sürücüsü ölçümü değildir.",
+  note: "Node input contract measurement; not a real device gamepad driver measurement.",
 };
 console.log(JSON.stringify(result, null, 2));
 if (sameAxesFrames !== frameCount || sameButtonFrames !== frameCount || samePressedFrames !== frameCount || sameReleasedFrames !== frameCount || actionMatches !== frameCount || axisMatches !== frameCount) process.exitCode = 1;

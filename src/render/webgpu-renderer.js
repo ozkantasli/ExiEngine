@@ -532,8 +532,8 @@ export class WebGPURenderer {
 
   getRenderPipeline(instanced, mode) {
     const pipelines = instanced ? this.instancedPipelines : this.pipelines;
-    // Bilinmeyen moda sessizce normal'e düşülmemesi için tablo + "normal" geri dönüşü korunur,
-    // ancak son alias kaldırıldı (mode yoksa tablo zaten normal'e bakar).
+    // The table + "normal" fallback stays so an unknown mode does not silently fall back to normal,
+    // but the last alias was removed (without a mode the table already maps to normal).
     return pipelines?.[mode] ?? pipelines?.normal ?? null;
   }
 

@@ -40,7 +40,7 @@ try {
     glyphRasterizations: atlas.size,
     textureReallocations: label.texture === initialTexture ? 0 : 1,
     complexScriptFallback: true,
-    note: "Node Canvas 2D sözleşme ölçümü; gerçek GPU upload/FPS ölçümü değildir.",
+    note: "Node Canvas 2D contract measurement; not a real GPU upload/FPS measurement.",
   };
   console.log(JSON.stringify(result, null, 2));
   complex.destroy();

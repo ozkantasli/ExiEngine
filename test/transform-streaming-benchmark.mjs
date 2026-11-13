@@ -36,7 +36,7 @@ const result = {
   movingVersionChanges,
   staticElapsedMs: Number(staticElapsedMs.toFixed(2)),
   movingElapsedMs: Number(movingElapsedMs.toFixed(2)),
-  note: "Node transform sözleşme ölçümü; gerçek GPU sürücüsü veya fiziksel cihaz FPS ölçümü değildir.",
+  note: "Node transform contract measurement; not a real GPU driver or physical-device FPS measurement.",
 };
 console.log(JSON.stringify(result, null, 2));
 if (sameStaticVersionFrames !== frameCount || movingVersionChanges !== frameCount) process.exitCode = 1;

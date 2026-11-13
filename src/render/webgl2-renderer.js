@@ -811,7 +811,7 @@ export class WebGL2Renderer {
 
   unbindInstanceBuffer() {
     const gl = this.gl;
-    // Instance attrib'leri regular draw'da da enabled kalırdı; isim alanı çakışmasını önlemek için kapat.
+    // Instance attribs would stay enabled for regular draws too; disable them to avoid clashing.
     for (const location of [this.instanceOriginLocation, this.instanceAxisXLocation, this.instanceAxisYLocation, this.instanceUvRectLocation, this.instanceColorLocation]) {
       if (location === null || location === undefined) continue;
       gl.disableVertexAttribArray?.(location);

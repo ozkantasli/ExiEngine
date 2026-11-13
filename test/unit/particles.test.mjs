@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { ParticleEmitter, Scene, Camera, Texture, SpriteBatch } from "../../src/index.js";
 import { buildRenderBatches } from "../../src/render/batch.js";
 
-test("particles: emit ve update", () => {
+test("particles: emit and update", () => {
   const emitter = new ParticleEmitter({ maxParticles: 4, random: () => 0.5 });
   assert.equal(emitter.emit(4, { size: 2 }), 4);
   assert.equal(emitter.particles.length, 4);
@@ -13,7 +13,7 @@ test("particles: emit ve update", () => {
   assert.equal(emitter.particles.length, 0);
 });
 
-test("particles: limitler ve doğrudan mutasyon", () => {
+test("particles: limits and direct mutation", () => {
   assert.throws(() => new ParticleEmitter({ maxParticles: 100_001 }), /limit/);
   const probe = new ParticleEmitter({ maxParticles: 1 });
   probe.particles.length = 2;
@@ -26,7 +26,7 @@ test("particles: limitler ve doğrudan mutasyon", () => {
   assert.throws(() => capacity.emit(), /limit/);
 });
 
-test("particles: bounded değerler", () => {
+test("particles: bounded values", () => {
   const emitter = new ParticleEmitter({ rate: Infinity, lifetime: Infinity, size: Infinity, random: null });
   assert.equal(emitter.rate, 0);
   assert.equal(Number.isFinite(emitter.lifetime), true);
@@ -39,7 +39,7 @@ test("particles: bounded değerler", () => {
   assert.equal(huge.particles.every((particle) => Object.values(particle).filter((value) => typeof value === "number").every(Number.isFinite)), true);
 });
 
-test("particles: instanced stream ve gpuCulling", () => {
+test("particles: instanced stream and gpuCulling", () => {
   const camera = new Camera({ width: 320, height: 180 });
   const emitter = new ParticleEmitter({ maxParticles: 2, gpuCulling: true, x: 10_000, y: 10_000 });
   emitter.emit(2, { size: 4, tint: 0xff0000 });
@@ -61,7 +61,7 @@ test("particles: instanced stream ve gpuCulling", () => {
   assert.ok(transformCalls > 0);
 });
 
-test("particles: culling ve instance reuse", () => {
+test("particles: culling and instance reuse", () => {
   const camera = new Camera({ width: 320, height: 180 });
   const emitter = new ParticleEmitter({ maxParticles: 2, x: 10_000, y: 10_000 });
   emitter.emit(2, { size: 4 });

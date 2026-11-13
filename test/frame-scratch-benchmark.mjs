@@ -23,7 +23,7 @@ const result = {
   sameInterpolationScratchFrames: sameScratchFrames,
   scratchReallocations: frameCount - sameScratchFrames,
   elapsedMs: Number(elapsedMs.toFixed(2)),
-  note: "Node engine frame-scratch identity sözleşme ölçümü; gerçek GPU/FPS ölçümü değildir.",
+  note: "Node engine frame-scratch identity contract measurement; not a real GPU/FPS measurement.",
 };
 console.log(JSON.stringify(result, null, 2));
 if (sameScratchFrames !== frameCount || engine.interpolationRoots.length !== 0) process.exitCode = 1;

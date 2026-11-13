@@ -23,7 +23,7 @@ scene.add(batch);
 const camera = new Camera({ width, height });
 const warmQueue = buildRenderBatches(scene, camera, width, height, { gpuCulling: true });
 const sourceData = warmQueue.batches[0]?.instanceData;
-if (!(sourceData instanceof Float32Array)) throw new Error("GPU streaming benchmark kaynak buffer üretmedi.");
+if (!(sourceData instanceof Float32Array)) throw new Error("GPU streaming benchmark produced no source buffer.");
 
 let sameBufferFrames = 0;
 const start = performance.now();
@@ -35,8 +35,8 @@ for (let frame = 0; frame < frameCount; frame += 1) {
   const queue = buildRenderBatches(scene, camera, width, height, { gpuCulling: true });
   const nextData = queue.batches[0]?.instanceData;
   if (nextData === sourceData) sameBufferFrames += 1;
-  if (nextData?.[0] !== offset) throw new Error("GPU streaming benchmark güncellenen kaydı okuyamadı.");
-  if (nextData?.[8] !== (frame % 2 === 0 ? 0 : 0.25)) throw new Error("GPU animation benchmark frame UV güncellenemedi.");
+  if (nextData?.[0] !== offset) throw new Error("GPU streaming benchmark could not read the updated record.");
+  if (nextData?.[8] !== (frame % 2 === 0 ? 0 : 0.25)) throw new Error("GPU animation benchmark did not update the frame UV.");
 }
 const elapsedMs = performance.now() - start;
 
@@ -49,7 +49,7 @@ const result = {
   animatedFrameSwitches: frameCount,
   elapsedMs: Number(elapsedMs.toFixed(2)),
   simulatedFramesPerSecond: Number((frameCount / Math.max(elapsedMs / 1000, Number.EPSILON)).toFixed(2)),
-  note: "Node ölçümü; gerçek WebGPU driver/GPU FPS ölçümü değildir.",
+  note: "Node measurement; not a real WebGPU driver/GPU FPS measurement.",
 };
 console.log(JSON.stringify(result, null, 2));
 if (sameBufferFrames !== frameCount) process.exitCode = 1;

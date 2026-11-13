@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Profiler } from "../../src/index.js";
 
-test("profiler: ölçüm ve snapshot davranışı", () => {
+test("profiler: measurement and snapshot behavior", () => {
   const profiler = new Profiler();
   profiler.begin(0);
   profiler.end(16, { drawCalls: 1, stale: true });
@@ -21,7 +21,7 @@ test("profiler: ölçüm ve snapshot davranışı", () => {
   assert.deepEqual(profiler.snapshot(), { fps: 0, frameMs: 16, drawCalls: 4 });
 });
 
-test("profiler: sınırlandırılmış geçmiş (bounded ring)", () => {
+test("profiler: bounded history (ring)", () => {
   const profiler = new Profiler();
   for (let frame = 0; frame < 300; frame += 1) {
     profiler.begin(frame);

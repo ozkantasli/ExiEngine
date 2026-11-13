@@ -38,7 +38,7 @@ const result = {
   rebuildsAfterWarmup: rebuilds - rebuildsAfterFirstFrame,
   elapsedMs: Number(elapsedMs.toFixed(2)),
   simulatedFramesPerSecond: Number((frameCount / Math.max(elapsedMs / 1000, Number.EPSILON)).toFixed(2)),
-  note: "Node PhysicsWorld sözleşme ölçümü; gerçek fiziksel cihaz FPS ölçümü değildir.",
+  note: "Node PhysicsWorld contract measurement; not a real physical-device FPS measurement.",
 };
 console.log(JSON.stringify(result, null, 2));
 if (sameScratchFrames !== frameCount || finiteFrames !== frameCount || rebuilds - rebuildsAfterFirstFrame !== 0) process.exitCode = 1;

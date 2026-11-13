@@ -18,7 +18,7 @@ scene.add(batch);
 const camera = new Camera({ width, height });
 const warmQueue = buildRenderBatches(scene, camera, width, height);
 const sourceData = warmQueue.batches[0]?.instanceData;
-if (!(sourceData instanceof Float32Array)) throw new Error("CPU instanced benchmark kaynak buffer üretmedi.");
+if (!(sourceData instanceof Float32Array)) throw new Error("CPU instanced benchmark produced no source buffer.");
 
 let sameBufferFrames = 0;
 const start = performance.now();
@@ -29,7 +29,7 @@ for (let frame = 0; frame < frameCount; frame += 1) {
   const queue = buildRenderBatches(scene, camera, width, height);
   const nextData = queue.batches[0]?.instanceData;
   if (nextData === sourceData) sameBufferFrames += 1;
-  if (nextData?.[0] === undefined) throw new Error("CPU instanced benchmark güncellenen kaydı okuyamadı.");
+  if (nextData?.[0] === undefined) throw new Error("CPU instanced benchmark could not read the updated record.");
 }
 const elapsedMs = performance.now() - start;
 const result = {
@@ -40,7 +40,7 @@ const result = {
   bufferReallocations: frameCount - sameBufferFrames,
   elapsedMs: Number(elapsedMs.toFixed(2)),
   simulatedFramesPerSecond: Number((frameCount / Math.max(elapsedMs / 1000, Number.EPSILON)).toFixed(2)),
-  note: "Node ölçümü; gerçek WebGL2 driver/GPU FPS ölçümü değildir.",
+  note: "Node measurement; not a real WebGL2 driver/GPU FPS measurement.",
 };
 console.log(JSON.stringify(result, null, 2));
 if (sameBufferFrames !== frameCount) process.exitCode = 1;

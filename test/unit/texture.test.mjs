@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Texture, TextureAtlas, RenderTexture, MAX_WORLD_COORDINATE } from "../../src/index.js";
 
-test("texture: varsayılanlar ve güvenli normalizasyon", () => {
+test("texture: defaults and safe normalization", () => {
   const safe = new Texture({ width: Infinity, sourceWidth: Infinity, u0: Infinity, u1: -Infinity });
   assert.equal(safe.width, 1);
   assert.equal(safe.sourceWidth, 1);
@@ -14,7 +14,7 @@ test("texture: varsayılanlar ve güvenli normalizasyon", () => {
   assert.equal(Texture.white.width, 1);
 });
 
-test("texture: filter kalıtımı", () => {
+test("texture: filter inheritance", () => {
   const nearest = new Texture({ id: "nearest", filter: "nearest", sourceWidth: 8, sourceHeight: 8 });
   assert.equal(nearest.filter, "nearest");
   const frame = nearest.subTexture({ x: 0, y: 0, width: 4, height: 4 });
@@ -28,7 +28,7 @@ test("texture: filter kalıtımı", () => {
   assert.equal(nearest.filter, "linear");
 });
 
-test("texture: subTexture UV hesaplaması", () => {
+test("texture: subTexture UV computation", () => {
   const base = new Texture({ id: "nested-source", sourceWidth: 100, sourceHeight: 100 });
   const outer = base.subTexture({ x: 20, y: 20, width: 40, height: 30 });
   const inner = outer.subTexture({ x: 10, y: 5, width: 20, height: 10 });
@@ -39,7 +39,7 @@ test("texture: subTexture UV hesaplaması", () => {
   assert.throws(() => new Texture({ id: "tiny", sourceWidth: 2, sourceHeight: 2 }).subTexture({ x: 2, y: 0, width: 1, height: 1 }), /bound|limit/);
 });
 
-test("texture: destroy ve markDirty", () => {
+test("texture: destroy and markDirty", () => {
   const source = { width: 4, height: 4 };
   const texture = new Texture({ source });
   const frame = texture.subTexture({ x: 0, y: 0, width: 2, height: 2 });
@@ -55,7 +55,7 @@ test("texture: destroy ve markDirty", () => {
   assert.throws(() => texture.setFilter("nearest"), /destroyed/);
 });
 
-test("texture: fromImage ve markDirty source kilit", () => {
+test("texture: fromImage and markDirty source lock", () => {
   const source = { width: 4, height: 4 };
   const texture = Texture.fromImage(source);
   assert.equal(texture.width, 4);
@@ -65,7 +65,7 @@ test("texture: fromImage ve markDirty source kilit", () => {
   assert.throws(() => mutable.markDirty(), /cannot be changed/);
 });
 
-test("textureAtlas: fromJSON, prototype güvenliği, lifecycle", () => {
+test("textureAtlas: fromJSON, prototype safety, lifecycle", () => {
   const atlas = TextureAtlas.fromJSON(new Texture({ sourceWidth: 64, sourceHeight: 32 }), { frames: { hero: { frame: { x: 0, y: 0, w: 32, h: 32 } } } });
   assert.equal(atlas.get("hero").u1, 0.5);
   assert.equal(atlas.get("hero"), atlas.get("hero"));
@@ -90,7 +90,7 @@ test("textureAtlas: fromJSON, prototype güvenliği, lifecycle", () => {
   assert.throws(() => lifecycle.get("hero"), /destroyed/);
 });
 
-test("textureAtlas: fromGrid ve kapasite", () => {
+test("textureAtlas: fromGrid and capacity", () => {
   const gridTexture = new Texture({ id: "grid", sourceWidth: 40, sourceHeight: 20 });
   const grid = TextureAtlas.fromGrid(gridTexture, { frameWidth: 8, frameHeight: 8, columns: 4, rows: 2, marginX: 2, marginY: 2, spacingX: 2, spacingY: 2, names: Array.from({ length: 8 }, (_, i) => `frame-${i}`) });
   assert.equal(grid.get("frame-3").u0, 0.8);
@@ -107,7 +107,7 @@ test("textureAtlas: fromGrid ve kapasite", () => {
   assert.throws(() => TextureAtlas.fromGrid(gridTexture, { frameWidth: 8, frameHeight: 8, columns: 2, rows: 1, names: ["same", "same"] }));
 });
 
-test("renderTexture: boyut ve subTexture koruması", () => {
+test("renderTexture: size and subTexture guard", () => {
   const target = new RenderTexture({ id: "smoke-target", width: 64, height: 32, filter: "nearest" });
   assert.equal(target.renderTarget, true);
   assert.equal(target.source, null);
@@ -120,9 +120,9 @@ test("renderTexture: boyut ve subTexture koruması", () => {
   assert.throws(() => target.updateSource({ width: 64, height: 32 }), /cannot be changed/);
 });
 
-test("renderTexture: renderToTexture eşleşme", () => {
-  // RenderTexture boyutu ile engine camera eşleşme kontrolleri engine-smoke'ta;
-  // burada temel davranış doğrulanır.
+test("renderTexture: renderToTexture matching", () => {
+  // RenderTexture size vs engine camera matching is checked in engine-smoke;
+  // the basic behavior is verified here.
   const target = new RenderTexture({ width: 32, height: 16 });
   assert.equal(target.renderTarget, true);
   target.destroy();

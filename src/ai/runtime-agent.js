@@ -729,7 +729,7 @@ export class RuntimeAgent {
         frames.push(result);
       }
     } catch (error) {
-      // Scenario hatasını sakla; resume hatası onun maskelemesin (#101).
+      // Keep the scenario error; a resume error must not mask it (#101).
       scenarioError = error;
     } finally {
       if (wasRunning && options.resume) {

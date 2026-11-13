@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { Scene, Node, Sprite, Camera, Texture, TextureAtlas, Graphics, SpriteBatch, ParticleEmitter, TileMap, RenderGroup, RenderTexture } from "../../src/index.js";
 import { buildRenderBatches, collectRenderGroups, createRenderBatchState } from "../../src/render/batch.js";
 
-test("pipeline: compact batch cache ve scratch reuse", () => {
+test("pipeline: compact batch cache and scratch reuse", () => {
   const scene = new Scene();
   const batch = new SpriteBatch({ texture: Texture.white });
   batch.addSprite({ x: -20, y: 0, width: 12, height: 12, tint: 0xff0000 });
@@ -25,7 +25,7 @@ test("pipeline: compact batch cache ve scratch reuse", () => {
   const again = buildRenderBatches(scene, camera, 320, 180, { state });
   assert.equal(state.batches[0], queue.batches[0]);
   assert.equal(again.batches[0].data, queue.batches[0].data);
-  // setSprite sprite kaydını günceller; data buffer'ı korunur (cache sözleşmesi)
+  // setSprite updates the sprite record; the data buffer is kept (cache contract)
   const spriteRecord = batch.sprites[0];
   batch.setSprite(0, { x: 4 });
   assert.equal(batch.sprites[0], spriteRecord);
@@ -36,7 +36,7 @@ test("pipeline: compact batch cache ve scratch reuse", () => {
   assert.equal(afterRemove.batches[0].vertexCount, 6);
 });
 
-test("pipeline: renderOrder cache ve equal-z kararlılığı", () => {
+test("pipeline: renderOrder cache and equal-z stability", () => {
   const frameOne = new Texture({ id: "ro-one" });
   const frameTwo = new Texture({ id: "ro-two" });
   const scene = new Scene();
@@ -66,7 +66,7 @@ test("pipeline: renderOrder cache ve equal-z kararlılığı", () => {
   assert.equal(buildRenderBatches(equalScene, camera, 320, 180, { state: equalState }).batches[0].texture, frameTwo);
 });
 
-test("pipeline: alpha ve filter mirası", () => {
+test("pipeline: alpha and filter inheritance", () => {
   const scene = new Scene();
   const group = new Node({ alpha: 0.5 });
   const sprite = new Sprite({ width: 8, height: 8, alpha: 0.8 });
@@ -128,7 +128,7 @@ test("pipeline: culling (offscreen, subtree, tile)", () => {
   assert.equal(tileQueue.culledCount, 1);
 });
 
-test("pipeline: scissor/clip ve mask", () => {
+test("pipeline: scissor/clip and mask", () => {
   const camera = new Camera({ width: 320, height: 180 });
   const scene = new Scene();
   const clipGroup = new Node({ clipRect: { x: 20, y: 20, width: 140, height: 90 } });
@@ -147,7 +147,7 @@ test("pipeline: scissor/clip ve mask", () => {
   assert.deepEqual(maskQueue.batches[0].clip, { x: 40, y: 20, width: 60, height: 80 });
 });
 
-test("pipeline: renderGroup toplama ve post-process", () => {
+test("pipeline: renderGroup collection and post-process", () => {
   const camera = new Camera({ width: 320, height: 180 });
   const renderGroup = new RenderGroup({ width: 64, height: 32, x: 20, y: 30, filter: "invert", filterAmount: 0.5, effects: [{ filter: "sepia", amount: 0.25 }, { filter: "contrast", amount: 0.2 }] });
   renderGroup.add(new Sprite({ width: 8, height: 8 }));
@@ -167,7 +167,7 @@ test("pipeline: renderGroup toplama ve post-process", () => {
   renderGroup.destroy();
 });
 
-test("pipeline: graphics static cache ve alpha invalidasyon", () => {
+test("pipeline: graphics static cache and alpha invalidation", () => {
   const camera = new Camera({ width: 320, height: 180 });
   const scene = new Scene();
   const group = new Node({ alpha: 0.5 });
@@ -187,7 +187,7 @@ test("pipeline: graphics static cache ve alpha invalidasyon", () => {
   assert.notEqual(filtered.batches[0].data, changed.batches[0].data);
 });
 
-test("pipeline: instanced ve gpuCulling batch", () => {
+test("pipeline: instanced and gpuCulling batch", () => {
   const camera = new Camera({ width: 320, height: 180 });
   const batch = new SpriteBatch({ texture: Texture.white, instanced: true, chunkSize: 1 });
   batch.addSprite({ x: -20, y: 0, width: 12, height: 12, tint: 0xff0000 });
@@ -217,7 +217,7 @@ test("pipeline: instanced ve gpuCulling batch", () => {
   assert.equal(gpuQueue.batches[0].instanceStride, 16);
 });
 
-test("pipeline: particle ve tilemap instanced queue", () => {
+test("pipeline: particle and tilemap instanced queue", () => {
   const camera = new Camera({ width: 320, height: 180 });
   const emitter = new ParticleEmitter({ maxParticles: 2, random: () => 0.5 });
   emitter.emit(2, { size: 2 });
@@ -241,7 +241,7 @@ test("pipeline: particle ve tilemap instanced queue", () => {
   assert.equal(gpuTileQueue.batches[0].instanceCount, 2);
 });
 
-test("pipeline: atlas batch ve flip UV", () => {
+test("pipeline: atlas batch and flip UV", () => {
   const camera = new Camera({ width: 320, height: 180 });
   const base = new Texture({ id: "pipeline-atlas", sourceWidth: 64, sourceHeight: 32 });
   const atlas = TextureAtlas.fromJSON(base, { frames: { left: { frame: { x: 0, y: 0, w: 32, h: 32 } }, right: { frame: { x: 32, y: 0, w: 32, h: 32 } } } });

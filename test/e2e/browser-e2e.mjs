@@ -1,11 +1,11 @@
-// ExiEngine browser e2e — gerçek Chromium'da demo render + telemetry doğrulaması.
-// Playwright repo'ya bağımlılık EKLEMEZ: geçici klasöre `@playwright/test` kurar.
-// Bu test, "Node yeşil ≠ browser/GPU kanıtı" kontratındaki boşluğu kapatır:
-// CI'da gerçek Chrome'da WebGL2/WebGPU canvas render + #exi-runtime telemetry doğrulanır.
+// ExiEngine browser e2e — demo render + telemetry verification in real Chromium.
+// Playwright is NOT added as a repo dependency: `@playwright/test` is installed into a temporary folder.
+// This test closes the gap in the "green Node ≠ browser/GPU evidence" contract:
+// WebGL2/WebGPU canvas rendering + #exi-runtime telemetry are verified in real Chrome.
 //
-// Kullanım:
-//   node test/e2e/browser-e2e.mjs            # server başlatır, spec'i playwright test ile koşturur
-// Chromium kurulumu (CI'da ayrı adım):
+// Usage:
+//   node test/e2e/browser-e2e.mjs            # starts the server, runs the spec with playwright test
+// Chromium install (a separate step in CI):
 //   npx -y playwright@latest install chromium --with-deps
 import { spawn } from "node:child_process";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -29,10 +29,10 @@ async function waitForServer(timeoutMs = 10_000) {
     try {
       const response = await fetch(baseUrl + "/");
       if (response.ok) return;
-    } catch { /* henüz hazır değil */ }
+    } catch { /* not ready yet */ }
     await new Promise((resolve) => setTimeout(resolve, 200));
   }
-  throw new Error(`server hazır olmadı. stderr: ${serverStderr.slice(0, 500)}`);
+  throw new Error(`server did not become ready. stderr: ${serverStderr.slice(0, 500)}`);
 }
 
 function runCommand(executable, args, workDir) {
@@ -71,7 +71,7 @@ function startMcp() {
     }
   });
   child.once("error", (error) => { for (const waiter of pending.values()) { clearTimeout(waiter.timer); waiter.reject(error); } pending.clear(); });
-  child.once("exit", (code) => { for (const waiter of pending.values()) { clearTimeout(waiter.timer); waiter.reject(new Error(`MCP bridge kapandı: ${code}; ${stderr.slice(0, 500)}`)); } pending.clear(); });
+  child.once("exit", (code) => { for (const waiter of pending.values()) { clearTimeout(waiter.timer); waiter.reject(new Error(`MCP bridge exited: ${code}; ${stderr.slice(0, 500)}`)); } pending.clear(); });
   return {
     child,
     request(method, params = {}) {
@@ -87,8 +87,8 @@ function startMcp() {
 }
 
 function mcpToolResult(response) {
-  if (response.error) throw new Error(response.error.message || "MCP JSON-RPC hatası");
-  if (response.result?.isError) throw new Error(response.result.content?.[0]?.text || "MCP tool hatası");
+  if (response.error) throw new Error(response.error.message || "MCP JSON-RPC error");
+  if (response.result?.isError) throw new Error(response.result.content?.[0]?.text || "MCP tool error");
   const text = response.result?.content?.find((entry) => entry.type === "text")?.text;
   return text === undefined ? response.result : JSON.parse(text);
 }
@@ -99,7 +99,7 @@ async function scaffoldForBrowser(relativeDirectory) {
   mcp.child.stdin.write('{"jsonrpc":"2.0","method":"notifications/initialized"}\n');
   const result = mcpToolResult(await mcp.request("tools/call", { name: "exi_scaffold", arguments: { directory: relativeDirectory } }));
   const checked = mcpToolResult(await mcp.request("tools/call", { name: "exi_project_check", arguments: { path: relativeDirectory } }));
-  if (!checked.ok) throw new Error(`Scaffold project check başarısız: ${JSON.stringify(checked)}`);
+  if (!checked.ok) throw new Error(`Scaffold project check failed: ${JSON.stringify(checked)}`);
   return result.directory;
 }
 
@@ -119,10 +119,10 @@ async function runPlaywright(workDir) {
 let failures = 0;
 try {
   await waitForServer();
-  console.log(`[browser-e2e] Server hazır: ${baseUrl}`);
+  console.log(`[browser-e2e] Server ready: ${baseUrl}`);
   scaffoldRelative = `browser-e2e-scaffold-${process.pid}-${Date.now()}`;
   scaffoldRelative = await scaffoldForBrowser(scaffoldRelative);
-  console.log(`[browser-e2e] MCP scaffold hazır: ${scaffoldRelative}`);
+  console.log(`[browser-e2e] MCP scaffold ready: ${scaffoldRelative}`);
 
   const workDir = await mkdtemp(path.join(tmpdir(), "exi-browser-e2e-"));
   const specPath = path.join(workDir, "browser-e2e.spec.mjs");
@@ -135,7 +135,7 @@ const backends = (process.env.EXI_PLAYWRIGHT_BACKENDS || "webgpu,webgl2")
   .split(",")
   .map((value) => value.trim())
   .filter(Boolean);
-if (backends.length === 0) throw new Error("EXI_PLAYWRIGHT_BACKENDS en az bir backend içermeli.");
+if (backends.length === 0) throw new Error("EXI_PLAYWRIGHT_BACKENDS must list at least one backend.");
 const requestedSoakSeconds = Number.parseInt(process.env.EXI_PLAYWRIGHT_SECONDS || "1", 10);
 const soakSecondsForTimeout = Number.isSafeInteger(requestedSoakSeconds) && requestedSoakSeconds > 0
   ? Math.min(600, requestedSoakSeconds)
@@ -176,19 +176,19 @@ test("demo render + WebGPU/WebGL2 hardware soak", async () => {
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
 
-  expect(telemetry, "demo telemetry ready olmali: " + JSON.stringify(telemetry)).not.toBeNull();
+  expect(telemetry, "demo telemetry must be ready: " + JSON.stringify(telemetry)).not.toBeNull();
   expect(telemetry.ready).toBe("true");
   expect(["webgpu", "webgl2"]).toContain(telemetry.backend);
   const fps = Number(telemetry.fps || 0);
-  expect(Number.isFinite(fps) && fps > 0, "pozitif fps bekleniyor, alinan: " + telemetry.fps).toBe(true);
+  expect(Number.isFinite(fps) && fps > 0, "expected a positive fps, got: " + telemetry.fps).toBe(true);
   if (telemetry.errors && telemetry.errors !== "0" && telemetry.errors !== "") {
-    throw new Error("console hatasi var: " + telemetry.errors);
+    throw new Error("console errors: " + telemetry.errors);
   }
-  console.log("OK: demo render calisti backend=" + telemetry.backend + " fps=" + telemetry.fps);
+  console.log("OK: demo rendered backend=" + telemetry.backend + " fps=" + telemetry.fps);
 
   const beforeSnapshot = await page.evaluate(() => window.game.runtimeAgent.execute({ operation: "snapshot", handle: "scene", args: [{ limit: 64 }] }));
   const beforeCursor = beforeSnapshot.nodes.find((node) => node.type === "AnimatedSprite");
-  expect(beforeCursor, "demo AnimatedSprite snapshot'ta görünmeli").not.toBeUndefined();
+  expect(beforeCursor, "demo AnimatedSprite must appear in the snapshot").not.toBeUndefined();
   const movementScenario = await page.evaluate(() => window.game.runtimeAgent.execute({
     operation: "scenario",
     handle: "engine",
@@ -205,7 +205,7 @@ test("demo render + WebGPU/WebGL2 hardware soak", async () => {
   const afterSnapshot = await page.evaluate(() => window.game.runtimeAgent.execute({ operation: "snapshot", handle: "scene", args: [{ limit: 64 }] }));
   const afterCursor = afterSnapshot.nodes.find((node) => node.type === "AnimatedSprite");
   expect(afterCursor.x).toBeGreaterThan(beforeCursor.x);
-  console.log("OK: RuntimeAgent scenario input hareketi x=" + beforeCursor.x + "→" + afterCursor.x);
+  console.log("OK: RuntimeAgent scenario input moved x=" + beforeCursor.x + "→" + afterCursor.x);
 
   await page.goto(scaffoldUrl, { waitUntil: "domcontentloaded" });
   let scaffoldTelemetry = null;
@@ -222,12 +222,12 @@ test("demo render + WebGPU/WebGL2 hardware soak", async () => {
   expect(Number(scaffoldTelemetry?.fps || 0)).toBeGreaterThan(0);
   const scaffoldBefore = await page.evaluate(() => window.game.runtimeAgent.execute({ operation: "snapshot", handle: "scene", args: [{ limit: 8 }] }));
   const scaffoldPlayerBefore = scaffoldBefore.nodes.find((node) => node.type === "Graphics");
-  expect(scaffoldPlayerBefore, "scaffold player snapshot'ta görünmeli").not.toBeUndefined();
+  expect(scaffoldPlayerBefore, "scaffold player must appear in the snapshot").not.toBeUndefined();
   await page.evaluate(() => window.game.runtimeAgent.execute({ operation: "scenario", handle: "engine", args: [{ frames: [{ input: [{ type: "keydown", code: "ArrowRight" }] }, {}, {}, {}, {}, { input: [{ type: "keyup", code: "ArrowRight" }] }] }] }));
   const scaffoldAfter = await page.evaluate(() => window.game.runtimeAgent.execute({ operation: "snapshot", handle: "scene", args: [{ limit: 8 }] }));
   const scaffoldPlayerAfter = scaffoldAfter.nodes.find((node) => node.type === "Graphics");
   expect(scaffoldPlayerAfter.x).toBeGreaterThan(scaffoldPlayerBefore.x);
-  console.log("OK: MCP scaffold browser oyunu hareketi x=" + scaffoldPlayerBefore.x + "→" + scaffoldPlayerAfter.x);
+  console.log("OK: MCP scaffold browser game moved x=" + scaffoldPlayerBefore.x + "→" + scaffoldPlayerAfter.x);
 
   const soakSeconds = process.env.EXI_PLAYWRIGHT_SECONDS || "1";
   const soakSprites = process.env.EXI_PLAYWRIGHT_SPRITES || "200";
@@ -249,7 +249,7 @@ test("demo render + WebGPU/WebGL2 hardware soak", async () => {
     if (consoleErrors.length > 0) {
       throw new Error(backend + " hardware-soak console hatalari: " + consoleErrors.slice(0, 10).join(" | "));
     }
-    console.log("OK: hardware-soak calisti backend=" + soak.backend + " frames=" + soak.frames);
+    console.log("OK: hardware-soak ran backend=" + soak.backend + " frames=" + soak.frames);
   }
   await browser.close();
 });
@@ -259,12 +259,12 @@ test("demo render + WebGPU/WebGL2 hardware soak", async () => {
   console.log(result.output.trim().split("\n").slice(-20).join("\n"));
   if (!result.ok) {
     failures += 1;
-    console.error("[browser-e2e] Playwright testi başarısız.");
+    console.error("[browser-e2e] Playwright test failed.");
   }
   await rm(workDir, { recursive: true, force: true });
 } catch (error) {
   failures += 1;
-  console.error(`[browser-e2e] HATA: ${error.message}`);
+  console.error(`[browser-e2e] ERROR: ${error.message}`);
 } finally {
   if (mcp) {
     try { mcpToolResult(await mcp.request("tools/call", { name: "exi_session_reset", arguments: {} })); } catch { /* cleanup best effort */ }
@@ -276,8 +276,8 @@ test("demo render + WebGPU/WebGL2 hardware soak", async () => {
 }
 
 if (failures > 0) {
-  console.error(`[browser-e2e] ${failures} kontrol başarısız.`);
+  console.error(`[browser-e2e] ${failures} check(s) failed.`);
   process.exitCode = 1;
 } else {
-  console.log("[browser-e2e] Tüm kontroller geçti.");
+  console.log("[browser-e2e] All checks passed.");
 }

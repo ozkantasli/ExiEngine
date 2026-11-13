@@ -25,7 +25,7 @@ const warmQueue = buildRenderBatches(scene, camera, width, height);
 const sourceData = warmQueue.batches[0]?.instanceData;
 const sourceView = map.instanceView;
 const sourceItems = map.instanceItems;
-if (!(sourceData instanceof Float32Array)) throw new Error("TileMap benchmark kaynak buffer üretmedi.");
+if (!(sourceData instanceof Float32Array)) throw new Error("TileMap benchmark produced no source buffer.");
 
 let sameBufferFrames = 0;
 let sameViewBufferFrames = 0;
@@ -52,7 +52,7 @@ const result = {
   itemListReallocations: frameCount - sameItemListFrames,
   elapsedMs: Number(elapsedMs.toFixed(2)),
   simulatedFramesPerSecond: Number((frameCount / Math.max(elapsedMs / 1000, Number.EPSILON)).toFixed(2)),
-  note: "Node ölçümü; gerçek WebGL2/WebGPU sürücü ve fiziksel cihaz FPS ölçümü değildir.",
+  note: "Node measurement; not a real WebGL2/WebGPU driver or physical-device FPS measurement.",
 };
 console.log(JSON.stringify(result, null, 2));
 if (sameBufferFrames !== frameCount || sameViewBufferFrames !== frameCount || sameItemListFrames !== frameCount) process.exitCode = 1;

@@ -1,9 +1,9 @@
 // ExiEngine zero-dependency lint
-// (a) src/, tools/, server.mjs ve test/*.mjs dosyalarını Node --check ile sözdizimi doğrular,
-// (b) static-smoke.mjs'teki kritik anti-pattern regex'lerini çalıştırır:
+// (a) syntax-checks src/, tools/, server.mjs and test/*.mjs with node --check,
+// (b) runs the critical anti-pattern regexes from static-smoke.mjs:
 //     - harici motor importu (pixi/phaser/three/...), eval/new Function
-//     - MCP server'da console.log, karışık girinti (tab+space)
-// ESLint/biome kullanmaz (runtime dependency-free kontratı).
+//     - console.log in the MCP server, mixed indentation (tab+space)
+// Does not use ESLint/biome (runtime dependency-free contract).
 import { spawn } from "node:child_process";
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";

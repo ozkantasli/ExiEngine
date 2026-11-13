@@ -45,7 +45,7 @@ test("assets: resolve origin allowlist", () => {
   loader.destroy();
 });
 
-test("assets: constructor limitler", () => {
+test("assets: constructor limits", () => {
   assert.throws(() => new AssetLoader({ maxBytes: 0 }), /limit/);
   assert.throws(() => new AssetLoader({ maxBytes: 64 * 1024 * 1024 + 1 }), /cannot exceed/);
   assert.throws(() => new AssetLoader({ maxJSONBytes: 0 }), /limit/);
@@ -59,7 +59,7 @@ test("assets: constructor limitler", () => {
   assert.throws(() => new AssetLoader({ allowedOrigins: ["not-a-url"] }), /Invalid URL/);
 });
 
-test("assets: loadJSON bütçeleri (maxBytes/maxJSONNodes/maxJSONDepth)", async () => {
+test("assets: loadJSON budgets (maxBytes/maxJSONNodes/maxJSONDepth)", async () => {
   const jsonLoader = new AssetLoader({ maxBytes: 64, maxJSONBytes: 8 });
   let observedMaxBytes = 0;
   jsonLoader.loadBytes = async (_url, options) => {
@@ -82,7 +82,7 @@ test("assets: loadJSON bütçeleri (maxBytes/maxJSONNodes/maxJSONDepth)", async 
   depthLoader.loadBytes = async () => new TextEncoder().encode("[[[[0]]]]");
   await assert.rejects(() => depthLoader.loadJSON("/depth.json"), /JSON depth/);
   await assert.rejects(() => depthLoader.loadJSON("/depth.json", { maxJSONDepth: 2 }), /JSON depth/);
-  // preflight: parse çağrılmadan derinlik reddi
+  // preflight: depth rejected before parse is called
   const previousJSONParse = JSON.parse;
   let jsonParseCalls = 0;
   JSON.parse = (...args) => { jsonParseCalls += 1; return previousJSONParse(...args); };
@@ -93,7 +93,7 @@ test("assets: loadJSON bütçeleri (maxBytes/maxJSONNodes/maxJSONDepth)", async 
   JSON.parse = previousJSONParse;
 });
 
-test("assets: loadBytes fetch dedupe ve abort", async () => {
+test("assets: loadBytes fetch dedupe and abort", async () => {
   let fetchCalls = 0;
   globalThis.fetch = async () => {
     fetchCalls += 1;
@@ -125,7 +125,7 @@ test("assets: loadBytes fetch dedupe ve abort", async () => {
   globalThis.fetch = previousFetch;
 });
 
-test("assets: integrity doğrulaması", async () => {
+test("assets: integrity verification", async () => {
   const helloIntegrity = "sha256-LPJNul+wow4m6DsqxbninhsWHlwfp0JecwQzYpOLmCQ=";
   globalThis.fetch = async () => fakeResponse(new TextEncoder().encode("hello"));
   const loader = new AssetLoader({ baseURL: "http://127.0.0.1:4174/" });
@@ -136,7 +136,7 @@ test("assets: integrity doğrulaması", async () => {
   globalThis.fetch = previousFetch;
 });
 
-test("assets: fragmente stream limiti", async () => {
+test("assets: fragmented stream limit", async () => {
   let reads = 0;
   let cancelled = false;
   globalThis.fetch = async () => ({
@@ -156,7 +156,7 @@ test("assets: fragmente stream limiti", async () => {
   globalThis.fetch = previousFetch;
 });
 
-test("assets: texture cache budget ve release", async () => {
+test("assets: texture cache budget and release", async () => {
   globalThis.createImageBitmap = async () => { await new Promise((resolve) => setTimeout(resolve, 1)); return { width: 2, height: 2, close() {} }; };
   globalThis.fetch = async () => fakeResponse(new Uint8Array([1, 2, 3, 4]));
   const loader = new AssetLoader({ baseURL: "http://127.0.0.1:4174/" });
@@ -172,7 +172,7 @@ test("assets: texture cache budget ve release", async () => {
   globalThis.createImageBitmap = previousCreateImageBitmap;
 });
 
-test("assets: cacheTexture doğrudan bütçe", () => {
+test("assets: cacheTexture direct budget", () => {
   const loader = new AssetLoader({ maxCacheTextures: 1, maxCachePixels: 4 });
   const a = new Texture({ id: "a", sourceWidth: 2, sourceHeight: 2 });
   const b = new Texture({ id: "b", sourceWidth: 2, sourceHeight: 2 });
@@ -194,7 +194,7 @@ test("assets: cacheTexture doğrudan bütçe", () => {
   directProbe.clear();
 });
 
-test("assets: loadMany ve loadAtlas", async () => {
+test("assets: loadMany and loadAtlas", async () => {
   const loader = new AssetLoader({ baseURL: "http://127.0.0.1:4174/" });
   loader.loadJSON = async (url) => ({ url });
   loader.loadBytes = async (url) => new TextEncoder().encode(url);
@@ -213,7 +213,7 @@ test("assets: loadMany ve loadAtlas", async () => {
   await assert.rejects(() => loader.loadMany([{ key: "k".repeat(257), type: "bytes", url: "/entry" }]), /key/);
 });
 
-test("assets: loadKTX2 inspect ve decoder", async () => {
+test("assets: loadKTX2 inspect and decoder", async () => {
   const bytes = ktx2Fixture();
   const info = inspectKTX2(bytes);
   assert.deepEqual({ width: info.width, height: info.height, levelCount: info.levelCount, rgba8: info.rgba8 }, { width: 2, height: 1, levelCount: 1, rgba8: true });
@@ -240,7 +240,7 @@ test("assets: loadKTX2 inspect ve decoder", async () => {
   else delete globalThis.ImageData;
 });
 
-test("assets: KTX2 compressed decoder zorunluluğu", async () => {
+test("assets: KTX2 compressed decoder requirement", async () => {
   const bytes = ktx2Fixture();
   const compressed = bytes.slice();
   const view = new DataView(compressed.buffer);
@@ -255,7 +255,7 @@ test("assets: KTX2 compressed decoder zorunluluğu", async () => {
   globalThis.fetch = previousFetch;
 });
 
-test("assets: destroy sonrası ve pixel preflight", async () => {
+test("assets: after destroy and pixel preflight", async () => {
   let destroyedSignal;
   globalThis.fetch = (_url, { signal }) => {
     destroyedSignal = signal;
@@ -284,7 +284,7 @@ test("assets: destroy sonrası ve pixel preflight", async () => {
   globalThis.createImageBitmap = bitmapCallsBefore;
 });
 
-test("saveStore: set/get ve limitler", () => {
+test("saveStore: set/get and limits", () => {
   const values = new Map();
   const storage = { setItem: (key, value) => values.set(key, value), getItem: (key) => values.get(key) ?? null, removeItem: (key) => values.delete(key) };
   const saves = new SaveStore({ storage, namespace: "smoke" });

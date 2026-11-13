@@ -1,10 +1,10 @@
-// ExiEngine unit test — WebGL2Renderer (fake GL context ile)
+// ExiEngine unit test — WebGL2Renderer (with a fake GL context)
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { WebGL2Renderer } from "../../src/render/webgl2-renderer.js";
 import { Scene, Camera, RenderTexture, Texture, Sprite, SpriteBatch, RenderGroup } from "../../src/index.js";
 
-test("webgl2: clear color normalizasyonu ve clear davranışı", () => {
+test("webgl2: clear color normalization and clear behavior", () => {
   const renderer = new WebGL2Renderer({ canvas: null, clearColor: "#abc", clearAlpha: 0.5, clearBeforeRender: false });
   assert.equal(renderer.clearColor, 0xaabbcc);
   assert.deepEqual(renderer.clearRGBA, { r: 0xaa / 255, g: 0xbb / 255, b: 0xcc / 255, a: 0.5 });
@@ -32,7 +32,7 @@ test("webgl2: clear color normalizasyonu ve clear davranışı", () => {
   assert.equal(clearCalls.length, 0);
 });
 
-test("webgl2: vertex/instance buffer büyüme, limitler, atomic-fail", () => {
+test("webgl2: vertex/instance buffer growth, limits, atomic-fail", () => {
   const calls = [];
   let limitQueries = 0;
   const probe = new WebGL2Renderer({ canvas: null });
@@ -55,7 +55,7 @@ test("webgl2: vertex/instance buffer büyüme, limitler, atomic-fail", () => {
   assert.equal(probe.getInfo().instanceBufferResizes, 1);
   assert.throws(() => probe.ensureInstanceBuffer(NaN), /limit/);
 
-  // Atomic-fail: başarısız tahsiste mevcut buffer korunur + delete edilir
+  // Atomic-fail: on a failed allocation the existing buffer is kept + the new one deleted
   let failBufferData = false;
   let bufferId = 0;
   const deleted = [];
@@ -84,7 +84,7 @@ test("webgl2: vertex/instance buffer büyüme, limitler, atomic-fail", () => {
   assert.equal(deleted.length, 2);
 });
 
-test("webgl2: static buffer cache, key değişimi, prune", () => {
+test("webgl2: static buffer cache, key change, prune", () => {
   const subDataCalls = [];
   const deletes = [];
   const probe = new WebGL2Renderer({ canvas: null });
@@ -95,14 +95,14 @@ test("webgl2: static buffer cache, key değişimi, prune", () => {
   const owner = { destroyed: false };
   const batch = { staticOwner: owner, staticKey: "first", data: new Float32Array(8) };
   const first = probe.ensureStaticBuffer(batch);
-  // Aynı key cache hit → yeni upload yok
+  // Same key cache hit → no new upload
   assert.equal(probe.ensureStaticBuffer(batch), first);
   assert.equal(subDataCalls.length, 1);
-  // Key değişimi aynı boyutta → in-place bufferSubData (yeni buffer YOK)
+  // Key change at the same size → in-place bufferSubData (NO new buffer)
   batch.staticKey = "second";
   probe.ensureStaticBuffer(batch);
   assert.equal(subDataCalls.length, 2);
-  // Büyüyen data → yeni buffer tahsisi + eski buffer delete
+  // Growing data → new buffer allocation + old buffer deleted
   batch.data = new Float32Array(8_192);
   probe.ensureStaticBuffer(batch);
   assert.equal(deletes.length, 1);
@@ -112,7 +112,7 @@ test("webgl2: static buffer cache, key değişimi, prune", () => {
   probe.destroy();
 });
 
-test("webgl2: texture upload, filter, atlas paylaşımı, lifecycle", () => {
+test("webgl2: texture upload, filter, atlas sharing, lifecycle", () => {
   const uploads = [];
   const filterCalls = [];
   const probe = new WebGL2Renderer({ canvas: null });
@@ -159,7 +159,7 @@ test("webgl2: texture upload, filter, atlas paylaşımı, lifecycle", () => {
   assert.throws(() => probe.createTexture(lifecycle), (error) => error?.code === "EXI_TEXTURE_INPUT");
 });
 
-test("webgl2: texture budget ve doğrudan mutasyon koruması", () => {
+test("webgl2: texture budget and direct mutation guard", () => {
   const probe = new WebGL2Renderer({ canvas: null });
   probe.gl = {
     TEXTURE_2D: 3553, RGBA: 6408, UNSIGNED_BYTE: 5121, TEXTURE_MIN_FILTER: 10241, TEXTURE_MAG_FILTER: 10240, TEXTURE_WRAP_S: 10242, TEXTURE_WRAP_T: 10243, LINEAR: 9729, NEAREST: 9728, CLAMP_TO_EDGE: 33071, UNPACK_FLIP_Y_WEBGL: 37440, MAX_TEXTURE_SIZE: 3379,
@@ -181,7 +181,7 @@ test("webgl2: texture budget ve doğrudan mutasyon koruması", () => {
   assert.throws(() => probe.createTexture(new Texture({ source: { width: 65, height: 65 } })), /pixel/);
 });
 
-test("webgl2: başarısız texture upload'da delete", () => {
+test("webgl2: delete on a failed texture upload", () => {
   const deleted = [];
   const probe = new WebGL2Renderer({ canvas: null });
   probe.gl = {
@@ -255,7 +255,7 @@ test("webgl2: program build failure cleanup", () => {
   assert.equal(programDeletes.length, 1);
 });
 
-test("webgl2: prepare prewarm ve static upload", () => {
+test("webgl2: prepare prewarm and static upload", () => {
   const source = { width: 4, height: 4 };
   const texture = new Texture({ source });
   const probe = new WebGL2Renderer({ canvas: null });
@@ -295,7 +295,7 @@ test("webgl2: prepare prewarm ve static upload", () => {
   probe.destroy();
 });
 
-test("webgl2: context lost/restored ve init failure", () => {
+test("webgl2: context lost/restored and init failure", () => {
   const statuses = [];
   const errors = [];
   const errorObjects = [];

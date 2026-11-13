@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Graphics, Camera } from "../../src/index.js";
 
-test("graphics: primitives ve bounds", () => {
+test("graphics: primitives and bounds", () => {
   const gfx = new Graphics({ staticCache: true }).rect(0, 0, 10, 10, { fill: 0xff0000 }).circle(20, 20, 5, { fill: 0x00ff00, segments: 8 });
   const items = gfx.getRenderItems();
   assert.deepEqual(items[0].bounds, { x: 0, y: 0, width: 10, height: 10 });
@@ -19,7 +19,7 @@ test("graphics: primitives ve bounds", () => {
   assert.ok(extra.getLocalBounds().width > 0);
 });
 
-test("graphics: polygon ve doğrulama", () => {
+test("graphics: polygon and validation", () => {
   const poly = new Graphics().polygon([0, 0, 20, 0, 20, 20, 10, 8, 10, 30, 0, 20]);
   const item = poly.getRenderItems()[0];
   assert.equal(item.positions.length, 24);
@@ -29,7 +29,7 @@ test("graphics: polygon ve doğrulama", () => {
   assert.throws(() => new Graphics().polygon(new Array(514).fill(0)), /point limit/);
 });
 
-test("graphics: staticCache invalidasyon ve clear", () => {
+test("graphics: staticCache invalidation and clear", () => {
   const gfx = new Graphics().rect(0, 0, 8, 8);
   const items = gfx.getRenderItems();
   const item = items[0];
@@ -47,7 +47,7 @@ test("graphics: staticCache invalidasyon ve clear", () => {
   assert.notEqual(gfx.getLocalBounds(), bounds);
 });
 
-test("graphics: limitler ve güvenli değerler", () => {
+test("graphics: limits and safe values", () => {
   const limitProbe = new Graphics();
   limitProbe.commands.length = 4_096;
   assert.throws(() => limitProbe.rect(0, 0, 1, 1), /limit/);
@@ -69,7 +69,7 @@ test("graphics: static render key", () => {
   assert.notEqual(gfx.getStaticRenderKey(camera, 320, 180), key);
 });
 
-test("graphics: destroy temizliği", () => {
+test("graphics: destroy cleanup", () => {
   const gfx = new Graphics({ staticCache: true }).rect(0, 0, 8, 8);
   gfx.getRenderItems();
   gfx.destroy();

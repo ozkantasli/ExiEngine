@@ -604,7 +604,7 @@ async function writeAssetChunk({ uploadId, offset, bytes } = {}) {
   if (upload.receivedBytes + data.byteLength > upload.expectedBytes) fail("Asset chunk exceeds the expected total size.", "EXI_MCP_UPLOAD_SIZE");
   await appendFile(upload.tempPath, data);
   upload.hash?.update(data);
-  // Disk otoritesi: counter yerine lstat ile doğrula (file upload ile aynı desen — #105).
+  // Disk is the authority: verify with lstat instead of the counter (same pattern as file upload — #105).
   const entry = await lstat(upload.tempPath);
   if (entry.isSymbolicLink() || !entry.isFile() || entry.size !== upload.receivedBytes + data.byteLength) fail("Asset upload size could not be verified.", "EXI_MCP_UPLOAD_SIZE");
   upload.receivedBytes = entry.size;

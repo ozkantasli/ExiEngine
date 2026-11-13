@@ -1,4 +1,4 @@
-// ExiEngine unit test — WebGPURenderer (fake device ile)
+// ExiEngine unit test — WebGPURenderer (with a fake device)
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { WebGPURenderer } from "../../src/render/webgpu-renderer.js";
@@ -21,7 +21,7 @@ function fakeDevice(options = {}) {
   };
 }
 
-test("webgpu: frameValues ve gpuCullParams", () => {
+test("webgpu: frameValues and gpuCullParams", () => {
   const probe = new WebGPURenderer({ canvas: null });
   const frameValues = probe.frameValues;
   const gpuCullParams = probe.gpuCullParams;
@@ -32,7 +32,7 @@ test("webgpu: frameValues ve gpuCullParams", () => {
   assert.equal(probe.gpuCullParams, gpuCullParams);
 });
 
-test("webgpu: refreshDeviceLimits ve buffer limitleri", () => {
+test("webgpu: refreshDeviceLimits and buffer limits", () => {
   const destroyedBuffers = [];
   const probe = new WebGPURenderer({ canvas: null });
   probe.device = fakeDevice({ destroyedBuffers, extra: { limits: { maxBufferSize: 4096, maxStorageBufferBindingSize: 4096 } } });
@@ -51,7 +51,7 @@ test("webgpu: refreshDeviceLimits ve buffer limitleri", () => {
   mutationProbe.destroy();
 });
 
-test("webgpu: vertex/instance buffer büyüme", () => {
+test("webgpu: vertex/instance buffer growth", () => {
   const destroyedBuffers = [];
   const probe = new WebGPURenderer({ canvas: null });
   probe.device = fakeDevice({ destroyedBuffers });
@@ -70,7 +70,7 @@ test("webgpu: vertex/instance buffer büyüme", () => {
   probe.destroy();
 });
 
-test("webgpu: gpu cull resources büyüme, rollback, stride", () => {
+test("webgpu: gpu cull resource growth, rollback, stride", () => {
   const destroyedBuffers = [];
   const probe = new WebGPURenderer({ canvas: null });
   probe.device = fakeDevice({ destroyedBuffers });
@@ -104,7 +104,7 @@ test("webgpu: gpu cull resources büyüme, rollback, stride", () => {
   probe.destroy();
 });
 
-test("webgpu: gpu cull stride ve limit doğrulama", () => {
+test("webgpu: gpu cull stride and limit validation", () => {
   const probe = new WebGPURenderer({ canvas: null });
   probe.device = fakeDevice();
   probe.refreshDeviceLimits();
@@ -113,7 +113,7 @@ test("webgpu: gpu cull stride ve limit doğrulama", () => {
   probe.destroy();
 });
 
-test("webgpu: static buffer upload failure koruması", () => {
+test("webgpu: static buffer upload failure guard", () => {
   const destroyedBuffers = [];
   let uploadFailure = false;
   const probe = new WebGPURenderer({ canvas: null });
@@ -225,7 +225,7 @@ test("webgpu: texture create/update/atlas/lifecycle", () => {
   assert.throws(() => probe.getTextureValue(destroyedFrame), (error) => error?.code === "EXI_TEXTURE_INPUT");
 });
 
-test("webgpu: texture budget ve başarısız bind group cleanup", () => {
+test("webgpu: texture budget and failed bind group cleanup", () => {
   const probe = new WebGPURenderer({ canvas: null });
   probe.device = fakeDevice({ extra: { limits: { maxTextureDimension2D: 64 } } });
   probe.textureLayout = {};
@@ -302,7 +302,7 @@ test("webgpu: render target lifecycle, feedback, allocation failure", () => {
   probe.destroy();
 });
 
-test("webgpu: render EXI_RENDER_INPUT ve pixel limiti", () => {
+test("webgpu: render EXI_RENDER_INPUT and pixel limit", () => {
   const losses = [];
   const renderInputProbe = new WebGPURenderer({ canvas: { width: 64, height: 64 }, onLost: (error) => losses.push(error) });
   renderInputProbe.device = fakeDevice();
@@ -326,7 +326,7 @@ test("webgpu: render EXI_RENDER_INPUT ve pixel limiti", () => {
   tooLargeProbe.destroy();
 });
 
-test("webgpu: device lost temizliği ve duplicate guard", () => {
+test("webgpu: device lost cleanup and duplicate guard", () => {
   const statuses = [];
   const errors = [];
   const errorObjects = [];
@@ -441,14 +441,140 @@ test("webgpu: prepare prewarm", () => {
   scene.add(batch);
   probe.width = 320;
   probe.height = 180;
-  // İlk prepare: texture ilk kez upload edilir
+  // First prepare: the texture is uploaded for the first time
   const result = probe.prepare(scene, new Camera({ width: 320, height: 180 }));
   assert.equal(result.batches, 1);
   assert.equal(result.uploads, 1);
   assert.equal(probe.staticBuffers.size, 1);
-  // İkinci prepare: cache hit → upload yok
+  // Second prepare: cache hit → no upload
   const second = probe.prepare(scene, new Camera({ width: 320, height: 180 }));
   assert.equal(second.batches, 1);
   assert.equal(second.uploads, 0);
   probe.destroy();
+});
+
+// A fake device that supports buildResources and records every pass command,
+// so the full render loop runs in Node (no GPU; the browser soak is the GPU evidence).
+function recordingDevice(log, options = {}) {
+  const pass = (kind) => new Proxy({}, { get: (_, name) => (...args) => { log.push([kind, name, ...args]); } });
+  return {
+    limits: { maxTextureDimension2D: 4096, maxBufferSize: 1 << 28, ...options.limits },
+    pushErrorScope() {},
+    popErrorScope: async () => null,
+    createShaderModule: ({ code }) => ({ code, getCompilationInfo: async () => ({ messages: options.compileErrors?.(code) ? [{ type: "error", message: "bad" }] : [] }) }),
+    createBindGroupLayout: () => ({}),
+    createPipelineLayout: () => ({}),
+    createRenderPipeline: (descriptor) => ({ entry: descriptor.vertex.entryPoint }),
+    createComputePipeline: () => ({}),
+    createSampler: (descriptor) => ({ filter: descriptor.magFilter }),
+    createBindGroup: () => ({}),
+    createBuffer: (descriptor) => ({ ...descriptor, destroy() { log.push(["buffer", "destroy", descriptor.size]); }, mapAsync: async () => {}, getMappedRange: () => options.mapped?.(descriptor.size) ?? new ArrayBuffer(descriptor.size), unmap() {} }),
+    createTexture: (descriptor) => ({ ...descriptor, createView: () => ({ view: descriptor.size }), destroy() { log.push(["texture", "destroy"]); } }),
+    createCommandEncoder: () => ({
+      beginRenderPass: (descriptor) => { log.push(["encoder", "beginRenderPass", descriptor.colorAttachments[0].loadOp]); return pass("render"); },
+      beginComputePass: () => pass("compute"),
+      copyTextureToBuffer: (...args) => log.push(["encoder", "copyTextureToBuffer", ...args]),
+      finish: () => ({}),
+    }),
+    queue: { writeBuffer: (...args) => log.push(["queue", "writeBuffer", args[1]]), writeTexture() {}, copyExternalImageToTexture() {}, submit: () => log.push(["queue", "submit"]), onSubmittedWorkDone: async () => {} },
+    addEventListener() {},
+    removeEventListener() {},
+  };
+}
+
+async function builtRenderer(log, options) {
+  const renderer = new WebGPURenderer({ canvas: { width: 64, height: 32 } });
+  renderer.device = recordingDevice(log, options);
+  renderer.format = "rgba8unorm";
+  renderer.context = { getCurrentTexture: () => ({ createView: () => ({ view: "canvas" }) }) };
+  await renderer.buildResources();
+  return renderer;
+}
+
+test("webgpu: the render loop draws regular, static, masked, clipped and GPU-culled instanced batches", async () => {
+  const { Graphics, Node } = await import("../../src/index.js");
+  const log = [];
+  const renderer = await builtRenderer(log);
+  const scene = new Scene();
+  scene.add(new Sprite({ x: 10, y: 10, width: 8, height: 8 }));
+  const shape = new Graphics({ staticCache: true });
+  shape.rect(0, 0, 10, 10, { fill: 0xff0000 });
+  scene.add(shape);
+  const mask = new Texture({ source: { width: 4, height: 4 } });
+  scene.add(new Sprite({ x: 30, y: 10, width: 8, height: 8, maskTexture: mask, filter: { type: "grayscale", amount: 1 } }));
+  const clipped = new Node({ clipRect: { x: 0, y: 0, width: 16, height: 16 } });
+  clipped.add(new Sprite({ x: 4, y: 4, width: 8, height: 8, blendMode: "additive" }));
+  scene.add(clipped);
+  const batch = new SpriteBatch({ texture: Texture.white, instanced: true, gpuCulling: true });
+  for (let index = 0; index < 5; index += 1) batch.addSprite({ x: index * 6, y: 20, width: 4, height: 4 });
+  scene.add(batch);
+  const plainInstanced = new SpriteBatch({ texture: Texture.white, instanced: true });
+  plainInstanced.addSprite({ x: 40, y: 20, width: 4, height: 4 });
+  scene.add(plainInstanced);
+
+  renderer.render(0, scene, new Camera({ width: 64, height: 32, x: 32, y: 16 }));
+  assert.equal(renderer.lost, false);
+  const calls = (name) => log.filter((entry) => entry[0] === "render" && entry[1] === name);
+  assert.ok(calls("draw").length >= 4, "regular, static and plain instanced batches draw");
+  assert.equal(calls("drawIndirect").length, 1, "the GPU-culled batch draws indirectly");
+  assert.ok(log.some((entry) => entry[0] === "compute" && entry[1] === "dispatchWorkgroups"), "GPU culling dispatches compute work");
+  assert.ok(calls("setScissorRect").some((entry) => entry[4] === 16 && entry[5] === 16), "the clip rect becomes a scissor");
+  assert.ok(calls("setBindGroup").some((entry) => entry[2] === 3), "masked batches bind the mask texture");
+  assert.equal(log.filter((entry) => entry[1] === "submit").length, 1);
+  assert.ok(renderer.getInfo().drawCalls >= 5);
+
+  // A second frame reuses the static buffer; destroying owners prunes their GPU resources.
+  log.length = 0;
+  renderer.render(1, scene, new Camera({ width: 64, height: 32, x: 32, y: 16 }));
+  assert.equal(renderer.staticBuffers.size, 1);
+  shape.destroy(); batch.destroy(); mask.destroy();
+  renderer.render(2, scene, new Camera({ width: 64, height: 32, x: 32, y: 16 }));
+  assert.equal(renderer.staticBuffers.size, 0, "static buffers of destroyed owners are released");
+  assert.equal(renderer.gpuCullResources.size, 0, "GPU cull resources of destroyed batches are released");
+  assert.equal(renderer.lost, false);
+  renderer.destroy();
+});
+
+test("webgpu: readRenderTarget strips row padding from the mapped buffer", async () => {
+  const log = [];
+  const width = 3; const height = 2; const bytesPerRow = 256;
+  const renderer = await builtRenderer(log, {
+    mapped: (size) => {
+      const bytes = new Uint8Array(size);
+      for (let row = 0; row < height; row += 1) for (let index = 0; index < width * 4; index += 1) bytes[row * bytesPerRow + index] = row * 100 + index;
+      return bytes.buffer;
+    },
+  });
+  const target = new RenderTexture({ width, height });
+  const result = await renderer.readRenderTarget(target);
+  assert.equal(result.width, 3); assert.equal(result.height, 2); assert.equal(result.flipY, false);
+  assert.equal(result.pixels.length, 24);
+  assert.equal(result.pixels[0], 0); assert.equal(result.pixels[11], 11); assert.equal(result.pixels[12], 100); assert.equal(result.pixels[23], 111);
+  assert.ok(log.some((entry) => entry[1] === "copyTextureToBuffer"));
+  assert.ok(log.some((entry) => entry[0] === "buffer" && entry[1] === "destroy" && entry[2] === bytesPerRow * height), "the readback buffer is released");
+  renderer.lost = true;
+  await assert.rejects(renderer.readRenderTarget(target), /not available/);
+  renderer.destroy();
+});
+
+test("webgpu: custom filters are compiled in the background and broken ones are disabled", async () => {
+  const { registerFilter, listFilters } = await import("../../src/index.js");
+  const log = [];
+  const renderer = await builtRenderer(log, { compileErrors: (code) => code.includes("BROKEN_WGSL") });
+  const glsl = "return color;";
+  const existing = new Set(listFilters());
+  const good = existing.has("gpu-good") ? "gpu-good" : registerFilter("gpu-good", { glsl, wgsl: "return color;" }).name;
+  const broken = existing.has("gpu-broken") ? "gpu-broken" : registerFilter("gpu-broken", { glsl, wgsl: "let BROKEN_WGSL = 1.0; return color;" }).name;
+  const before = renderer.pipelines;
+  renderer.syncCustomFilters();
+  assert.ok(renderer.customFilterSync, "a background rebuild starts");
+  renderer.syncCustomFilters(); // a second call while it runs does nothing
+  await renderer.customFilterSync;
+  const status = renderer.getCustomFilterStatus();
+  assert.equal(status[good].status, "ok");
+  assert.equal(status[broken].status, "error");
+  assert.match(status[broken].error, /did not compile/);
+  assert.notEqual(renderer.pipelines, before, "the pipelines were rebuilt");
+  assert.equal(renderer.getRenderPipeline(false, "unknown-mode"), renderer.pipelines.normal, "unknown modes fall back to normal");
+  renderer.destroy();
 });

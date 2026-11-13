@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Sprite, NineSliceSprite, AnimatedSprite, Texture, MAX_WORLD_COORDINATE, UNINITIALIZED } from "../../src/index.js";
 
-test("sprite: güvenli boyutlar ve anchor", () => {
+test("sprite: safe sizes and anchor", () => {
   const safe = new Sprite({ width: Infinity, height: NaN, anchorX: Infinity, alpha: NaN });
   assert.equal(safe.width, 0);
   assert.equal(safe.height, 0);
@@ -12,7 +12,7 @@ test("sprite: güvenli boyutlar ve anchor", () => {
   assert.throws(() => new Sprite({ texture: {} }), /texture/);
 });
 
-test("sprite: renderItems cache ve invalidasyon", () => {
+test("sprite: renderItems cache and invalidation", () => {
   const sprite = new Sprite({ width: 20, height: 10, x: 5, y: 6, tint: 0xff0000 });
   const items = sprite.getRenderItems();
   assert.equal(sprite.getRenderItems(), items);
@@ -44,13 +44,13 @@ test("sprite: setTexture / setFlip / destroy", () => {
   assert.equal(flip.setFlip(false).flipX, false);
 });
 
-test("sprite: düşmanca değerler (hostile inputs)", () => {
+test("sprite: hostile inputs", () => {
   const hostile = new Sprite({ width: Number.MAX_VALUE, height: Number.MAX_VALUE, anchorX: Number.MAX_VALUE, anchorY: -Number.MAX_VALUE });
   assert.equal(hostile.width, MAX_WORLD_COORDINATE);
   assert.ok([hostile.getLocalBounds(), ...hostile.getRenderItems().flatMap((item) => item.positions)].flatMap((value) => typeof value === "number" ? [value] : Object.values(value)).every(Number.isFinite));
 });
 
-test("nineSlice: 9 parça render ve flip", () => {
+test("nineSlice: 9-piece render and flip", () => {
   const texture = new Texture({ id: "nine-slice", width: 16, height: 16, sourceWidth: 16, sourceHeight: 16 });
   const nine = new NineSliceSprite({ texture, width: 100, height: 60, left: 6, right: 6, top: 5, bottom: 5 });
   const items = nine.getRenderItems();
@@ -67,18 +67,18 @@ test("nineSlice: 9 parça render ve flip", () => {
   assert.equal(hostile.left, 0);
 });
 
-test("nineSlice: kurucu tüm geometri aynalarını tanımlı değerle damglamalı", () => {
+test("nineSlice: the constructor must stamp every geometry mirror with a defined value", () => {
   const nine = new NineSliceSprite({ width: 10, height: 10 });
   const mirrorKeys = ["renderGeometryTexture", "renderGeometryWidth", "renderGeometryHeight", "renderGeometryAnchorX", "renderGeometryAnchorY", "renderGeometryFlipX", "renderGeometryFlipY", "renderGeometryLeft", "renderGeometryRight", "renderGeometryTop", "renderGeometryBottom"];
   for (const key of mirrorKeys) {
-    assert.ok(Object.hasOwn(nine, key), `kurucu ${key} alanını damglamalı`);
+    assert.ok(Object.hasOwn(nine, key), `the constructor must stamp ${key}`);
     assert.notEqual(nine[key], undefined, `${key} undefined olamaz`);
   }
   assert.equal(nine.renderGeometryTexture, UNINITIALIZED);
-  for (const key of mirrorKeys) assert.equal(nine[key], UNINITIALIZED, `${key} UNINITIALIZED olmalı`);
+  for (const key of mirrorKeys) assert.equal(nine[key], UNINITIALIZED, `${key} must be UNINITIALIZED`);
 });
 
-test("animatedSprite: frame ilerleme, pingPong, callback'ler", () => {
+test("animatedSprite: frame progress, pingPong, callbacks", () => {
   const frameOne = new Texture({ id: "frame-one" });
   const frameTwo = new Texture({ id: "frame-two" });
   let completed = 0;
@@ -116,7 +116,7 @@ test("animatedSprite: frame ilerleme, pingPong, callback'ler", () => {
   assert.deepEqual(loops, [pingPong]);
 });
 
-test("animatedSprite: limitler ve frame sahipliği", () => {
+test("animatedSprite: limits and frame ownership", () => {
   const frameOne = new Texture({ id: "frame-one-b" });
   const frameTwo = new Texture({ id: "frame-two-b" });
   assert.throws(() => new AnimatedSprite({ frames: new Array(4_097).fill(frameOne) }), /limit/);

@@ -1,4 +1,4 @@
-// ExiEngine unit test — Node/Scene ek davranışlar (renderGroup flag, mask, focus, layout)
+// ExiEngine unit test — extra Node/Scene behavior (renderGroup flag, mask, focus, layout)
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Node, Scene, Sprite, RenderGroup, Camera, Texture } from "../../src/index.js";
@@ -22,7 +22,7 @@ test("node: renderGroupSubtree flag collectRenderGroups", () => {
   scene.destroy();
 });
 
-test("node: nested renderGroup post-order toplama", () => {
+test("node: nested renderGroup post-order collection", () => {
   const scene = new Scene();
   const outer = new RenderGroup({ width: 32, height: 16 });
   const inner = new RenderGroup({ width: 16, height: 16 });
@@ -40,7 +40,7 @@ test("node: nested renderGroup post-order toplama", () => {
   outer.destroy();
 });
 
-test("node: maskTexture mirası ve doğrulama", () => {
+test("node: maskTexture inheritance and validation", () => {
   const maskTexture = new Texture({ id: "mask", sourceWidth: 4, sourceHeight: 4 });
   const scene = new Scene();
   const group = new Node({ maskTexture, maskRect: { x: 12, y: 18, width: 80, height: 50 } });
@@ -57,7 +57,7 @@ test("node: maskTexture mirası ve doğrulama", () => {
   assert.throws(() => new Node().setMaskTexture({}), /maskTexture/);
 });
 
-test("node: clipRect nested kesişim", () => {
+test("node: clipRect nested intersection", () => {
   const scene = new Scene();
   const group = new Node({ clipRect: { x: 20, y: 20, width: 140, height: 90 } });
   const nested = new Node({ clipRect: { x: 60, y: 10, width: 100, height: 100 } });
@@ -70,16 +70,16 @@ test("node: clipRect nested kesişim", () => {
   assert.equal(nested.renderClip, clip);
 });
 
-test("node: focus ve focusNext", () => {
+test("node: focus and focusNext", () => {
   const scene = new Scene();
   const a = new Node({ focusable: true, onFocus: () => { a.focused = true; } });
   const b = new Node({ focusable: true, onBlur: () => { b.focused = false; }, onFocus: () => { b.focused = true; } });
   scene.add(a, b);
-  // Focus, ExiEngine üzerinden yönetilir; Scene düzeyinde focusable keşfi doğrulanır
+  // Focus is managed by ExiEngine; focusable discovery is verified at the Scene level
   const focusables = [];
   scene.traverse((node) => { if (node.focusable) focusables.push(node); });
   assert.deepEqual(focusables, [a, b]);
-  // focusable alan doğrudan set/get
+  // focusable field set/get directly
   assert.equal(a.focusable, true);
   assert.equal(b.focusable, true);
   a.focusable = false;
@@ -91,7 +91,7 @@ test("node: layout anchor HUD", () => {
   const scene = new Scene();
   const sprite = new Sprite({ width: 100, height: 20, anchorX: 0.5, anchorY: 0.5, layout: { right: 16, bottom: 8 } });
   scene.add(sprite);
-  // layout normalize edilmiş tam nesne olarak saklanır
+  // layout is stored as a full normalized object
   assert.equal(sprite.layout.right, 16);
   assert.equal(sprite.layout.bottom, 8);
   assert.equal(sprite.setLayout({ left: 16, top: 12 }), sprite);

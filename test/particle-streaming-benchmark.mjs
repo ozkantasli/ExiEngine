@@ -24,7 +24,7 @@ const camera = new Camera({ width, height });
 const warmQueue = buildRenderBatches(scene, camera, width, height);
 const sourceData = warmQueue.batches[0]?.instanceData;
 const sourceItems = emitter.instanceItems;
-if (!(sourceData instanceof Float32Array)) throw new Error("Particle benchmark kaynak buffer üretmedi.");
+if (!(sourceData instanceof Float32Array)) throw new Error("Particle benchmark produced no source buffer.");
 
 let sameBufferFrames = 0;
 let sameViewFrames = 0;
@@ -38,7 +38,7 @@ for (let frame = 0; frame < frameCount; frame += 1) {
   if (nextData === sourceData) sameBufferFrames += 1;
   if (emitter.instanceView === sourceData) sameViewFrames += 1;
   if (emitter.instanceItems === sourceItems) sameItemListFrames += 1;
-  if (nextData?.[0] === undefined) throw new Error("Particle benchmark güncellenen kaydı okuyamadı.");
+  if (nextData?.[0] === undefined) throw new Error("Particle benchmark could not read the updated record.");
 }
 const elapsedMs = performance.now() - start;
 const result = {
@@ -53,7 +53,7 @@ const result = {
   itemListReallocations: frameCount - sameItemListFrames,
   elapsedMs: Number(elapsedMs.toFixed(2)),
   simulatedFramesPerSecond: Number((frameCount / Math.max(elapsedMs / 1000, Number.EPSILON)).toFixed(2)),
-  note: "Node ölçümü; gerçek WebGL2/WebGPU sürücü ve fiziksel cihaz FPS ölçümü değildir.",
+  note: "Node measurement; not a real WebGL2/WebGPU driver or physical-device FPS measurement.",
 };
 console.log(JSON.stringify(result, null, 2));
 if (sameBufferFrames !== frameCount || sameViewFrames !== frameCount || sameItemListFrames !== frameCount) process.exitCode = 1;

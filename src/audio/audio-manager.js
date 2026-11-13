@@ -92,8 +92,8 @@ export class AudioManager {
     this.pendingLoadIntegrities = new Map();
     this.loadControllers = new Map();
     this.keyGenerations = new Map();
-    // Tek ses kayıt tablosu: source → { buffer, gain, panner, output, cleanup, phase }.
-    // Semantics: voices üyeliği "alive" demektir; cleanup() idempotent olup kaydı siler (#40).
+    // Single voice record table: source → { buffer, gain, panner, output, cleanup, phase }.
+    // Semantics: membership in voices means "alive"; cleanup() is idempotent and deletes the record (#40).
     this.voices = new Map();
     this.sprites = new Map();
     this.listener = { x: 0, y: 0 };

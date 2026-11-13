@@ -42,7 +42,7 @@ const result = {
   sameBufferFrames,
   sameViewFrames,
   transformPointCalls,
-  note: "Node ParticleEmitter WebGPU source-stream sözleşme ölçümü; gerçek compute/GPU FPS ölçümü değildir.",
+  note: "Node ParticleEmitter WebGPU source-stream contract measurement; not a real compute/GPU FPS measurement.",
 };
 console.log(JSON.stringify(result, null, 2));
 if (sourceData?.length !== particleCount * 16 || sameBufferFrames !== frameCount || sameViewFrames !== frameCount || transformPointCalls !== 0) process.exitCode = 1;

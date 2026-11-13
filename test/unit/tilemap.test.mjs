@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { Scene, Texture, TileMap, PhysicsWorld, PhysicsBody, Sprite, Camera } from "../../src/index.js";
 import { buildRenderBatches } from "../../src/render/batch.js";
 
-test("tilemap: setTile sonrası getInstanceItems getRenderItems'ı bozamaz (ayrı dirty)", () => {
+test("tilemap: getInstanceItems after setTile cannot break getRenderItems (separate dirty)", () => {
   const map = new TileMap({ texture: new Texture({ sourceWidth: 64, sourceHeight: 32 }), tileWidth: 16, tileHeight: 16, columns: 2, rows: 1 });
   const camera = new Camera({ width: 320, height: 180 });
   map.setTiles([0, -1]);
@@ -24,7 +24,7 @@ test("tilemap: setTile sonrası getInstanceItems getRenderItems'ı bozamaz (ayr�
   assert.deepEqual(map.getInstanceItems(camera, 320, 180), []);
 });
 
-test("tilemap: temel setTile/getTile/getFrame", () => {
+test("tilemap: basic setTile/getTile/getFrame", () => {
   const map = new TileMap({ texture: new Texture({ sourceWidth: 64, sourceHeight: 32 }), tileWidth: 16, tileHeight: 16, columns: 2, rows: 1 });
   map.setTiles([0, 1]);
   assert.equal(map.getTile(0, 0), 0);
@@ -41,7 +41,7 @@ test("tilemap: temel setTile/getTile/getFrame", () => {
   assert.throws(() => new TileMap({ texture: Texture.white, tileWidth: 1, tileHeight: 1, columns: 1000, rows: 501 }), /limit/);
 });
 
-test("tilemap: flip flag ve setTile seçenekleri", () => {
+test("tilemap: flip flags and setTile options", () => {
   const map = new TileMap({ texture: new Texture({ sourceWidth: 64, sourceHeight: 32 }), tileWidth: 16, tileHeight: 16, columns: 2, rows: 1 });
   map.setTiles([0, 1]);
   const frame = map.getFrame(1);
@@ -53,7 +53,7 @@ test("tilemap: flip flag ve setTile seçenekleri", () => {
   assert.throws(() => map.setTile(0, 0, 99), /index/);
 });
 
-test("tilemap: getCollisionRects ve createStaticBodies", () => {
+test("tilemap: getCollisionRects and createStaticBodies", () => {
   const map = new TileMap({ texture: new Texture({ sourceWidth: 64, sourceHeight: 32 }), tileWidth: 16, tileHeight: 16, columns: 4, rows: 3, x: 10, y: 20 });
   map.setTiles([0, 0, -1, -1, 0, 0, -1, -1, -1, -1, 1, 1]);
   const rects = map.getCollisionRects(new Set([0, 1]));
@@ -75,14 +75,14 @@ test("tilemap: getCollisionRects ve createStaticBodies", () => {
   assert.equal(world.bodies.size, 0);
 });
 
-test("tilemap: lifecycle controller ve static cache", () => {
+test("tilemap: lifecycle controller and static cache", () => {
   const scene = new Scene();
   const map = new TileMap({ texture: new Texture({ sourceWidth: 64, sourceHeight: 32 }), tileWidth: 16, tileHeight: 16, columns: 2, rows: 1, staticCache: true, instanced: false });
   map.setTiles([0, 1]);
   scene.add(map);
   const world = new PhysicsWorld({ scene, gravityY: 0 });
   const controller = map.createStaticBodies(world, { solidTiles: new Set([0, 1]) });
-  // 2x1 map'te iki solid tile yan yana → birleşik tek rect → 1 body
+  // two solid tiles side by side on a 2x1 map → one merged rect → 1 body
   assert.equal(world.bodies.size, 1);
   map.destroy();
   assert.equal(world.bodies.size, 0);
@@ -93,7 +93,7 @@ test("tilemap: lifecycle controller ve static cache", () => {
   assert.equal(typeof key, "number");
 });
 
-test("tilemap: setRegion atomik ve culling", () => {
+test("tilemap: setRegion atomic and culling", () => {
   const map = new TileMap({ texture: new Texture({ sourceWidth: 32, sourceHeight: 16 }), tileWidth: 16, tileHeight: 16, columns: 4, rows: 4, gpuCulling: false });
   map.setRegion(1, 1, 2, 2, new Int32Array([0, 1, 1, 0]));
   assert.equal(map.getTile(1, 1), 0);
@@ -114,7 +114,7 @@ test("tilemap: setRegion atomik ve culling", () => {
   assert.equal(moved.batches[0].instanceCount, 16);
 });
 
-test("tilemap: render batch ve getLocalBounds cache", () => {
+test("tilemap: render batch and getLocalBounds cache", () => {
   const camera = new Camera({ width: 320, height: 180 });
   const map = new TileMap({ texture: new Texture({ sourceWidth: 64, sourceHeight: 32 }), tileWidth: 16, tileHeight: 16, columns: 2, rows: 1 });
   map.setTiles([0, 1]);

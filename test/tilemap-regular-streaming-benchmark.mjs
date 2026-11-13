@@ -31,7 +31,7 @@ const result = {
   samePositionsFrames,
   sameUvsFrames,
   elapsedMs: Number(elapsedMs.toFixed(2)),
-  note: "Node TileMap regular dirty-rebuild identity sözleşme ölçümü; gerçek WebGL2/FPS ölçümü değildir.",
+  note: "Node TileMap regular dirty-rebuild identity contract measurement; not a real WebGL2/FPS measurement.",
 };
 console.log(JSON.stringify(result, null, 2));
 if ([sameItemListFrames, sameItemFrames, samePositionsFrames, sameUvsFrames].some((value) => value !== frameCount)) process.exitCode = 1;

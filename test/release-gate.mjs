@@ -48,7 +48,7 @@ function run(relativePath) {
 for (const check of checks) {
   console.log(`\n[release-gate] ${check}`);
   const result = await run(check);
-  if (result.code !== 0) throw new Error(`${check} başarısız oldu (${result.signal || result.code}).`);
+  if (result.code !== 0) throw new Error(`${check} failed (${result.signal || result.code}).`);
 }
 
 console.log("\nExiEngine release gate: passed");

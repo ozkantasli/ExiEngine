@@ -1,6 +1,6 @@
-// ExiEngine coverage runner — unit suite'ini --experimental-test-coverage ile çalıştırır,
-// her modülün line coverage'ını thresholds.mjs ile karşılaştırır, özet raporlar.
-// Bağımlılık yoktur. Node 20 uyumluluğu için glob yerine dosya listesi kullanılır.
+// ExiEngine coverage runner — runs the unit suite with --experimental-test-coverage,
+// compares each module's line coverage with thresholds.mjs and reports a summary.
+// No dependencies. Uses a file list instead of a glob for Node 20 compatibility.
 import { spawn } from "node:child_process";
 import { readdir } from "node:fs/promises";
 import path from "node:path";
@@ -32,17 +32,17 @@ function parseCoverage(text) {
   const lines = text.split("\n");
   let inTable = false;
   for (const line of lines) {
-    const trimmed = line.trim();
-    // Tablo başlığı: "ℹ file | line % | branch % | funcs %" (ℹ öneki olabilir)
+    // Reporters prefix diagnostic lines with "ℹ" (spec) or "#" (TAP); strip either.
+    const trimmed = line.trim().replace(/^(?:ℹ|#)\s*/, "");
+    // Table header: "file | line % | branch % | funcs %"
     if (trimmed.includes("line %") && trimmed.includes("funcs %")) { inTable = true; continue; }
     if (!inTable) continue;
     if (trimmed.startsWith("all files")) break;
-    // Sütunları "|" ayracıyla ayır: [path, line%, branch%, funcs%]
+    // Split columns on "|": [path, line%, branch%, funcs%]
     if (!trimmed.includes("|")) continue;
     const parts = trimmed.split("|").map((part) => part.trim());
     if (parts.length < 4) continue;
-    // Dosya adı "ℹ   asset-loader.js" formatında gelebilir; ℹ öneki ve boşlukları temizle
-    const fileName = parts[0].replace(/^ℹ\s*/, "");
+    const fileName = parts[0];
     const linePercent = parseFloat(parts[1]);
     if (fileName && Number.isFinite(linePercent)) files.set(fileName, linePercent);
   }
@@ -51,28 +51,28 @@ function parseCoverage(text) {
 
 const result = await runUnitWithCoverage();
 if (result.error) {
-  console.error(`[coverage] Unit suite çalıştırılamadı: ${result.error.message}`);
+  console.error(`[coverage] Could not run the unit suite: ${result.error.message}`);
   process.exitCode = 1;
   throw result.error;
 }
 if (result.code !== 0) {
   console.error(result.stdout.slice(-4_000));
   console.error(result.stderr.slice(-4_000));
-  console.error(`##[error][coverage] Unit suite başarısız (exit ${result.code}): ${result.stderr.trim().split("\n").slice(-4).join(" | ").slice(0, 600)}`);
+  console.error(`##[error][coverage] Unit suite failed (exit ${result.code}): ${result.stderr.trim().split("\n").slice(-4).join(" | ").slice(0, 600)}`);
   process.exitCode = 1;
   throw new Error("unit suite failed");
 }
 
 const coverage = parseCoverage(result.stdout + "\n" + result.stderr);
-console.log(`[coverage] Parse edilen dosya sayısı: ${coverage.size} (stdout ${result.stdout.length} bayt, stderr ${result.stderr.length} bayt)`);
-// Coverage tablosu göreli basename kullanır (ör. "math.js"); threshold'lar tam yol (ör. "src/core/math.js").
-// Eşleştirme: threshold anahtarının basename'i ile tablo basename'ini karşılaştır.
+console.log(`[coverage] Parsed files: ${coverage.size} (stdout ${result.stdout.length} bytes, stderr ${result.stderr.length} bytes)`);
+// The coverage table uses relative basenames (e.g. "math.js"); thresholds use full paths (e.g. "src/core/math.js").
+// Matching: compare the threshold key's basename with the table basename.
 const byBasename = new Map();
 for (const [file, percent] of coverage) {
   const base = file.split(/[\\/]/).pop();
   byBasename.set(base, Math.max(byBasename.get(base) ?? 0, percent));
 }
-console.log("\n[coverage] Modül bazlı line coverage:");
+console.log("\n[coverage] Line coverage per module:");
 let failures = 0;
 let checked = 0;
 for (const [file, minimum] of Object.entries(thresholds)) {
@@ -81,12 +81,12 @@ for (const [file, minimum] of Object.entries(thresholds)) {
   checked += 1;
   const ok = actual >= minimum;
   if (!ok) failures += 1;
-  console.log(`  ${ok ? "OK  " : "FAIL"} ${file.padEnd(34)} %${String(actual).padStart(6)}  (eşik %${minimum})`);
+  console.log(`  ${ok ? "OK  " : "FAIL"} ${file.padEnd(34)} %${String(actual).padStart(6)}  (threshold %${minimum})`);
 }
-console.log(`\n[coverage] ${checked - failures}/${checked} modül eşik üzerinde.`);
+console.log(`\n[coverage] ${checked - failures}/${checked} modules meet their threshold.`);
 if (failures > 0) {
-  console.error(`[coverage] ${failures} modül eşiğin altında.`);
+  console.error(`[coverage] ${failures} module(s) below their threshold.`);
   process.exitCode = 1;
 } else {
-  console.log("[coverage] Tüm eşikler karşılandı.");
+  console.log("[coverage] All thresholds met.");
 }

@@ -15,7 +15,7 @@ test("collision: firstHit / query / raycast", () => {
   const results = [];
   assert.equal(world.query(getAABB(sprite), undefined, results), results);
   assert.equal(results.length, 1);
-  // Raycast ayrı senaryo: hedef sprite'ın bounds'u ile kesişen ışın
+  // Raycast as a separate scenario: a ray that intersects the target sprite's bounds
   const rayTarget = new Sprite({ width: 16, height: 16, x: 30, y: 0 });
   scene.add(rayTarget);
   scene.updateWorldMatrix();
@@ -46,7 +46,7 @@ test("collision: autoSync spatial index", () => {
   assert.throws(() => new CollisionWorld({ spatial: true, cellSize: 8 }), /cellSize/);
 });
 
-test("collision: spatial world syncCollider ve disable", () => {
+test("collision: spatial world syncCollider and disable", () => {
   const scene = new Scene();
   const probe = new Sprite({ width: 16, height: 16 });
   const target = new Sprite({ width: 16, height: 16, x: 10, y: 6 });
@@ -75,7 +75,7 @@ test("collision: spatial world syncCollider ve disable", () => {
   assert.equal(hit.collider, collider);
 });
 
-test("collision: yok edilmiş node collider'ı otomatik kaldırılır", () => {
+test("collision: a destroyed node's collider is removed automatically", () => {
   const scene = new Scene();
   const probe = new Sprite({ width: 16, height: 16 });
   const node = new Sprite({ width: 10, height: 10 });
@@ -165,7 +165,7 @@ test("physics: overlaps, layer/mask, trigger", () => {
   probe.destroy();
 });
 
-test("physics: yok edilmiş node otomatik kaldırılır", () => {
+test("physics: a destroyed node is removed automatically", () => {
   const node = new Sprite({ width: 10, height: 10 });
   const body = new PhysicsBody(node);
   const world = new PhysicsWorld({ gravityY: 0 });
@@ -178,7 +178,7 @@ test("physics: yok edilmiş node otomatik kaldırılır", () => {
   world.clear();
 });
 
-test("physics: custom bounds ve one-way platform", () => {
+test("physics: custom bounds and one-way platform", () => {
   const scene = new Scene();
   const floor = new Sprite({ width: 100, height: 10, y: 50 });
   const player = new Sprite({ width: 100, height: 100, y: 0 });
@@ -211,7 +211,7 @@ test("physics: custom bounds ve one-way platform", () => {
   assert.throws(() => new Collider(platform, { oneWay: "diagonal" }), /oneWay/);
 });
 
-test("physics: kinematic platform taşıyıcı", () => {
+test("physics: kinematic platform carrier", () => {
   const scene = new Scene();
   const platform = new Sprite({ width: 100, height: 10, x: 0, y: 50 });
   const rider = new Sprite({ width: 10, height: 10, x: 10, y: 40 });
@@ -272,7 +272,7 @@ test("physics: contact begin/stay/end lifecycle", () => {
   world.clear();
 });
 
-test("physics: contact kayıtları retained kabul edilebilir (paylaşılmaz)", () => {
+test("physics: contact records may be retained (not shared)", () => {
   const scene = new Scene();
   const a = new Sprite({ width: 10, height: 10, x: 0, y: 0 });
   const b = new Sprite({ width: 10, height: 10, x: 5, y: 0 });
@@ -314,7 +314,7 @@ test("physics: contact kayıtları retained kabul edilebilir (paylaşılmaz)", (
   world.clear();
 });
 
-test("physics: onStayContact ve clear end-contact", () => {
+test("physics: onStayContact and clear end-contact", () => {
   const scene = new Scene();
   const a = new Sprite({ width: 10, height: 10 });
   const b = new Sprite({ width: 10, height: 10 });
@@ -353,7 +353,7 @@ test("physics: onStayContact ve clear end-contact", () => {
   assert.equal(clearWorld.bodies.size, 0);
 });
 
-test("physics: autoSync, tunnel, hız sınırı, kapasite", () => {
+test("physics: autoSync, tunnel, speed limit, capacity", () => {
   const scene = new Scene();
   const wall = new Sprite({ width: 1, height: 100, x: 50, y: 0 });
   const player = new Sprite({ width: 10, height: 10, x: 0, y: 10 });

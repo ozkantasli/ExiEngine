@@ -39,7 +39,7 @@ const result = {
   culledSprites,
   transformPointCalls,
   expectedTransformPointCalls,
-  note: "Node tekil Sprite bounds-culling sözleşme ölçümü; gerçek GPU/FPS ölçümü değildir.",
+  note: "Node single-Sprite bounds-culling contract measurement; not a real GPU/FPS measurement.",
 };
 console.log(JSON.stringify(result, null, 2));
 if (culledSprites !== offscreenCount * frameCount || transformPointCalls !== expectedTransformPointCalls) process.exitCode = 1;

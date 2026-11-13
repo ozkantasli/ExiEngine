@@ -66,8 +66,8 @@ assert.equal(openCode.mcp?.timeout, undefined);
 
 for (const relativePath of [".cursor/mcp.json", ".cline/mcp.json", ".mcp.json", "opencode.json", ".gemini/settings.json", ".codex/config.toml"]) {
   const content = await readFile(path.join(root, relativePath), "utf8");
-  assert.doesNotMatch(content, /(?:api[_-]?key|secret|token|password)\s*[:=]/i, `${relativePath} secret içermemeli`);
-  assert.doesNotMatch(content, /(?:^|[\\/])(?:\.env|credentials|id_rsa|.*\.(?:pem|key|p12|pfx))(?=$|[\\/"])/i, `${relativePath} credential yolu içermemeli`);
+  assert.doesNotMatch(content, /(?:api[_-]?key|secret|token|password)\s*[:=]/i, `${relativePath} must not contain a secret`);
+  assert.doesNotMatch(content, /(?:^|[\\/])(?:\.env|credentials|id_rsa|.*\.(?:pem|key|p12|pfx))(?=$|[\\/"])/i, `${relativePath} must not contain a credential path`);
 }
 
 function runBridge({ command, args, cwd, env }) {
@@ -142,7 +142,7 @@ for (const [client, launch] of Object.entries(clientLaunches)) {
     const functionCall = await bridge.request("tools/call", { name: "exi_function", arguments: { name: "clamp", args: [2, 0, 1] } });
     const functionValue = functionCall.result.structuredContent?.value ?? functionCall.result.structuredContent;
     assert.equal(functionValue, 1, `${client} tool call`);
-    assert.equal(bridge.getStderr(), "", `${client} MCP stderr temiz olmalı`);
+    assert.equal(bridge.getStderr(), "", `${client} MCP stderr must be clean`);
   } finally {
     bridge.child.kill();
     await Promise.race([once(bridge.child, "exit"), new Promise((resolve) => setTimeout(resolve, 1_000))]);

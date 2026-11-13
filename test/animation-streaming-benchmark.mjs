@@ -32,7 +32,7 @@ const camera = new Camera({ width, height });
 const state = createRenderBatchState();
 const firstQueue = buildRenderBatches(scene, camera, width, height, { state, gpuCulling: true });
 const firstBatch = firstQueue.batches[0];
-if (!firstBatch?.gpuSource || !(firstBatch.instanceData instanceof Float32Array)) throw new Error("Animation benchmark GPU source üretmedi.");
+if (!firstBatch?.gpuSource || !(firstBatch.instanceData instanceof Float32Array)) throw new Error("Animation benchmark produced no GPU source.");
 const sourceBuffer = firstBatch.instanceData;
 let sameBufferFrames = 0;
 let advancedFrames = 0;
@@ -53,7 +53,7 @@ const result = {
   instanceBufferReallocations: frameCount - sameBufferFrames,
   elapsedMs: Number(elapsedMs.toFixed(2)),
   simulatedFramesPerSecond: Number((frameCount / Math.max(elapsedMs / 1000, Number.EPSILON)).toFixed(2)),
-  note: "Node GPU-source streaming sözleşmesi; gerçek WebGL2/WebGPU sürücü ve fiziksel cihaz FPS ölçümü değildir.",
+  note: "Node GPU-source streaming contract; not a real WebGL2/WebGPU driver or physical-device FPS measurement.",
 };
 console.log(JSON.stringify(result, null, 2));
 if (advancedFrames === 0 || sameBufferFrames !== frameCount) process.exitCode = 1;

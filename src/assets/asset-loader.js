@@ -589,7 +589,7 @@ export class AssetLoader {
           if (stopOnError) throw error;
         } finally {
           loaded += 1;
-          // loaded, tamamlanan attempt sayısını korur (geri uyum); failed başarısızlığı açıkça verir.
+          // loaded keeps the completed attempt count (backward compatible); failed reports the failure explicitly.
           onProgress({ loaded, failed: errors.size, total, key: entry?.key || `#${index}`, percent: total ? loaded / total : 1 });
         }
       }

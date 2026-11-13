@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Camera } from "../../src/index.js";
 
-test("camera: güvenli normalizasyon (Infinity/NaN)", () => {
+test("camera: safe normalization (Infinity/NaN)", () => {
   const safe = new Camera({ zoom: Infinity, rotation: NaN, width: Infinity, height: NaN });
   assert.equal(safe.zoom, 1);
   assert.equal(safe.rotation, 0);
@@ -29,7 +29,7 @@ test("camera: worldToScreen / screenToWorld / viewport", () => {
   assert.equal(viewportCam.isScreenPointInViewport(19.99, 10), false);
 });
 
-test("camera: zoomAt ve pixelRatio sınırı", () => {
+test("camera: zoomAt and pixelRatio bound", () => {
   const cam = new Camera({ width: 200, height: 100, pixelRatio: 2 });
   const anchor = cam.screenToWorld(40, 20, { x: 0, y: 0 });
   cam.zoomAt(40, 20, 2);
@@ -54,7 +54,7 @@ test("camera: follow / deadzone / smoothing / clearFollow", () => {
   assert.throws(() => cam.follow({ x: 1 }), /x\/y/);
 });
 
-test("camera: deadzone davranışı", () => {
+test("camera: deadzone behavior", () => {
   const point = { x: 10, y: 5 };
   const cam = new Camera();
   cam.follow(point, { deadzoneWidth: 40, deadzoneHeight: 20 });
@@ -68,7 +68,7 @@ test("camera: deadzone davranışı", () => {
   assert.deepEqual({ x: cam.position.x, y: cam.position.y }, { x: 80, y: 40 });
 });
 
-test("camera: bounds sınırlaması", () => {
+test("camera: bounds clamping", () => {
   const bounded = new Camera({ width: 100, height: 50, bounds: { x: 0, y: 0, width: 200, height: 100 } });
   bounded.position.set(-100, 999);
   bounded.normalize();

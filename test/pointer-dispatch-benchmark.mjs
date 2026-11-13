@@ -49,7 +49,7 @@ const result = {
   sameHoverPredicateFrames,
   emptyPathFrames,
   elapsedMs: Number(elapsedMs.toFixed(2)),
-  note: "Node pointer dispatch scratch identity sözleşme ölçümü; gerçek cihaz input/FPS ölçümü değildir.",
+  note: "Node pointer dispatch scratch identity contract measurement; not a real device input/FPS measurement.",
 };
 console.log(JSON.stringify(result, null, 2));
 if (enterCount !== 1 || moveCount !== frameCount || [samePathFrames, sameHitFrames, sameHoverHitFrames, samePickPredicateFrames, sameHoverPredicateFrames, emptyPathFrames].some((value) => value !== frameCount) || engine.pointerEventPath.length !== 0) process.exitCode = 1;

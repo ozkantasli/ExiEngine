@@ -101,7 +101,7 @@ export class Graphics extends Node {
 
   clear() { this.commands.length = 0; this._invalidate(); return this; }
 
-  // Tek invalidasyon noktası: itemsDirty + boundsCache + contentVersion her zaman birlikte ilerler (#30 denetimi).
+  // Single invalidation point: itemsDirty + boundsCache + contentVersion always advance together (#30 audit).
   _invalidate() { this.itemsDirty = true; this.boundsCache = null; this.contentVersion += 1; return this; }
 
   rect(x, y, width, height, { fill = 0xffffff, alpha = 1 } = {}) {
@@ -306,7 +306,7 @@ export class Graphics extends Node {
     this.renderItemPool.length = 0;
     this.boundsCache = null;
     this.staticRenderCache = null;
-    // Yok edilmiş grafik yasadışı kullanımda ne tam ne eksik cache sunmasın: dirty + version bump.
+    // A destroyed Graphics used illegally must serve neither a full nor a partial cache: dirty + version bump.
     this.itemsDirty = true;
     this.contentVersion += 1;
     super.destroy();

@@ -62,7 +62,7 @@ const result = {
   animatedSamePositions,
   animatedSameUvs,
   elapsedMs: Number(elapsedMs.toFixed(2)),
-  note: "Node Sprite/AnimatedSprite identity sözleşme ölçümü; gerçek GPU/FPS ölçümü değildir.",
+  note: "Node Sprite/AnimatedSprite identity contract measurement; not a real GPU/FPS measurement.",
 };
 console.log(JSON.stringify(result, null, 2));
 if (textureChanges === 0 || [sameItemListFrames, sameItemFrames, samePositionsFrames, sameUvsFrames].some((value) => value !== frameCount) || animatedFrameChanges === 0 || [animatedSameItems, animatedSamePositions, animatedSameUvs].some((value) => value !== frameCount)) process.exitCode = 1;
