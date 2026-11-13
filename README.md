@@ -86,6 +86,9 @@ only and sends CSP/`nosniff` headers.
 | [`examples/top-down`](examples/top-down/main.js) | Code-built TileMap walls, zero-gravity physics, trigger pickups, A* (`findGridPath`) chasers, particles, camera shake, `LightLayer` torch lighting |
 | [`examples/lighting`](examples/lighting/main.js) | `LightLayer` with normal maps: generated brick and orb normal maps, a torch on the pointer, toggling normal maps and light height |
 | [`examples/physics`](examples/physics/main.js) | `RigidBodyWorld`: boxes, circles, convex polygons, rotation, friction, restitution, a standing pyramid, a plank bridge and a pendulum on joints, a motorized windmill (weld + motor), a piston (prismatic), a flipper (revolute angle limits) and a drivable car (wheel joints with spring suspension), click to drop shapes |
+| [`examples/shooter`](examples/shooter/main.js) | Vertical space shooter: pooled `Graphics` bullets/enemies (no allocation while playing), seeded waves, circle collision, `ParticleEmitter` explosions, camera shake, parallax stars, `SaveStore` high score, keyboard/gamepad/touch |
+| [`examples/runner`](examples/runner/main.js) | Endless runner: variable-height jump, coyote time + jump buffering, procedural obstacles and coins from a seeded generator, ramping speed, parallax, `Tween` pickups |
+| [`examples/match3`](examples/match3/main.js) | Match-3 puzzle: tap/drag/keyboard swaps, tweened clears and cascades awaited through `Tween` `onComplete`, `StateMachine` input gating, reshuffle on no moves, screen-space `clipRect` from `camera.worldToScreen` |
 | [`examples/ui-widgets`](examples/ui-widgets/main.js) | `Button`, `Slider`, `TextInput` (IME/mobile), `ScrollView`, `Checkbox`, `Dropdown` and `Stack` with pointer, wheel and keyboard focus |
 | [`examples/ui-menu`](examples/ui-menu/main.js) | Overlay UI, pointer + keyboard focus (Tab/Enter), tweened buttons, `StateMachine` screens |
 

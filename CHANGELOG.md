@@ -34,7 +34,8 @@ Content, authoring and game-feature release. Everything stays dependency-free.
 - **UI:** `Button`, `Slider`, `TextInput` (IME and mobile keyboards through a hidden input), `ScrollView`,
   `Checkbox`, `Dropdown`, `Stack` and `Grid` layout containers.
 - **Examples:** platformer (Tiled), top-down (A*, lighting), normal-mapped lighting, physics sandbox (now with a drivable
-  car on wheel joints and a flipper with angle limits), UI menu, UI widgets;
+  car on wheel joints and a flipper with angle limits), UI menu, UI widgets, a space shooter, an endless runner
+  and a match-3 puzzle;
   `npm run test:e2e:examples` drives them and the editor in Chromium.
 
 ### Changed

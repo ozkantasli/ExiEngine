@@ -31,6 +31,9 @@ const inputs = {
   "top-down": [["ArrowDown", 500], ["ArrowRight", 500]],
   "ui-menu": [["Tab", 80], ["Enter", 80]],
   physics: [["Space", 80], ["Space", 80], ["ArrowRight", 600], ["KeyF", 200]],
+  shooter: [["Space", 900], ["ArrowLeft", 300], ["KeyR", 60]],
+  runner: [["Space", 60], ["Space", 300]],
+  match3: [["ArrowRight", 60], ["ArrowDown", 60], ["Space", 60], ["ArrowRight", 60], ["KeyR", 60]],
   lighting: [["ArrowLeft", 300], ["KeyH", 60], ["KeyN", 60], ["KeyN", 60]],
   "ui-widgets": [["KeyE", 60], ["KeyX", 60], ["KeyI", 60], ["Enter", 60], ["Tab", 60], ["ArrowRight", 60]],
 };

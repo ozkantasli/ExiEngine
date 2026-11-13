@@ -148,6 +148,7 @@ Core methods:
 - `remove(node)`: detaches a child.
 - `destroy()`: removes the child graph and attached resources from the lifecycle.
 - `setClipRect`, `setMaskRect`, `setMaskTexture`, `setCullBounds`, `setHitArea` and the related `clear*` methods.
+  `clipRect` and `maskRect` are in render-target (screen) pixels, not in the node's local or world space, and children inherit the intersection; to clip a world-space area, convert its corners with `camera.worldToScreen` each frame (the `ScrollView` widget and the match-3 example do this).
 - `setInteractive`, `setPointerHandlers`, `setUpdateHandler`, `setFocusHandlers`, `setFocusable`.
 - `setLayout`, `clearLayout`, `applyLayout`: overlay viewport layout.
 - `traverse(callback)`, `find(predicate)`, `findByName(name)`: safe search and traversal of the scene graph.

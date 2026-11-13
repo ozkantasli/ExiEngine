@@ -50,7 +50,7 @@ Legend: ✅ built in · 🔌 official/common plugin or companion package · ➖ 
 | UI widgets (input, scroll, slider, layout) | ✅ Button, Slider, TextInput (IME), ScrollView, Checkbox, Dropdown, Stack/Grid | ➖ | 🔌 | ➖ | ➖ | ➖ | ✅ | ✅ | ✅ |
 | Netcode helpers | ✅ `RollbackSession` (rollback, transport-agnostic) | — | — | — | — | — | ➖ | ✅ | ✅ |
 | npm package + CDN bundle | ✅ ready (not yet published) | ✅ | ✅ | ✅ | ✅ | ✅ | n/a | n/a | n/a |
-| Playable examples | ➖ 6 examples + editor | ✅ (hundreds) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Playable examples | ➖ 9 examples + editor | ✅ (hundreds) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Determinism (fixed step, replay-safe physics) | ✅ | ➖ | n/a | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ |
 | Security budgets (asset size/integrity, bounded inputs) | ✅ | — | — | — | — | — | — | — | — |
 | AI-agent API (MCP bridge, runtime telemetry) | ✅ | — | — | — | — | — | — | — | — |
@@ -72,7 +72,7 @@ Legend: ✅ built in · 🔌 official/common plugin or companion package · ➖ 
 
 **P0 — adoption blockers**
 1. **Not on npm yet and little content.** The package is ready (`npm pack` works, dist
-   bundles build) but unpublished; four examples versus hundreds for Phaser. Publishing and
+   bundles build) but unpublished; nine examples versus hundreds for Phaser. Publishing and
    growing examples/tutorials matters more than any single feature.
 2. **Editor is still light.** Editing, saving, a live Play window and hot reload exist; prefabs,
    an asset browser, animation timelines and behaviours/events (what makes GDevelop and
@@ -100,7 +100,7 @@ Legend: ✅ built in · 🔌 official/common plugin or companion package · ➖ 
 ## 5. Recommended next steps
 
 1. Publish to npm (owner action) and announce the CDN path.
-2. Grow examples: shooter, puzzle, endless runner, physics puzzle; one tutorial per example.
+2. Grow examples: ✅ shooter, endless runner, match-3; next a physics puzzle and one tutorial per example.
 3. Editor v3: prefabs, asset browser, simple data-driven behaviours (play/hot reload ✅).
 4. ~~More joint types~~ ✅ (weld, prismatic, motors, revolute angle limits, springs, wheel); next: gear/pulley joints if games ask for them.
 5. Spine runtime adapter as an optional package (keeps the core dependency-free).
