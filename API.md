@@ -494,6 +494,23 @@ const engine = await ExiEngine.create({ canvas, scene, animator });
 
 Provides `Tween.update`, `Animator.add/remove/update/clear` and the `easing` functions (linear, smooth, in/out/inOut quad, cubic, sine, expo, bounce, elastic). If the engine binds the animator to the fixed-step order, the order is `scene → animator → physics → onUpdate`.
 
+### Behaviours and keyframes: `BehaviorSystem`
+
+```js
+const coin = new Sprite({ texture, x: 200, y: 120, data: { behaviors: [
+  { type: "oscillate", axis: "y", amplitude: 6, period: 1.2 },
+  { type: "pulse", amount: 0.08, period: 0.6 },
+] } });
+const door = new Sprite({ texture, data: { behaviors: [
+  { type: "keyframes", duration: 2, mode: "pingpong", ease: "smooth", tracks: { y: [[0, 300], [1.5, 220], [2, 220]] } },
+] } });
+const behaviors = new BehaviorSystem({ input: engine.input, camera });
+behaviors.attach(scene);              // scan once; re-attach after replacing the scene
+// onUpdate: (delta) => behaviors.update(delta)
+```
+
+Behaviours are plain JSON in `node.data.behaviors`, so they are saved in scene documents and edited in the editor (inspector + timeline); nothing is evaluated. Built-in types (`BEHAVIOR_TYPES`): `move` (`vx`, `vy` per second), `rotate` (`speed` rad/s), `oscillate` (`axis`, `amplitude`, `period`, `phase` 0..1, around the attach-time position), `pulse` (`amount`, `period`, scale around the attach-time scale), `blink` (`period`, `duty`), `keyboard-move` (`speed`, `vertical`; arrows and WASD, diagonal speed normalized), `camera-follow` (`smoothing`) and `keyframes` (`duration`, `mode` loop/once/pingpong, `ease` linear/smooth, `tracks` for `x`, `y`, `rotation`, `scaleX`, `scaleY`, `alpha` as sorted `[time, value]` pairs with absolute values). Missing parameters get their defaults; `describeBehaviors()` returns every type with its parameter ranges (the editor builds its inspector from it), and `normalizeBehavior` / `normalizeBehaviors` validate definitions. `attach(root)` scans the subtree; a node whose list is invalid is skipped and reported in `errors` while the rest runs. Destroyed nodes are dropped on the next update. `sampleKeyframes(behavior, property, time)` and `applyKeyframes(node, behavior, time)` evaluate a normalized keyframes behaviour directly. Limits: `MAX_BEHAVIORS_PER_NODE` (16), `MAX_BEHAVIOR_NODES` (4 096), `MAX_KEYFRAMES` (256) keys per track, parameters are bounded and finite.
+
 ### `Collider`, `CollisionWorld`, `PhysicsBody`, `PhysicsWorld`
 
 ```js

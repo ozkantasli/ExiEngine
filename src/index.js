@@ -34,3 +34,4 @@ export { watchScene, EDITOR_CHANNEL } from "./assets/scene-watch.js";
 export { tileMapFromLDtk, ldtkIntGrid, ldtkEntities } from "./core/ldtk.js";
 export { Button, Checkbox, Dropdown, Grid, Slider, ScrollView, Stack, TextInput, UI_THEME } from "./ui/widgets.js";
 export { registerFilter, listFilters, MAX_CUSTOM_FILTERS } from "./render/custom-filters.js";
+export { BehaviorSystem, BEHAVIOR_TYPES, KEYFRAME_PROPERTIES, MAX_BEHAVIORS_PER_NODE, MAX_BEHAVIOR_NODES, MAX_KEYFRAMES, applyKeyframes, describeBehaviors, normalizeBehavior, normalizeBehaviors, sampleKeyframes } from "./core/behaviors.js";

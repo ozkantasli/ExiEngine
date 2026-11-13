@@ -7,6 +7,7 @@
 import {
   Camera, ExiEngine, FILTER_TYPES, MAX_PREFABS, Graphics, NineSliceSprite, Node, Scene, Sprite, Text, Texture, TileMap,
   SCENE_FORMAT, SCENE_FORMAT_VERSION, deserializeScene, getAABB, serializeScene,
+  KEYFRAME_PROPERTIES, applyKeyframes, describeBehaviors, normalizeBehavior, normalizeBehaviors,
 } from "../src/index.js";
 import { AUTOSAVE_KEY, BUILTIN_TILES_ID, EDITOR_CHANNEL, createBuiltinTiles } from "./shared.js";
 
@@ -48,17 +49,75 @@ async function importTextures(files) {
   setStatus(`Imported ${files.length} texture(s).`);
 }
 
+// Asset browser: a thumbnail per texture with its size and how many nodes use
+// it. Click assigns it to the selected Sprite / Panel / TileMap, dragging it
+// into the view creates a Sprite there, × removes an unused imported texture.
+function textureUsage() {
+  const counts = new Map();
+  const visit = (entry) => {
+    const id = entry?.options?.texture;
+    if (typeof id === "string") counts.set(id, (counts.get(id) || 0) + 1);
+    for (const child of entry?.children || []) visit(child);
+  };
+  visit(snapshot().root);
+  return counts;
+}
+
+function thumbnail(texture) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 32; canvas.height = 32;
+  canvas.className = "thumb";
+  const source = texture?.source;
+  const context = canvas.getContext("2d");
+  if (source && context) {
+    const scale = Math.min(32 / Math.max(1, texture.sourceWidth), 32 / Math.max(1, texture.sourceHeight));
+    const width = texture.sourceWidth * scale; const height = texture.sourceHeight * scale;
+    try { context.imageSmoothingEnabled = false; context.drawImage(source, (32 - width) / 2, (32 - height) / 2, width, height); } catch { /* not drawable */ }
+  }
+  return canvas;
+}
+
+function assignTexture(id) {
+  const node = selection ? nodeAt(selection) : null;
+  if (!(node instanceof Sprite || node instanceof TileMap)) { setStatus("Select a Sprite, Panel or TileMap to assign a texture, or drag the texture into the view.", true); return; }
+  setOption("texture", id, `Texture ${id}`);
+}
+
+function removeTexture(id) {
+  if (id === BUILTIN_TILES_ID || (textureUsage().get(id) || 0) > 0) return;
+  textures.get(id)?.destroy?.();
+  textures.delete(id);
+  renderTextures();
+  setStatus(`Removed texture ${id}`);
+}
+
 function renderTextures() {
   texturesNode.replaceChildren();
+  const usage = textureUsage();
   const ids = new Set([...textures.keys(), ...missingTextures]);
   for (const id of ids) {
     const item = document.createElement("li");
     const texture = textures.get(id);
-    item.textContent = id;
-    const size = document.createElement("span");
-    size.textContent = texture ? `${texture.sourceWidth}×${texture.sourceHeight}` : "missing";
-    item.append(size);
+    item.className = "asset";
+    item.title = texture ? "Click: use on the selected node · drag into the view: new sprite" : "Missing: import an image with this file name";
+    item.draggable = Boolean(texture);
+    item.dataset.texture = id;
+    const name = Object.assign(document.createElement("span"), { className: "asset-name", textContent: id });
+    const info = Object.assign(document.createElement("span"), { className: "asset-info", textContent: texture ? `${texture.sourceWidth}×${texture.sourceHeight} · ${usage.get(id) || 0} use(s)` : "missing" });
+    const text = document.createElement("span");
+    text.className = "asset-text";
+    text.append(name, info);
+    item.append(thumbnail(texture), text);
     if (!texture) item.classList.add("missing");
+    if (texture && id !== BUILTIN_TILES_ID && !usage.get(id)) {
+      const remove = Object.assign(document.createElement("button"), { type: "button", className: "asset-remove", textContent: "×", title: "Remove this unused texture" });
+      remove.addEventListener("click", (event) => { event.stopPropagation(); removeTexture(id); });
+      item.append(remove);
+    }
+    if (texture) {
+      item.addEventListener("click", () => assignTexture(id));
+      item.addEventListener("dragstart", (event) => { event.dataTransfer.setData("text/exi-texture", id); event.dataTransfer.effectAllowed = "copy"; });
+    }
     texturesNode.append(item);
   }
 }
@@ -251,15 +310,197 @@ function duplicateSelected() {
   }, "Duplicated");
 }
 
-function setOption(key, value) {
-  if (!selection) return;
+function setOption(key, value, label = `Set ${key}`) {
+  if (!selection) return false;
   const path = selection;
-  applyDocument((document) => {
+  return applyDocument((document) => {
     const entry = entryAt(document, path);
     entry.options = entry.options || {};
     if (value === undefined) delete entry.options[key];
     else entry.options[key] = value;
-  }, `Set ${key}`);
+  }, label);
+}
+
+// Adds a sprite with a texture at a world point (asset drag and drop).
+function addSpriteAt(id, x, y) {
+  const texture = textures.get(id);
+  const scale = texture ? Math.min(1, 256 / Math.max(texture.sourceWidth, texture.sourceHeight)) : 1;
+  const parentPath = selectedContainerPath();
+  return applyDocument((document) => {
+    const parent = entryAt(document, parentPath);
+    parent.children = parent.children || [];
+    parent.children.push({ type: "Sprite", options: { name: id.replace(/\.[a-z0-9]+$/i, "").slice(0, 64) || "sprite", texture: id, x: Math.round(x), y: Math.round(y), width: Math.round((texture?.sourceWidth || 64) * scale), height: Math.round((texture?.sourceHeight || 64) * scale) } });
+    return { select: [...parentPath, parent.children.length - 1] };
+  }, `Added sprite ${id}`);
+}
+
+// ---------------------------------------------------------------- behaviours + timeline
+// Behaviours are plain JSON in node.data.behaviors (see src/core/behaviors.js);
+// the Play window and games run them with BehaviorSystem.
+const BEHAVIOR_SPECS = describeBehaviors();
+const timeline = { time: 0, playing: false, tracks: new Set(["x", "y", "rotation"]), autoKey: true, slider: null, readout: null };
+
+function behaviorsOf(node) { return Array.isArray(node?.data?.behaviors) ? node.data.behaviors : []; }
+function keyframesIndex(node) { return behaviorsOf(node).findIndex((behavior) => behavior?.type === "keyframes"); }
+
+function setBehaviors(list, label) {
+  const node = selection ? nodeAt(selection) : null;
+  if (!node) return false;
+  try { normalizeBehaviors(list); } catch (error) { setStatus(error.message, true); renderInspector(); return false; }
+  const data = { ...(node.data || {}) };
+  if (list.length) data.behaviors = list; else delete data.behaviors;
+  const ok = setOption("data", Object.keys(data).length ? data : undefined, label);
+  previewTimeline();
+  return ok;
+}
+
+function updateBehavior(index, key, value) {
+  const list = JSON.parse(JSON.stringify(behaviorsOf(nodeAt(selection))));
+  list[index][key] = value;
+  if (key === "duration" && list[index].tracks) {
+    // Keys past a shorter duration are dropped instead of failing validation.
+    for (const property of Object.keys(list[index].tracks)) {
+      list[index].tracks[property] = list[index].tracks[property].filter(([time]) => time <= value);
+      if (!list[index].tracks[property].length) delete list[index].tracks[property];
+    }
+  }
+  setBehaviors(list, `Behaviour ${list[index].type}: ${key}`);
+}
+
+// Shows the selected node at the timeline time (the live node only; nothing is committed).
+function previewTimeline() {
+  const node = selection ? nodeAt(selection) : null;
+  const index = keyframesIndex(node);
+  if (index < 0) return;
+  try { applyKeyframes(node, normalizeBehavior(behaviorsOf(node)[index]), timeline.time); } catch { /* invalid data is reported on edit */ }
+}
+
+const PROPERTY_VALUE = {
+  x: (node) => node.position.x, y: (node) => node.position.y, rotation: (node) => node.rotation,
+  scaleX: (node) => node.scale.x, scaleY: (node) => node.scale.y, alpha: (node) => node.alpha,
+};
+
+// Records the live node's current values for the checked tracks at the timeline time.
+function recordKey() {
+  const node = selection ? nodeAt(selection) : null;
+  const index = keyframesIndex(node);
+  if (index < 0) return false;
+  const list = JSON.parse(JSON.stringify(behaviorsOf(node)));
+  const behavior = list[index];
+  behavior.tracks = behavior.tracks || {};
+  const time = Math.round(timeline.time * 1000) / 1000;
+  for (const property of timeline.tracks) {
+    const value = Math.round(PROPERTY_VALUE[property](node) * 10000) / 10000;
+    const keys = (behavior.tracks[property] || []).filter(([keyTime]) => Math.abs(keyTime - time) > 0.005);
+    keys.push([time, value]);
+    keys.sort((left, right) => left[0] - right[0]);
+    behavior.tracks[property] = keys;
+  }
+  return setBehaviors(list, `Key at ${time.toFixed(2)} s`);
+}
+
+function deleteKey() {
+  const node = selection ? nodeAt(selection) : null;
+  const index = keyframesIndex(node);
+  if (index < 0) return;
+  const list = JSON.parse(JSON.stringify(behaviorsOf(node)));
+  const tracks = list[index].tracks || {};
+  for (const property of Object.keys(tracks)) {
+    tracks[property] = tracks[property].filter(([time]) => Math.abs(time - timeline.time) > 0.02);
+    if (!tracks[property].length) delete tracks[property];
+  }
+  setBehaviors(list, `Deleted keys at ${timeline.time.toFixed(2)} s`);
+}
+
+function setTimelineTime(time, duration) {
+  timeline.time = Math.max(0, Math.min(duration, time));
+  if (timeline.slider) timeline.slider.value = String(timeline.time);
+  if (timeline.readout) timeline.readout.textContent = `${timeline.time.toFixed(2)} / ${duration.toFixed(2)} s`;
+  previewTimeline();
+}
+
+function paramControl(param, value, onCommit) {
+  if (param.kind === "choice") return selectInput(value ?? param.fallback, param.values, onCommit);
+  if (param.kind === "boolean") return checkbox(value ?? param.fallback, onCommit);
+  const step = param.max - param.min <= 2 ? 0.05 : param.max <= 100 ? 0.1 : 1;
+  return numberInput(Number(value ?? param.fallback), (next) => onCommit(Math.max(param.min, Math.min(param.max, next))), { step, min: param.min, max: param.max });
+}
+
+function renderBehaviors(node) {
+  section("Behaviours");
+  const list = behaviorsOf(node);
+  list.forEach((behavior, index) => {
+    const spec = BEHAVIOR_SPECS[behavior?.type];
+    const remove = Object.assign(document.createElement("button"), { type: "button", textContent: "Remove", className: "small" });
+    remove.addEventListener("click", () => setBehaviors(list.filter((_, other) => other !== index), `Removed ${behavior?.type}`));
+    field(spec ? spec.label : `Unknown: ${behavior?.type}`, remove);
+    if (!spec) return;
+    for (const [key, param] of Object.entries(spec.params)) field(`· ${key}`, paramControl(param, behavior[key], (value) => updateBehavior(index, key, value)));
+  });
+  const picker = selectInput("rotate", Object.keys(BEHAVIOR_SPECS), () => {});
+  const add = Object.assign(document.createElement("button"), { type: "button", textContent: "Add" });
+  add.addEventListener("click", () => {
+    const type = picker.value;
+    if (type === "keyframes" && keyframesIndex(node) >= 0) { setStatus("This node already has a keyframes behaviour.", true); return; }
+    const definition = { type };
+    for (const [key, param] of Object.entries(BEHAVIOR_SPECS[type].params)) definition[key] = param.fallback;
+    if (type === "keyframes") { definition.tracks = {}; timeline.time = 0; }
+    setBehaviors([...list, definition], `Added ${type} behaviour`);
+  });
+  field("Add behaviour", pair(picker, add));
+  if (keyframesIndex(node) >= 0) renderTimeline(node);
+}
+
+function renderTimeline(node) {
+  const behavior = behaviorsOf(node)[keyframesIndex(node)];
+  const duration = Number(behavior.duration) || 2;
+  section("Timeline");
+  const slider = Object.assign(document.createElement("input"), { type: "range", min: "0", max: String(duration), step: "0.01", value: String(Math.min(timeline.time, duration)) });
+  slider.addEventListener("input", () => { timeline.playing = false; setTimelineTime(Number(slider.value), duration); });
+  timeline.slider = slider;
+  field("Time", slider, { wide: true });
+  const readout = document.createElement("span");
+  timeline.readout = readout;
+  const play = Object.assign(document.createElement("button"), { type: "button", textContent: timeline.playing ? "■ Stop" : "▶ Preview" });
+  play.addEventListener("click", () => { timeline.playing = !timeline.playing; renderInspector(); });
+  field("Playback", pair(play, readout));
+  const trackBoxes = document.createElement("div");
+  trackBoxes.className = "tracks";
+  for (const property of KEYFRAME_PROPERTIES) {
+    const label = document.createElement("label");
+    const box = checkbox(timeline.tracks.has(property), (checked) => { if (checked) timeline.tracks.add(property); else timeline.tracks.delete(property); });
+    label.append(box, ` ${property}`);
+    trackBoxes.append(label);
+  }
+  field("Record", trackBoxes, { wide: true });
+  const key = Object.assign(document.createElement("button"), { type: "button", textContent: "◆ Key" });
+  key.addEventListener("click", recordKey);
+  const unkey = Object.assign(document.createElement("button"), { type: "button", textContent: "Delete key" });
+  unkey.addEventListener("click", deleteKey);
+  field("Keys", pair(key, unkey));
+  field("Auto key", checkbox(timeline.autoKey, (value) => { timeline.autoKey = value; }));
+  // Key markers: one button per key time; click jumps there.
+  const times = [...new Set(Object.values(behavior.tracks || {}).flatMap((keys) => keys.map(([time]) => time)))].sort((left, right) => left - right);
+  const markers = document.createElement("div");
+  markers.className = "markers";
+  for (const time of times) {
+    const marker = Object.assign(document.createElement("button"), { type: "button", textContent: time.toFixed(2), title: Object.entries(behavior.tracks).filter(([, keys]) => keys.some(([keyTime]) => keyTime === time)).map(([property]) => property).join(", ") });
+    marker.classList.toggle("active", Math.abs(time - timeline.time) < 0.005);
+    marker.addEventListener("click", () => { timeline.playing = false; setTimelineTime(time, duration); renderInspector(); });
+    markers.append(marker);
+  }
+  if (!times.length) markers.textContent = "No keys yet: move the node, pick a time and press ◆ Key (or drag with Auto key on).";
+  field("Key times", markers, { wide: true });
+  setTimelineTime(timeline.time, duration);
+}
+
+function advanceTimeline(delta) {
+  if (!timeline.playing) return;
+  const node = selection ? nodeAt(selection) : null;
+  const index = keyframesIndex(node);
+  if (index < 0) { timeline.playing = false; return; }
+  const duration = Number(behaviorsOf(node)[index].duration) || 2;
+  setTimelineTime((timeline.time + delta) % duration, duration);
 }
 
 // ---------------------------------------------------------------- prefabs
@@ -510,6 +751,8 @@ function renderInspector() {
     setOption("data", parsed);
   }, { multiline: true }), { wide: true });
 
+  if (selection.length > 0) renderBehaviors(node);
+
   if (selection.length > 0) {
     section("Prefab");
     if (node.data?.prefab) {
@@ -748,11 +991,29 @@ function endDrag() {
   if (!drag) return;
   const finished = drag;
   drag = null;
-  if (finished.mode === "move" && (finished.node.position.x !== finished.startX || finished.node.position.y !== finished.startY)) commit(`Moved ${finished.node.name}`);
+  if (finished.mode === "move" && (finished.node.position.x !== finished.startX || finished.node.position.y !== finished.startY)) {
+    // With a keyframes behaviour and Auto key on, a move becomes a key at the timeline time.
+    if (timeline.autoKey && keyframesIndex(finished.node) >= 0 && nodeAt(selection) === finished.node) recordKey();
+    else commit(`Moved ${finished.node.name}`);
+  }
   if (finished.mode === "paint" && finished.changed) commit("Painted tiles");
 }
 viewportElement.addEventListener("pointerup", endDrag);
 viewportElement.addEventListener("pointercancel", endDrag);
+
+// Asset drag and drop: textures from the browser panel, or image files from the desktop.
+viewportElement.addEventListener("dragover", (event) => { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; });
+viewportElement.addEventListener("drop", async (event) => {
+  event.preventDefault();
+  updatePointer(event);
+  const x = snap(pointer.x); const y = snap(pointer.y);
+  const id = event.dataTransfer.getData("text/exi-texture");
+  if (id && textures.has(id)) { addSpriteAt(id, x, y); return; }
+  const files = [...(event.dataTransfer.files || [])].filter((file) => file.type.startsWith("image/"));
+  if (!files.length) return;
+  await importTextures(files);
+  files.forEach((file, index) => { const name = file.name.slice(0, 200); if (textures.has(name)) addSpriteAt(name, x + index * gridSize(), y); });
+});
 
 viewportElement.addEventListener("wheel", (event) => {
   event.preventDefault();
@@ -862,7 +1123,8 @@ engine = await ExiEngine.create({
   backgroundColor: "#0b1020",
   scene: world,
   camera,
-  onUpdate() {
+  onUpdate(delta) {
+    advanceTimeline(delta);
     drawGrid();
     drawGizmo();
   },
@@ -907,4 +1169,10 @@ window.editor = {
   insertPrefab: (name) => insertPrefab(name),
   applyPrefab: () => applyPrefab(),
   load: (document) => loadDocument(document, "Loaded from script"),
+  setBehaviors: (list) => setBehaviors(list, "Behaviours from script"),
+  timeline,
+  setTimelineTime: (time) => { const node = nodeAt(selection); const index = keyframesIndex(node); if (index >= 0) setTimelineTime(time, Number(behaviorsOf(node)[index].duration) || 2); },
+  recordKey: () => recordKey(),
+  assignTexture: (id) => assignTexture(id),
+  addSpriteAt: (id, x, y) => addSpriteAt(id, x, y),
 };

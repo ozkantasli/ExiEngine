@@ -38,4 +38,18 @@ export const thresholds = {
   "src/assets/asset-loader.js": 85,
   "src/assets/save-store.js": 90,
   "src/assets/ktx2.js": 90,
+  // Modules added since 0.2: thresholds a little under their current coverage.
+  "src/core/behaviors.js": 95,
+  "src/core/bitmap-text.js": 95,
+  "src/core/ldtk.js": 95,
+  "src/core/light-layer.js": 95,
+  "src/core/rigid-body.js": 95,
+  "src/core/scene-serializer.js": 95,
+  "src/core/state-machine.js": 95,
+  "src/core/sentinel.js": 95,
+  "src/assets/scene-watch.js": 95,
+  "src/net/rollback.js": 95,
+  "src/render/custom-filters.js": 95,
+  "src/ui/widgets.js": 95,
+  "src/ai/public-methods.js": 90,
 };

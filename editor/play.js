@@ -2,14 +2,17 @@
 // committed edit live (watchScene over the editor's BroadcastChannel).
 // Nodes whose data has body: "dynamic" or "static" get rigid-body physics so a
 // level can be tried out; shape: "circle" uses a circle, otherwise the node's
-// bounds become a box. Press R to restart from the latest edit.
-import { Camera, ExiEngine, RigidBody, RigidBodyWorld, Texture, TileMap, getAABB, watchScene } from "../src/index.js";
+// bounds become a box. Behaviours in node.data.behaviors (move, rotate,
+// oscillate, keyboard-move, camera-follow, keyframes, ...) run through
+// BehaviorSystem. Press R to restart from the latest edit.
+import { BehaviorSystem, Camera, ExiEngine, RigidBody, RigidBodyWorld, Texture, TileMap, getAABB, watchScene } from "../src/index.js";
 import { AUTOSAVE_KEY, BUILTIN_TILES_ID, EDITOR_CHANNEL, createBuiltinTiles } from "./shared.js";
 
 const name = new URLSearchParams(location.search).get("name");
 const statusNode = document.querySelector("#play-status");
 const textures = new Map([[BUILTIN_TILES_ID, createBuiltinTiles()]]);
 const camera = new Camera();
+const behaviors = new BehaviorSystem({ camera });
 let world = null;
 let reloads = 0;
 
@@ -64,12 +67,16 @@ function show(scene, document, source) {
   engine.physics = physics;
   engine.setScene(scene, camera);
   if (previous && previous !== scene) previous.destroy();
+  camera.clearFollow();
   if (reloads === 0) frame(scene);
+  behaviors.input = engine.input;
+  const behaviorCount = behaviors.attach(scene);
   reloads += 1;
-  statusNode.textContent = `▶ ${scene.name || "scene"} · ${bodies} physics bodies · update #${reloads} (${source}) · R restarts`;
+  const rejected = behaviors.errors.length ? ` · ${behaviors.errors.length} invalid behaviour list(s): ${behaviors.errors[0].node}: ${behaviors.errors[0].message}` : "";
+  statusNode.textContent = `▶ ${scene.name || "scene"} · ${bodies} physics bodies · ${behaviorCount} behaviours · update #${reloads} (${source}) · R restarts${rejected}`;
 }
 
-engine = await ExiEngine.create({ canvas: document.querySelector("#play-canvas"), backgroundColor: "#0b1020", camera, physics: new RigidBodyWorld() });
+engine = await ExiEngine.create({ canvas: document.querySelector("#play-canvas"), backgroundColor: "#0b1020", camera, physics: new RigidBodyWorld(), onUpdate: (delta) => behaviors.update(delta) });
 engine.start();
 
 const watcher = watchScene({
@@ -98,4 +105,4 @@ setTimeout(() => {
 // R restarts from the latest edit: a reload asks the editor for its scene again.
 window.addEventListener("keydown", (event) => { if (event.code === "KeyR") location.reload(); });
 
-window.play = { engine, camera, get world() { return world; }, watcher, get reloads() { return reloads; } };
+window.play = { engine, camera, behaviors, get world() { return world; }, watcher, get reloads() { return reloads; } };

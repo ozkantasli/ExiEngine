@@ -124,11 +124,31 @@ async function checkEditor() {
       const document = editor.serialize();
       return tints.every((tint) => tint === 0xff0000) && positions.size === 2 && Boolean(document.prefabs?.hero) && document.prefabs.hero.options.x === undefined;
     });
+    // Behaviours + timeline: two keys, then scrubbing between them interpolates.
+    result.timeline = await page.evaluate(() => {
+      const editor = window.editor;
+      const index = editor.root.children.findIndex((node) => node.name === "sun");
+      editor.select([index]);
+      editor.setBehaviors([{ type: "keyframes", duration: 2, tracks: {} }, { type: "rotate", speed: 1 }]);
+      editor.setTimelineTime(0); editor.recordKey();
+      editor.setTimelineTime(1);
+      const sun = editor.root.children[index];
+      sun.position.x += 100;
+      editor.recordKey();
+      editor.setTimelineTime(0.5);
+      const start = editor.serialize().root.children[index].options.data.behaviors[0].tracks.x[0][1];
+      return Math.abs(editor.root.children[index].position.x - (start + 50)) < 0.01 && editor.root.children[index].data.behaviors.length === 2;
+    });
+    // Asset browser: dragging a texture into the view adds a sprite with it.
+    const assetsBefore = await page.evaluate(() => window.editor.root.children.length);
+    const viewport = await page.locator(".viewport").boundingBox();
+    await page.locator("#textures li.asset").first().dragTo(page.locator(".viewport"), { targetPosition: { x: viewport.width * 0.3, y: viewport.height * 0.3 } });
+    result.assets = await page.evaluate((count) => { const nodes = window.editor.root.children; return nodes.length === count + 1 && nodes.at(-1).texture?.id === "editor:tiles"; }, assetsBefore);
   } catch (error) {
     errors.push(error.message);
   }
   await page.close();
-  const ok = errors.length === 0 && Object.values(result).every(Boolean) && Object.keys(result).length === 7;
+  const ok = errors.length === 0 && Object.values(result).every(Boolean) && Object.keys(result).length === 9;
   console.log(`[examples-e2e] ${ok ? "PASS" : "FAIL"} editor ${JSON.stringify(result)}${errors.length ? ` errors=${JSON.stringify(errors)}` : ""}`);
   return ok ? 0 : 1;
 }

@@ -17,7 +17,11 @@ Content, authoring and game-feature release. Everything stays dependency-free.
   `exi_build_scene`), `node.data` metadata, `watchScene` hot reload (polling and BroadcastChannel).
 - **Editor** (`/editor/`): hierarchy, inspector, drag/snap, tile painting, undo/redo, texture import,
   autosave, save straight into project files, live **Play** window with physics preview, prefabs
-  (`instantiatePrefab` for runtime spawning).
+  (`instantiatePrefab` for runtime spawning), a behaviour inspector, a keyframe timeline with auto key
+  and an asset browser with thumbnails, use counts and drag-and-drop.
+- **Behaviours:** data-only `node.data.behaviors` (move, rotate, oscillate, pulse, blink, keyboard-move,
+  camera-follow, keyframes) run by `BehaviorSystem`; `describeBehaviors`, `normalizeBehavior(s)`,
+  `sampleKeyframes`, `applyKeyframes`.
 - **Physics:** `RigidBodyWorld` / `RigidBody` (circles, boxes, convex polygons, rotation, friction,
   restitution, stable stacking, sensors, layers), `RevoluteJoint` (with motor), `WeldJoint`,
   `PrismaticJoint` (limits, motor), `DistanceJoint` (rod/rope),

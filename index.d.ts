@@ -1078,3 +1078,39 @@ export const MAX_CUSTOM_FILTERS: number;
  * `exiSample(uv)` samples the current texture in both. */
 export function registerFilter(name: string, source: { glsl: string; wgsl: string }): { name: string; mode: number };
 export function listFilters(): string[];
+
+export const BEHAVIOR_TYPES: readonly ["move", "rotate", "oscillate", "pulse", "blink", "keyboard-move", "camera-follow", "keyframes"];
+export type BehaviorType = (typeof BEHAVIOR_TYPES)[number];
+export const KEYFRAME_PROPERTIES: readonly ["x", "y", "rotation", "scaleX", "scaleY", "alpha"];
+export type KeyframeProperty = (typeof KEYFRAME_PROPERTIES)[number];
+export const MAX_BEHAVIORS_PER_NODE: number;
+export const MAX_BEHAVIOR_NODES: number;
+export const MAX_KEYFRAMES: number;
+/** A data-only behaviour stored in node.data.behaviors; missing parameters get their defaults. */
+export type BehaviorDefinition =
+  | { type: "move"; vx?: number; vy?: number }
+  | { type: "rotate"; speed?: number }
+  | { type: "oscillate"; axis?: "x" | "y"; amplitude?: number; period?: number; phase?: number }
+  | { type: "pulse"; amount?: number; period?: number }
+  | { type: "blink"; period?: number; duty?: number }
+  | { type: "keyboard-move"; speed?: number; vertical?: boolean }
+  | { type: "camera-follow"; smoothing?: number }
+  | { type: "keyframes"; duration?: number; mode?: "loop" | "once" | "pingpong"; ease?: "linear" | "smooth"; tracks?: Partial<Record<KeyframeProperty, Array<[time: number, value: number]>>> };
+export type NormalizedBehavior = Required<BehaviorDefinition>;
+export interface BehaviorParamDescription { kind: "number" | "choice" | "boolean"; fallback: number | string | boolean; min?: number; max?: number; values?: string[]; }
+export function describeBehaviors(): Record<BehaviorType, { label: string; params: Record<string, BehaviorParamDescription> }>;
+export function normalizeBehavior(definition: BehaviorDefinition): NormalizedBehavior;
+export function normalizeBehaviors(list: BehaviorDefinition[] | null | undefined): NormalizedBehavior[];
+export function sampleKeyframes(behavior: NormalizedBehavior, property: KeyframeProperty, time: number): number | undefined;
+export function applyKeyframes(node: Node, behavior: NormalizedBehavior, time: number): void;
+/** Runs the behaviours found in node.data.behaviors under a root; call update(delta) every frame. */
+export class BehaviorSystem {
+  input: Input | null; camera: Camera | null; readonly time: number;
+  readonly entries: ReadonlyArray<{ readonly node: Node; readonly behaviors: readonly NormalizedBehavior[] }>;
+  /** Nodes whose behaviour data was rejected (they are skipped, the rest keeps running). */ readonly errors: ReadonlyArray<{ node: string; message: string }>;
+  readonly count: number;
+  constructor(options?: { input?: Input | null; camera?: Camera | null });
+  attach(root: Node): number;
+  clear(): this;
+  update(delta: number): this;
+}

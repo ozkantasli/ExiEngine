@@ -44,9 +44,9 @@ Legend: ✅ built in · 🔌 official/common plugin or companion package · ➖ 
 | Skeletal animation (Spine/DragonBones) | — | 🔌 | 🔌 | 🔌 | — | 🔌 | ✅ | ✅ | ✅ |
 | Audio sprites / spatial audio | ✅ (2D, deterministic) | ✅ | 🔌 | ✅ | ➖ | ✅ | ✅ | ✅ | ✅ |
 | Scene file format | ✅ `serializeScene` JSON | ➖ | — | — | — | — | ✅ | ✅ | ✅ |
-| Visual editor | ➖ first browser editor | — (commercial 3rd party) | — | — | — | — | ✅ | ✅ | ✅ |
+| Visual editor | ➖ browser editor with behaviours, keyframe timeline and asset browser | — (commercial 3rd party) | — | — | — | — | ✅ | ✅ | ✅ |
 | Hot reload / play-in-editor | ✅ `watchScene` + live Play window | ➖ (dev servers) | — | — | — | — | ✅ | ✅ | ✅ |
-| Prefabs / asset manager in editor | ➖ prefabs (no asset browser) | — | — | — | — | — | ✅ | ✅ | ✅ |
+| Prefabs / asset manager in editor | ✅ prefabs and an asset browser (images only) | — | — | — | — | — | ✅ | ✅ | ✅ |
 | UI widgets (input, scroll, slider, layout) | ✅ Button, Slider, TextInput (IME), ScrollView, Checkbox, Dropdown, Stack/Grid | ➖ | 🔌 | ➖ | ➖ | ➖ | ✅ | ✅ | ✅ |
 | Netcode helpers | ✅ `RollbackSession` (rollback, transport-agnostic) | — | — | — | — | — | ➖ | ✅ | ✅ |
 | npm package + CDN bundle | ✅ ready (not yet published) | ✅ | ✅ | ✅ | ✅ | ✅ | n/a | n/a | n/a |
@@ -74,9 +74,10 @@ Legend: ✅ built in · 🔌 official/common plugin or companion package · ➖ 
 1. **Not on npm yet and little content.** The package is ready (`npm pack` works, dist
    bundles build) but unpublished; nine examples versus hundreds for Phaser. Publishing and
    growing examples/tutorials matters more than any single feature.
-2. **Editor is still light.** Editing, saving, a live Play window and hot reload exist; prefabs,
-   an asset browser, animation timelines and behaviours/events (what makes GDevelop and
-   Construct attractive to non-programmers) do not.
+2. **Editor is still lighter than GDevelop/Construct.** Editing, saving, a live Play window, hot
+   reload, prefabs, an asset browser, data behaviours and a keyframe timeline exist; event
+   sheets (conditions → actions), sprite-frame animation editing and collision/overlap
+   behaviours do not.
 
 **P1 — common feature requests**
 3. **Skeletal animation (Spine/DragonBones).** Expected by artists; usually solved with a
@@ -101,7 +102,8 @@ Legend: ✅ built in · 🔌 official/common plugin or companion package · ➖ 
 
 1. Publish to npm (owner action) and announce the CDN path.
 2. Grow examples: ✅ shooter, endless runner, match-3; next a physics puzzle and one tutorial per example.
-3. Editor v3: prefabs, asset browser, simple data-driven behaviours (play/hot reload ✅).
+3. ~~Editor v3~~ ✅ prefabs, asset browser, data behaviours and keyframe timeline; next: simple
+   events (on overlap / on key → action) and sprite-frame animation editing.
 4. ~~More joint types~~ ✅ (weld, prismatic, motors, revolute angle limits, springs, wheel); next: gear/pulley joints if games ask for them.
 5. Spine runtime adapter as an optional package (keeps the core dependency-free).
 6. ~~Custom-shader policy~~ ✅ decided: local `registerFilter`, denied to agents.

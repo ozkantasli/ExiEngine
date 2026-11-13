@@ -57,7 +57,7 @@ Full list and behavior details: [FEATURES.md](FEATURES.md)
 |---|---|---|
 | **Try the engine** | [Run the demo](#run-the-demo) | A live scene you can switch between Auto / WebGL2 / WebGPU, with FPS/draw/node stats |
 | **Learn from a game** | [Examples](#examples) | Small complete games: platformer (Tiled), top-down arena, UI menu |
-| **Build a level visually** | [Editor](#editor) | Browser scene editor: hierarchy, inspector, drag/snap, tile painting, JSON save/load |
+| **Build a level visually** | [Editor](#editor) | Browser scene editor: hierarchy, inspector, drag/snap, tile painting, behaviours, keyframe timeline, asset browser, JSON save/load |
 | **Write a game** | [Quick start](#quick-start) and [API.md](API.md) | Your first game loop with scene, camera, input and physics |
 | **Build a game with an AI agent** | [Using with AI agents](#using-with-ai-agents) | Scaffolding, scene generation and browser preview over MCP |
 | **Contribute** | [Development](#development) | Tests, lint, coverage and the release gate |
@@ -110,6 +110,13 @@ top of the engine (no dependencies) and edits a live ExiEngine scene:
 - **▶ Play** opens a live window that follows every edit; nodes with `data.body` set to
   `"dynamic"` or `"static"` get rigid-body physics there (`data.shape: "circle"` for circles)
 - **Data (JSON)** per node for game metadata (spawn types, hit points…), saved in the scene
+- **Behaviours**: add move, rotate, oscillate, pulse, blink, keyboard-move, camera-follow or
+  keyframes behaviours from the inspector; they are data in `node.data.behaviors` and run in the
+  Play window and in games through `BehaviorSystem` (no code is stored or evaluated)
+- **Timeline** for keyframes behaviours: scrub, preview, pick the tracks (x, y, rotation, scale,
+  alpha), press ◆ Key or just drag the node with Auto key on; key markers jump to their time
+- **Asset browser**: texture thumbnails with size and use count; click to assign to the
+  selected node, drag into the view (or drop image files from the desktop) to add a sprite
 - **Prefabs**: make a prefab from a node, insert it from the left panel, edit one instance and
   apply it to all; games spawn more at runtime with `instantiatePrefab(document, name, { x, y })`
 - **Save** writes straight into a project file in Chromium (File System Access API), so a game
@@ -120,6 +127,14 @@ top of the engine (no dependencies) and edits a live ExiEngine scene:
 ```js
 const level = await loader.loadJSON("./level.json");
 engine.setScene(deserializeScene(level, { textures: { "tiles.png": tilesTexture } }));
+```
+
+Run the same behaviours in a game:
+
+```js
+const behaviors = new BehaviorSystem({ input: engine.input, camera });
+behaviors.attach(engine.scene);                       // after setScene / deserializeScene
+// in onUpdate: behaviors.update(delta)
 ```
 
 Textures are referenced by id (the imported file name); scripts and callbacks stay in your
@@ -313,8 +328,9 @@ hidden), but the physical iOS/Android device matrix is not complete yet.
 ## Limitations
 
 ExiEngine is a **core** with a lightweight scene editor: it edits, saves, previews (live Play
-window with physics) and hot-reloads scenes, but it does not have animation timelines,
-an asset browser or a script editor, which full engines provide. Device-loss and fallback flows are verified with simulated smoke
+window with physics), animates (data behaviours and a keyframe timeline) and hot-reloads
+scenes, but it has no script or event-sheet editor, no sprite-frame animation editor and no
+asset pipeline beyond importing images, which full engines provide. Device-loss and fallback flows are verified with simulated smoke
 tests; real GPU memory soak, driver resets and physical device testing must be done
 separately. Audio is subject to the browser's user-gesture policy. In production,
 HTTPS and server-side security headers still need to be configured.
