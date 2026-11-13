@@ -26,7 +26,7 @@ export { inspectKTX2, VK_FORMAT_R8G8B8A8_UNORM } from "./assets/ktx2.js";
 export { AudioManager } from "./audio/audio-manager.js";
 export { Profiler } from "./core/profiler.js";
 export { serializeScene, deserializeScene, instantiatePrefab, SCENE_FORMAT, SCENE_FORMAT_VERSION, SERIALIZABLE_NODE_TYPES, MAX_SERIALIZED_NODES, MAX_PREFABS } from "./core/scene-serializer.js";
-export { RigidBody, RigidBodyWorld, RevoluteJoint, WeldJoint, PrismaticJoint, DistanceJoint, collideRigidBodies, MAX_RIGID_BODIES, MAX_RIGID_JOINTS, MAX_POLYGON_VERTICES } from "./core/rigid-body.js";
+export { RigidBody, RigidBodyWorld, RevoluteJoint, WeldJoint, PrismaticJoint, WheelJoint, DistanceJoint, collideRigidBodies, MAX_RIGID_BODIES, MAX_RIGID_JOINTS, MAX_POLYGON_VERTICES } from "./core/rigid-body.js";
 export { BitmapFont, BitmapText, parseBitmapFontText, MAX_BITMAP_FONT_GLYPHS, MAX_BITMAP_TEXT_LENGTH } from "./core/bitmap-text.js";
 export { RollbackSession, MAX_ROLLBACK_PLAYERS, MAX_ROLLBACK_FRAMES } from "./net/rollback.js";
 export { LightLayer, MAX_LIGHTS, MAX_NORMAL_SPRITES } from "./core/light-layer.js";

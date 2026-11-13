@@ -415,6 +415,42 @@ class RigidJoint {
       y: b.velocity.y + b.angularVelocity * rb.x - a.velocity.y - a.angularVelocity * ra.x,
     };
   }
+
+  // Axis helpers for joints with a localAxis fixed in a's frame (prismatic, wheel).
+  frame() {
+    const { a, ra, rb } = this;
+    const anchors = this.worldAnchors();
+    const dx = anchors.bx - anchors.ax; const dy = anchors.by - anchors.ay;
+    rotate(a, this.localAxis, this.axis);
+    this.perp.x = -this.axis.y; this.perp.y = this.axis.x;
+    // Lever arms: impulses act at b's anchor; on a they act at (d + ra).
+    this.a1 = cross(dx + ra.x, dy + ra.y, this.axis.x, this.axis.y); this.a2 = cross(rb.x, rb.y, this.axis.x, this.axis.y);
+    this.s1 = cross(dx + ra.x, dy + ra.y, this.perp.x, this.perp.y); this.s2 = cross(rb.x, rb.y, this.perp.x, this.perp.y);
+    return { dx, dy };
+  }
+
+  applyLinear(direction, leverA, leverB, impulse) {
+    if (impulse === 0) return;
+    const { a, b } = this;
+    a.velocity.x -= direction.x * impulse * a.invMass; a.velocity.y -= direction.y * impulse * a.invMass;
+    a.angularVelocity -= a.invInertia * leverA * impulse;
+    b.velocity.x += direction.x * impulse * b.invMass; b.velocity.y += direction.y * impulse * b.invMass;
+    b.angularVelocity += b.invInertia * leverB * impulse;
+  }
+
+  speedAlong(direction, leverA, leverB) {
+    const { a, b } = this;
+    return (b.velocity.x - a.velocity.x) * direction.x + (b.velocity.y - a.velocity.y) * direction.y + leverB * b.angularVelocity - leverA * a.angularVelocity;
+  }
+
+  // Position-level counterpart of applyLinear.
+  moveLinear(direction, leverA, leverB, impulse) {
+    const { a, b } = this;
+    a.position.x -= direction.x * impulse * a.invMass; a.position.y -= direction.y * impulse * a.invMass;
+    if (!a.fixedRotation) a.angle -= a.invInertia * leverA * impulse;
+    b.position.x += direction.x * impulse * b.invMass; b.position.y += direction.y * impulse * b.invMass;
+    if (!b.fixedRotation) b.angle += b.invInertia * leverB * impulse;
+  }
 }
 
 // Pins two bodies together at one world point; they may rotate freely around it,
@@ -742,18 +778,6 @@ export class PrismaticJoint extends RigidJoint {
     return (anchors.bx - anchors.ax) * this.axis.x + (anchors.by - anchors.ay) * this.axis.y;
   }
 
-  frame() {
-    const { a, ra, rb } = this;
-    const anchors = this.worldAnchors();
-    const dx = anchors.bx - anchors.ax; const dy = anchors.by - anchors.ay;
-    rotate(a, this.localAxis, this.axis);
-    this.perp.x = -this.axis.y; this.perp.y = this.axis.x;
-    // Lever arms: impulses act at b's anchor; on a they act at (d + ra).
-    this.a1 = cross(dx + ra.x, dy + ra.y, this.axis.x, this.axis.y); this.a2 = cross(rb.x, rb.y, this.axis.x, this.axis.y);
-    this.s1 = cross(dx + ra.x, dy + ra.y, this.perp.x, this.perp.y); this.s2 = cross(rb.x, rb.y, this.perp.x, this.perp.y);
-    return { dx, dy };
-  }
-
   prepare(delta) {
     const { a, b } = this;
     const { dx, dy } = this.frame();
@@ -772,20 +796,6 @@ export class PrismaticJoint extends RigidJoint {
     this.applyLinear(this.perp, this.s1, this.s2, this.perpImpulse);
     this.applyLinear(this.axis, this.a1, this.a2, this.motorImpulse + this.lowerImpulse - this.upperImpulse);
     applyAngularImpulse(a, b, this.angularImpulse);
-  }
-
-  applyLinear(direction, leverA, leverB, impulse) {
-    if (impulse === 0) return;
-    const { a, b } = this;
-    a.velocity.x -= direction.x * impulse * a.invMass; a.velocity.y -= direction.y * impulse * a.invMass;
-    a.angularVelocity -= a.invInertia * leverA * impulse;
-    b.velocity.x += direction.x * impulse * b.invMass; b.velocity.y += direction.y * impulse * b.invMass;
-    b.angularVelocity += b.invInertia * leverB * impulse;
-  }
-
-  speedAlong(direction, leverA, leverB) {
-    const { a, b } = this;
-    return (b.velocity.x - a.velocity.x) * direction.x + (b.velocity.y - a.velocity.y) * direction.y + leverB * b.angularVelocity - leverA * a.angularVelocity;
   }
 
   solve() {
@@ -841,11 +851,119 @@ export class PrismaticJoint extends RigidJoint {
       worst = Math.max(worst, Math.abs(error));
       const k = a.invMass + b.invMass + a.invInertia * leverA * leverA + b.invInertia * leverB * leverB;
       if (!(k > 0)) continue;
-      const impulse = -(error / k) * JOINT_POSITION_FACTOR;
-      a.position.x -= direction.x * impulse * a.invMass; a.position.y -= direction.y * impulse * a.invMass;
-      if (!a.fixedRotation) a.angle -= a.invInertia * leverA * impulse;
-      b.position.x += direction.x * impulse * b.invMass; b.position.y += direction.y * impulse * b.invMass;
-      if (!b.fixedRotation) b.angle += b.invInertia * leverB * impulse;
+      this.moveLinear(direction, leverA, leverB, -(error / k) * JOINT_POSITION_FACTOR);
+    }
+    return worst;
+  }
+}
+
+// A wheel on a suspension: b's anchor stays on a line through a's anchor along
+// an axis fixed in a's frame, a damped spring holds it at the anchor along that
+// axis and b rotates freely, optionally driven by a motor (vehicles).
+export class WheelJoint extends RigidJoint {
+  constructor({ a, b, x, y, axisX = 0, axisY = 1, frequency = 4, dampingRatio = 0.7, motorSpeed = 0, maxMotorTorque = 0, collideConnected = false } = {}) {
+    super(a, b, collideConnected);
+    const px = Number(x ?? b?.position?.x); const py = Number(y ?? b?.position?.y);
+    if (!Number.isFinite(px) || !Number.isFinite(py)) throw new RangeError("WheelJoint x/y must be finite.");
+    const ax = Number(axisX); const ay = Number(axisY); const length = Math.hypot(ax, ay);
+    if (!Number.isFinite(length) || length < 1e-9) throw new RangeError("WheelJoint axis must be a finite, non-zero vector.");
+    this.localA = toLocal(a, px, py);
+    this.localB = toLocal(b, px, py);
+    const cos = Math.cos(-a.angle); const sin = Math.sin(-a.angle);
+    this.localAxis = { x: (ax * cos - ay * sin) / length, y: (ax * sin + ay * cos) / length };
+    this.setSpring(frequency, dampingRatio);
+    this.setMotor(motorSpeed, maxMotorTorque);
+    this.axis = { x: 0, y: 0 }; this.perp = { x: 0, y: 0 };
+    this.a1 = 0; this.a2 = 0; this.s1 = 0; this.s2 = 0;
+    this.perpImpulse = 0; this.springImpulse = 0; this.motorImpulse = 0;
+    this.perpMass = 0; this.springMass = 0; this.angularMass = 0;
+    this.gamma = 0; this.bias = 0; this.step = 0;
+  }
+
+  // frequency 0 makes the suspension rigid (the wheel cannot move along the axis).
+  setSpring(frequency, dampingRatio = this.dampingRatio) {
+    const hz = nonNegative(frequency, "WheelJoint frequency");
+    if (hz > MAX_SPRING_FREQUENCY) throw new RangeError(`WheelJoint frequency must not exceed ${MAX_SPRING_FREQUENCY} Hz.`);
+    const ratio = nonNegative(dampingRatio, "WheelJoint dampingRatio");
+    if (ratio > MAX_SPRING_DAMPING) throw new RangeError(`WheelJoint dampingRatio must not exceed ${MAX_SPRING_DAMPING}.`);
+    this.frequency = hz; this.dampingRatio = ratio;
+    return this;
+  }
+
+  setMotor(speed, maxTorque = this.maxMotorTorque) {
+    this.motorSpeed = finiteNumber(speed, "WheelJoint motorSpeed");
+    this.maxMotorTorque = nonNegative(maxTorque, "WheelJoint maxMotorTorque");
+    return this;
+  }
+
+  // Signed offset of b's anchor from a's anchor along the axis (suspension travel).
+  get translation() {
+    const { dx, dy } = this.frame();
+    return dx * this.axis.x + dy * this.axis.y;
+  }
+
+  prepare(delta) {
+    const { a, b } = this;
+    const { dx, dy } = this.frame();
+    this.step = delta;
+    const kPerp = a.invMass + b.invMass + a.invInertia * this.s1 * this.s1 + b.invInertia * this.s2 * this.s2;
+    this.perpMass = kPerp > 0 ? 1 / kPerp : 0;
+    const kAxial = a.invMass + b.invMass + a.invInertia * this.a1 * this.a1 + b.invInertia * this.a2 * this.a2;
+    this.springMass = 0; this.gamma = 0; this.bias = 0;
+    if (this.frequency > 0 && kAxial > 0 && delta > 0) {
+      const omega = 2 * Math.PI * this.frequency;
+      const effective = 1 / kAxial;
+      const gamma = delta * (2 * effective * this.dampingRatio * omega + delta * effective * omega * omega);
+      this.gamma = gamma > 0 ? 1 / gamma : 0;
+      this.bias = (dx * this.axis.x + dy * this.axis.y) * delta * effective * omega * omega * this.gamma;
+      this.springMass = 1 / (kAxial + this.gamma);
+    } else if (this.frequency > 0) {
+      this.springImpulse = 0;
+    }
+    const kAngle = a.invInertia + b.invInertia;
+    this.angularMass = kAngle > 0 ? 1 / kAngle : 0;
+    if (!(this.maxMotorTorque > 0) || this.angularMass === 0) this.motorImpulse = 0;
+    if (this.frequency === 0) {
+      // A rigid suspension is a second hard line constraint along the axis.
+      this.springMass = kAxial > 0 ? 1 / kAxial : 0;
+    }
+    this.applyLinear(this.perp, this.s1, this.s2, this.perpImpulse);
+    this.applyLinear(this.axis, this.a1, this.a2, this.springImpulse);
+    applyAngularImpulse(a, b, this.motorImpulse);
+  }
+
+  solve() {
+    const { a, b } = this;
+    if (this.springMass > 0) {
+      const speed = this.speedAlong(this.axis, this.a1, this.a2);
+      const impulse = -this.springMass * (speed + this.bias + this.gamma * this.springImpulse);
+      this.springImpulse += impulse;
+      this.applyLinear(this.axis, this.a1, this.a2, impulse);
+    }
+    if (this.maxMotorTorque > 0 && this.angularMass > 0) {
+      const limit = this.maxMotorTorque * this.step;
+      const previous = this.motorImpulse;
+      this.motorImpulse = Math.max(-limit, Math.min(limit, previous + this.angularMass * (this.motorSpeed - (b.angularVelocity - a.angularVelocity))));
+      applyAngularImpulse(a, b, this.motorImpulse - previous);
+    }
+    if (this.perpMass > 0) {
+      const impulse = -this.perpMass * this.speedAlong(this.perp, this.s1, this.s2);
+      this.perpImpulse += impulse;
+      this.applyLinear(this.perp, this.s1, this.s2, impulse);
+    }
+  }
+
+  correctPosition() {
+    const { a, b } = this;
+    const { dx, dy } = this.frame();
+    const corrections = [[this.perp, this.s1, this.s2, dx * this.perp.x + dy * this.perp.y]];
+    if (this.frequency === 0) corrections.push([this.axis, this.a1, this.a2, dx * this.axis.x + dy * this.axis.y]);
+    let worst = 0;
+    for (const [direction, leverA, leverB, error] of corrections) {
+      if (Math.abs(error) < JOINT_SLOP) continue;
+      worst = Math.max(worst, Math.abs(error));
+      const k = a.invMass + b.invMass + a.invInertia * leverA * leverA + b.invInertia * leverB * leverB;
+      if (k > 0) this.moveLinear(direction, leverA, leverB, -(error / k) * JOINT_POSITION_FACTOR);
     }
     return worst;
   }
@@ -917,7 +1035,7 @@ export class RigidBodyWorld {
   }
 
   addJoint(joint) {
-    if (!(joint instanceof RigidJoint)) throw new TypeError("RigidBodyWorld.addJoint expects a RevoluteJoint, WeldJoint, PrismaticJoint or DistanceJoint.");
+    if (!(joint instanceof RigidJoint)) throw new TypeError("RigidBodyWorld.addJoint expects a RevoluteJoint, WeldJoint, PrismaticJoint, WheelJoint or DistanceJoint.");
     if (joint.world === this) return joint;
     if (joint.world) throw new Error("Joint already belongs to another world.");
     if (joint.a.world !== this || joint.b.world !== this) throw new Error("Add both joint bodies to this world first.");

@@ -34,7 +34,7 @@ Legend: ✅ built in · 🔌 official/common plugin or companion package · ➖ 
 | GPU culling / instancing | ✅ compute culling + indirect draw | ➖ | ➖ | — | — | — | — | ➖ | ✅ |
 | Arcade / AABB physics | ✅ `PhysicsWorld` | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Rigid bodies with rotation | ✅ `RigidBodyWorld` | ✅ (Matter) | — | ✅ | — | ➖ | ✅ | ✅ | ✅ |
-| Joints / constraints | ✅ revolute (motor, angle limits), weld, prismatic (limits, motor), distance/rope/spring | ✅ | — | — | — | — | ✅ | ✅ | ✅ |
+| Joints / constraints | ✅ revolute (motor, angle limits), weld, prismatic (limits, motor), wheel (suspension, motor), distance/rope/spring | ✅ | — | — | — | — | ✅ | ✅ | ✅ |
 | Tiled import | ✅ `TileMap.fromTiled` | ✅ | 🔌 | 🔌 | ➖ | ✅ | ➖ | ➖ | 🔌 |
 | LDtk import | ✅ tiles, IntGrid, entities | 🔌 | 🔌 | 🔌 | — | — | — | — | 🔌 |
 | Bitmap fonts (BMFont) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
@@ -83,7 +83,7 @@ Legend: ✅ built in · 🔌 official/common plugin or companion package · ➖ 
    runtime adapter.
 4. ~~More joint types~~ ✅ revolute (with motor), weld, prismatic (limits + motor) and distance/rope
    joints plus anti-tunneling shipped, then revolute angle limits and damped springs
-   (`DistanceJoint` `frequency`). A dedicated wheel joint (spring along an axis) remains open.
+   (`DistanceJoint` `frequency`) and a `WheelJoint` for vehicles. Gear and pulley joints remain open.
 5. **Shadows.** ✅ `LightLayer` point lights and normal-mapped sprites shipped; shadow casting is
    still open.
 6. ~~UI widgets~~ ✅ Button, Slider, TextInput (IME via hidden input), ScrollView, Checkbox,
@@ -102,7 +102,7 @@ Legend: ✅ built in · 🔌 official/common plugin or companion package · ➖ 
 1. Publish to npm (owner action) and announce the CDN path.
 2. Grow examples: shooter, puzzle, endless runner, physics puzzle; one tutorial per example.
 3. Editor v3: prefabs, asset browser, simple data-driven behaviours (play/hot reload ✅).
-4. ~~More joint types~~ ✅ (weld, prismatic, motors, revolute angle limits, springs); next: a wheel joint.
+4. ~~More joint types~~ ✅ (weld, prismatic, motors, revolute angle limits, springs, wheel); next: gear/pulley joints if games ask for them.
 5. Spine runtime adapter as an optional package (keeps the core dependency-free).
 6. ~~Custom-shader policy~~ ✅ decided: local `registerFilter`, denied to agents.
 7. ~~Normal-mapped sprites~~ ✅; simple shadow casting on top of `LightLayer` is next.

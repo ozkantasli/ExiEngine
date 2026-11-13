@@ -85,7 +85,7 @@ only and sends CSP/`nosniff` headers.
 | [`examples/platformer`](examples/platformer/main.js) | `TileMap.fromTiled` level, tile-property collision bodies, gravity, coyote time / jump buffering, camera follow + bounds, HUD overlay |
 | [`examples/top-down`](examples/top-down/main.js) | Code-built TileMap walls, zero-gravity physics, trigger pickups, A* (`findGridPath`) chasers, particles, camera shake, `LightLayer` torch lighting |
 | [`examples/lighting`](examples/lighting/main.js) | `LightLayer` with normal maps: generated brick and orb normal maps, a torch on the pointer, toggling normal maps and light height |
-| [`examples/physics`](examples/physics/main.js) | `RigidBodyWorld`: boxes, circles, convex polygons, rotation, friction, restitution, a standing pyramid, a plank bridge and a pendulum on joints, a motorized windmill (weld + motor), a piston (prismatic), click to drop shapes |
+| [`examples/physics`](examples/physics/main.js) | `RigidBodyWorld`: boxes, circles, convex polygons, rotation, friction, restitution, a standing pyramid, a plank bridge and a pendulum on joints, a motorized windmill (weld + motor), a piston (prismatic), a flipper (revolute angle limits) and a drivable car (wheel joints with spring suspension), click to drop shapes |
 | [`examples/ui-widgets`](examples/ui-widgets/main.js) | `Button`, `Slider`, `TextInput` (IME/mobile), `ScrollView`, `Checkbox`, `Dropdown` and `Stack` with pointer, wheel and keyboard focus |
 | [`examples/ui-menu`](examples/ui-menu/main.js) | Overlay UI, pointer + keyboard focus (Tab/Enter), tweened buttons, `StateMachine` screens |
 

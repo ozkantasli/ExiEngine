@@ -223,7 +223,7 @@ test("rigid joints: jointed bodies do not collide, removal and validation", asyn
   assert.throws(() => new RevoluteJoint({ a, b: fixed, x: NaN, y: 0 }), /finite/);
   assert.throws(() => new DistanceJoint({ a, b: fixed, length: -1 }), /length/);
   assert.throws(() => world.addJoint(new DistanceJoint({ a, b: fixed })), /both joint bodies/);
-  assert.throws(() => world.addJoint({}), /PrismaticJoint or DistanceJoint/);
+  assert.throws(() => world.addJoint({}), /WheelJoint or DistanceJoint/);
 });
 
 test("rigid: fast thin bodies do not tunnel through thin walls (speculative contacts + substeps)", () => {
@@ -398,4 +398,50 @@ test("rigid joints: a spring distance joint oscillates, settles and can be a bun
   assert.throws(() => spring.setSpring(5000), /1000 Hz/);
   assert.throws(() => spring.setSpring(1, 1000), /dampingRatio/);
   assert.throws(() => new DistanceJoint({ a: spring.a, b: spring.b, frequency: NaN }), /finite/);
+});
+
+test("rigid joints: a wheel joint gives a car suspension and a driving motor", async () => {
+  const { WheelJoint } = await import("../../src/index.js");
+  const build = (frequency, motorSpeed = 0) => {
+    const world = new RigidBodyWorld({ gravityY: 980 });
+    world.add(new RigidBody({ shape: { type: "box", width: 4000, height: 20 }, x: 0, y: 110, static: true, friction: 1 }));
+    const chassis = world.add(new RigidBody({ shape: { type: "box", width: 120, height: 20 }, x: 0, y: 40 }));
+    const wheels = [-45, 45].map((x) => world.add(new RigidBody({ shape: { type: "circle", radius: 20 }, x, y: 80, friction: 1 })));
+    const joints = wheels.map((wheel) => world.addJoint(new WheelJoint({ a: chassis, b: wheel, axisX: 0, axisY: 1, frequency, dampingRatio: 0.7, motorSpeed, maxMotorTorque: motorSpeed ? 5e7 : 0 })));
+    return { world, chassis, wheels, joints };
+  };
+
+  const soft = build(4);
+  for (let index = 0; index < 180; index += 1) soft.world.step(1 / 60);
+  for (const joint of soft.joints) {
+    const anchors = joint.worldAnchors();
+    const perpendicular = (anchors.bx - anchors.ax) * joint.perp.x + (anchors.by - anchors.ay) * joint.perp.y;
+    assert.ok(Math.abs(perpendicular) < 0.5, `the wheel stays on its axis (${perpendicular})`);
+    assert.ok(joint.translation < -0.5, `the chassis weight compresses the suspension (${joint.translation})`);
+  }
+  assert.ok(Math.abs(soft.chassis.angle) < 0.02 && Math.abs(soft.chassis.velocity.y) < 2, "the car rests level");
+
+  const rigid = build(0);
+  for (let index = 0; index < 180; index += 1) rigid.world.step(1 / 60);
+  for (const joint of rigid.joints) assert.ok(Math.abs(joint.translation) < 0.5, `frequency 0 is a rigid axle (${joint.translation})`);
+
+  const driving = build(4, 8);
+  const startX = driving.chassis.position.x;
+  for (let index = 0; index < 120; index += 1) driving.world.step(1 / 60);
+  assert.ok(driving.chassis.position.x - startX > 100, `the motor drives the car forward (${driving.chassis.position.x - startX})`);
+  assert.ok(Math.abs(driving.wheels[0].angularVelocity - 8) < 1, `wheels spin near motor speed (${driving.wheels[0].angularVelocity})`);
+  assert.ok(Math.abs(driving.chassis.angle) < 0.3, "the chassis does not flip");
+
+  const joint = soft.joints[0];
+  assert.equal(joint.setSpring(0).frequency, 0);
+  assert.equal(joint.setMotor(2, 10).maxMotorTorque, 10);
+  assert.throws(() => joint.setSpring(-1), /negative/);
+  assert.throws(() => joint.setSpring(2000), /1000 Hz/);
+  assert.throws(() => joint.setMotor(1, -1), /negative/);
+  assert.throws(() => new WheelJoint({ a: soft.chassis, b: soft.wheels[0], axisX: 0, axisY: 0 }), /axis/);
+  assert.throws(() => new WheelJoint({ a: soft.chassis, b: soft.wheels[0], x: Infinity }), /finite/);
+  // Same inputs, same results.
+  const again = build(4, 8);
+  for (let index = 0; index < 120; index += 1) again.world.step(1 / 60);
+  assert.equal(again.chassis.position.x, driving.chassis.position.x);
 });

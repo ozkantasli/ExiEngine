@@ -22,6 +22,7 @@ Content, authoring and game-feature release. Everything stays dependency-free.
   restitution, stable stacking, sensors, layers), `RevoluteJoint` (with motor), `WeldJoint`,
   `PrismaticJoint` (limits, motor), `DistanceJoint` (rod/rope),
   `RevoluteJoint` angle limits (`lowerAngle`/`upperAngle`, `setLimits`, `jointAngle`),
+  `WheelJoint` (vehicle suspension with a drive motor),
   damped springs and bungees through `DistanceJoint` `frequency`/`dampingRatio` (`setSpring`, `currentLength`),
   anti-tunneling (speculative contacts + substeps).
 - **Rendering:** `blur`, `glow`, `outline`, `pixelate`, `vignette` filters (`FILTER_TYPES`),
@@ -32,7 +33,8 @@ Content, authoring and game-feature release. Everything stays dependency-free.
 - **Multiplayer:** `RollbackSession`, transport-agnostic rollback netcode with desync detection.
 - **UI:** `Button`, `Slider`, `TextInput` (IME and mobile keyboards through a hidden input), `ScrollView`,
   `Checkbox`, `Dropdown`, `Stack` and `Grid` layout containers.
-- **Examples:** platformer (Tiled), top-down (A*, lighting), normal-mapped lighting, physics sandbox, UI menu, UI widgets;
+- **Examples:** platformer (Tiled), top-down (A*, lighting), normal-mapped lighting, physics sandbox (now with a drivable
+  car on wheel joints and a flipper with angle limits), UI menu, UI widgets;
   `npm run test:e2e:examples` drives them and the editor in Chromium.
 
 ### Changed
@@ -55,6 +57,9 @@ Content, authoring and game-feature release. Everything stays dependency-free.
 - A key, action, pointer or gamepad press was reported to every fixed step of a slow frame (toggles fired twice)
   and key/gamepad presses were dropped in frames that ran no fixed step; each press now reaches exactly one step.
 - `deserializeScene` placeholders now keep missing texture ids instead of rewriting them to `"white"`.
+- Demo, example, editor and soak pages declare an SVG favicon, so browsers no longer log a `/favicon.ico` 404 console error.
+- The editor Play-window browser test measured the fall from a position read after the player had already landed;
+  it now measures from the authored start height.
 
 ## [0.2.0]
 

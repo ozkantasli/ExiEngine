@@ -30,7 +30,7 @@ const inputs = {
   platformer: [["ArrowRight", 700], ["Space", 150], ["ArrowRight", 400]],
   "top-down": [["ArrowDown", 500], ["ArrowRight", 500]],
   "ui-menu": [["Tab", 80], ["Enter", 80]],
-  physics: [["Space", 80], ["Space", 80]],
+  physics: [["Space", 80], ["Space", 80], ["ArrowRight", 600], ["KeyF", 200]],
   lighting: [["ArrowLeft", 300], ["KeyH", 60], ["KeyN", 60], ["KeyN", 60]],
   "ui-widgets": [["KeyE", 60], ["KeyX", 60], ["KeyI", 60], ["Enter", 60], ["Tab", 60], ["ArrowRight", 60]],
 };
@@ -139,18 +139,21 @@ async function checkPlayWindow() {
     editor.on("pageerror", (error) => errors.push(`editor: ${error.message}`));
     await editor.goto(`${base}/editor/`);
     await editor.waitForFunction(() => window.editor?.engine?.running === true, null, { timeout: 10_000 });
-    await editor.evaluate(() => {
+    // The authored start height: the player can land within the first frames of the
+    // Play window, so the fall is measured from the document, not from a later read.
+    const startY = await editor.evaluate(() => {
       localStorage.clear();
       window.editor.load(window.editor.serialize());
       window.editor.select([0]); window.editor.setOption("data", { body: "static" });
       window.editor.select([1]); window.editor.setOption("data", { body: "dynamic" });
+      const find = (node) => node.options?.name === "player" ? node : (node.children || []).map(find).find(Boolean);
+      return find(window.editor.serialize().root).options.y;
     });
     const play = await context.newPage();
     play.on("pageerror", (error) => errors.push(`play: ${error.message}`));
     play.on("console", (message) => { if (message.type() === "error") errors.push(`play: ${message.text()}`); });
     await play.goto(`${base}/editor/play.html?name=scene`);
     await play.waitForFunction(() => window.play?.reloads > 0, null, { timeout: 10_000 });
-    const startY = await play.evaluate(() => window.play.engine.scene.findByName("player").position.y);
     await play.waitForTimeout(1_200);
     result.physics = await play.evaluate(([y]) => { const node = window.play.engine.scene.findByName("player"); return node.position.y > y && window.play.world.bodies.length === 2; }, [startY]);
     await editor.evaluate(() => { window.editor.select([3]); window.editor.setOption("text", "Edited live!"); });

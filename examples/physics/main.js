@@ -3,10 +3,11 @@
 // friction, restitution, a pyramid that stays standing, static ramps, a plank
 // bridge on revolute joints, a pendulum on a distance joint, a motorized
 // windmill (two welded blades on a revolute motor), a piston on a prismatic
-// joint with limits and a reversing motor, and
+// joint with limits and a reversing motor, a flipper on a revolute joint with
+// angle limits, a car on wheel joints (spring suspension, drive motor), and
 // RigidBody.node keeping Graphics nodes in sync. Passed to ExiEngine as
 // `physics`, so the engine steps it on its fixed timestep.
-import { Camera, DistanceJoint, ExiEngine, Graphics, PrismaticJoint, RevoluteJoint, RigidBody, RigidBodyWorld, Scene, Text, WeldJoint } from "../../src/index.js";
+import { Camera, DistanceJoint, ExiEngine, Graphics, PrismaticJoint, RevoluteJoint, RigidBody, RigidBodyWorld, Scene, Text, WeldJoint, WheelJoint } from "../../src/index.js";
 
 const WIDTH = 960;
 const HEIGHT = 540;
@@ -17,6 +18,13 @@ const world = new RigidBodyWorld({ gravityY: 980, iterations: 10 });
 let spawned = 0;
 let piston = null;
 let pistonTimer = 0;
+let flipper = null;
+let carWheels = [];
+let car = null;
+const DRIVE_SPEED = 12;
+const DRIVE_TORQUE = 2e7;
+// The arm alone needs ~8e7 to lift against gravity, a car on it ~2e8 more.
+const FLIP_TORQUE = 6e8;
 
 // Draws a body's shape around its center of mass so node rotation matches.
 function createBody(options, color) {
@@ -79,6 +87,19 @@ function buildLevel() {
   const platform = createBody({ shape: { type: "box", width: 70, height: 12 }, x: 880, y: HEIGHT - 70, friction: 0.9 }, 0xf59e0b);
   piston = world.addJoint(new PrismaticJoint({ a: base, b: platform, x: 880, y: HEIGHT - 70, axisX: 0, axisY: 1, lowerLimit: -150, upperLimit: 0, motorSpeed: -120, maxMotorForce: 5e7 }));
   pistonTimer = 0;
+  // A flipper: an arm hinged at its right end, kept between two angle limits.
+  // At rest it is a ramp the car can climb; F swings it up against the upper limit.
+  const flipperPivot = createBody({ shape: { type: "circle", radius: 6 }, x: 345, y: 484, static: true, isSensor: true }, 0x94a3b8);
+  const flipperArm = createBody({ shape: { type: "box", width: 90, height: 10 }, x: 300, y: 484, density: 2, friction: 0.9 }, 0xef4444);
+  flipper = world.addJoint(new RevoluteJoint({ a: flipperPivot, b: flipperArm, x: 345, y: 484, lowerAngle: -0.12, upperAngle: 0.7, motorSpeed: -4, maxMotorTorque: FLIP_TORQUE / 20 }));
+  // A car: a chassis on two wheel joints (spring suspension), driven by the arrow keys.
+  car = createBody({ shape: { type: "polygon", points: [0, 0, 110, 0, 110, -14, 80, -30, 30, -30, 0, -14] }, x: 90, y: 440, density: 1, friction: 0.5 }, 0x22c55e);
+  carWheels = [];
+  for (const offset of [-36, 36]) {
+    const wheel = createBody({ shape: { type: "circle", radius: 15 }, x: car.position.x + offset, y: 466, friction: 1.2 }, 0xcbd5e1);
+    world.addJoint(new WheelJoint({ a: car, b: wheel, axisX: 0, axisY: 1, frequency: 4, dampingRatio: 0.7, maxMotorTorque: DRIVE_TORQUE / 10 }));
+    carWheels.push(wheel);
+  }
   // A pyramid that stays standing until something hits it.
   for (let row = 0; row < 7; row += 1) {
     for (let index = 0; index < 7 - row; index += 1) {
@@ -107,7 +128,7 @@ const engine = await ExiEngine.create({
   camera,
   overlayScene: hud,
   physics: world,
-  inputActions: { slow: ["Space"], reset: ["KeyR"] },
+  inputActions: { slow: ["Space"], reset: ["KeyR"], flip: ["KeyF"], left: ["ArrowLeft", "KeyA"], right: ["ArrowRight", "KeyD"] },
   onUpdate(delta, currentEngine) {
     const input = currentEngine.input;
     if (!input) return;
@@ -117,6 +138,10 @@ const engine = await ExiEngine.create({
     }
     pistonTimer += delta;
     if (piston && pistonTimer > 1.6) { pistonTimer = 0; piston.setMotor(-piston.motorSpeed); }
+    if (flipper) flipper.setMotor(input.isActionDown("flip") ? 10 : -4, input.isActionDown("flip") ? FLIP_TORQUE : FLIP_TORQUE / 20);
+    const drive = (input.isActionDown("right") ? 1 : 0) - (input.isActionDown("left") ? 1 : 0);
+    // With no key held the motors act as a brake (target speed 0, low torque).
+    for (const joint of world.joints) if (joint instanceof WheelJoint) joint.setMotor(drive * DRIVE_SPEED, drive ? DRIVE_TORQUE : DRIVE_TORQUE / 10);
     if (input.wasActionPressed("slow")) { slowMotion = !slowMotion; currentEngine.setTimeScale(slowMotion ? 0.25 : 1); }
     if (input.wasActionPressed("reset")) buildLevel();
     label.setText(`${world.bodies.length} bodies · ${world.joints.length} joints · ${world.contacts.length} contacts${slowMotion ? " · slow motion" : ""}`);
@@ -124,4 +149,4 @@ const engine = await ExiEngine.create({
 });
 engine.start();
 
-window.game = { engine, scene, world, get piston() { return piston; } };
+window.game = { engine, scene, world, get piston() { return piston; }, get flipper() { return flipper; }, get car() { return car; }, get carWheels() { return carWheels; } };

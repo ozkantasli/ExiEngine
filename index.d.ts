@@ -841,7 +841,7 @@ export class RigidBodyWorld {
 }
 export function collideRigidBodies(a: RigidBody, b: RigidBody, manifold?: RigidContactManifold, margin?: number): RigidContactManifold | null;
 export const MAX_RIGID_JOINTS: number;
-export type RigidJointKind = RevoluteJoint | WeldJoint | PrismaticJoint | DistanceJoint;
+export type RigidJointKind = RevoluteJoint | WeldJoint | PrismaticJoint | WheelJoint | DistanceJoint;
 export class RevoluteJoint {
   readonly a: RigidBody; readonly b: RigidBody; readonly collideConnected: boolean; world: RigidBodyWorld | null;
   /** Target angular velocity of b relative to a (rad/s); used while maxMotorTorque > 0. */ motorSpeed: number;
@@ -870,6 +870,19 @@ export class PrismaticJoint {
   constructor(options: { a: RigidBody; b: RigidBody; x?: number; y?: number; axisX?: number; axisY?: number; lowerLimit?: number | null; upperLimit?: number | null; motorSpeed?: number; maxMotorForce?: number; collideConnected?: boolean });
   setLimits(lower?: number | null, upper?: number | null): this;
   setMotor(speed: number, maxForce?: number): this;
+  worldAnchors(): { ax: number; ay: number; bx: number; by: number };
+}
+/** A wheel on a suspension: b stays on an axis fixed in a's frame, held by a damped spring, and rotates freely (optionally motor-driven). x/y default to b's position, the axis to (0, 1). */
+export class WheelJoint {
+  readonly a: RigidBody; readonly b: RigidBody; readonly collideConnected: boolean; world: RigidBodyWorld | null;
+  /** Suspension spring in Hz (0 = rigid axle, max 1000; default 4). */ readonly frequency: number;
+  /** Suspension damping ratio (default 0.7, max 100). */ readonly dampingRatio: number;
+  /** Target angular velocity of b relative to a (rad/s); used while maxMotorTorque > 0. */ motorSpeed: number;
+  maxMotorTorque: number;
+  /** Signed offset of b's anchor from a's anchor along the axis (suspension travel). */ readonly translation: number;
+  constructor(options: { a: RigidBody; b: RigidBody; x?: number; y?: number; axisX?: number; axisY?: number; frequency?: number; dampingRatio?: number; motorSpeed?: number; maxMotorTorque?: number; collideConnected?: boolean });
+  setSpring(frequency: number, dampingRatio?: number): this;
+  setMotor(speed: number, maxTorque?: number): this;
   worldAnchors(): { ax: number; ay: number; bx: number; by: number };
 }
 export class DistanceJoint {
